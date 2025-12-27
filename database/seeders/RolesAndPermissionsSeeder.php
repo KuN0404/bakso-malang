@@ -1,0 +1,123 @@
+<?php
+
+namespace Database\Seeders;
+
+use Illuminate\Database\Seeder;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
+use App\Models\User;
+
+class RolesAndPermissionsSeeder extends Seeder
+{
+    public function run(): void
+    {
+        // Reset cached roles and permissions
+        app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
+
+        // Define all permissions (these are fixed/predefined)
+        $permissions = [
+            // Products
+            'view_products',
+            'create_products',
+            'edit_products',
+            'delete_products',
+            
+            // Categories
+            'view_categories',
+            'create_categories',
+            'edit_categories',
+            'delete_categories',
+            
+            // Modifiers
+            'view_modifiers',
+            'create_modifiers',
+            'edit_modifiers',
+            'delete_modifiers',
+            
+            // Transactions (POS)
+            'access_pos',
+            'create_transactions',
+            'view_transactions',
+            'view_own_transactions',
+            'cancel_transactions',
+            
+            // Shifts
+            'open_shift',
+            'close_shift',
+            'view_own_shifts',
+            'view_all_shifts',
+            'add_shift_expense',
+            
+            // Reports
+            'view_sales_reports',
+            'view_financial_reports',
+            'view_peak_hours_reports',
+            'view_cancellation_reports',
+            'export_reports',
+            
+            // Settings
+            'manage_settings',
+            'manage_printers',
+            'manage_payment_sources',
+            
+            // Users & Roles
+            'view_users',
+            'create_users',
+            'edit_users',
+            'delete_users',
+            'manage_roles',
+        ];
+
+        // Create all permissions
+        foreach ($permissions as $permission) {
+            Permission::firstOrCreate(['name' => $permission]);
+        }
+
+        // Create roles with default permissions
+        // Note: Users can have multiple roles (multi-role assignment feature)
+
+        // Super Admin - has all permissions
+        $superAdmin = Role::firstOrCreate(['name' => 'Super Admin']);
+        $superAdmin->syncPermissions($permissions);
+
+        // Manager - can manage products, view reports, manage shifts
+        $manager = Role::firstOrCreate(['name' => 'Manager']);
+        $manager->syncPermissions([
+            'view_products', 'create_products', 'edit_products',
+            'view_categories', 'create_categories', 'edit_categories',
+            'view_modifiers', 'create_modifiers', 'edit_modifiers',
+            'access_pos', 'view_transactions', 'cancel_transactions',
+            'open_shift', 'close_shift', 'view_own_shifts', 'view_all_shifts', 'add_shift_expense',
+            'view_sales_reports', 'view_financial_reports', 'view_peak_hours_reports', 'view_cancellation_reports', 'export_reports',
+            'manage_payment_sources',
+        ]);
+
+        // Kasir - can use POS, manage own shifts
+        $kasir = Role::firstOrCreate(['name' => 'Kasir']);
+        $kasir->syncPermissions([
+            'view_products',
+            'access_pos', 'create_transactions', 'view_own_transactions',
+            'open_shift', 'close_shift', 'view_own_shifts', 'add_shift_expense',
+        ]);
+
+        // Kitchen - can view orders (read-only for kitchen display)
+        $kitchen = Role::firstOrCreate(['name' => 'Kitchen']);
+        $kitchen->syncPermissions([
+            'view_transactions',
+        ]);
+
+        // Create default Super Admin user
+        $admin = User::firstOrCreate(
+            ['username' => 'admin'],
+            [
+                'name' => 'Super Admin',
+                'email' => 'admin@baksomalang.com',
+                'password' => bcrypt('password'),
+            ]
+        );
+        $admin->assignRole('Super Admin');
+
+        $this->command->info('Roles and permissions seeded successfully!');
+        $this->command->info('Default admin: admin / password');
+    }
+}
