@@ -61,11 +61,28 @@
     </style>
 </head>
 <body class="h-full bg-gray-100 antialiased">
-    <div class="flex h-screen">
+    <div x-data="{ sidebarOpen: false, showLogoutModal: false }" class="flex h-screen bg-gray-100">
+        
+        <!-- Mobile Backdrop -->
+        <div 
+            x-show="sidebarOpen" 
+            x-transition:enter="transition-opacity ease-linear duration-300"
+            x-transition:enter-start="opacity-0"
+            x-transition:enter-end="opacity-100"
+            x-transition:leave="transition-opacity ease-linear duration-300"
+            x-transition:leave-start="opacity-100"
+            x-transition:leave-end="opacity-0"
+            @click="sidebarOpen = false"
+            class="fixed inset-0 z-20 bg-black/50 lg:hidden"
+        ></div>
+
         <!-- Sidebar -->
-        <aside class="w-64 bg-sidebar flex flex-col">
+        <aside 
+            :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'"
+            class="fixed inset-y-0 left-0 z-30 w-64 bg-sidebar flex flex-col transform transition-transform duration-300 lg:static lg:translate-x-0"
+        >
             <!-- Logo -->
-            <div class="p-5 border-b border-sidebar-light">
+            <div class="p-5 border-b border-sidebar-light flex justify-between items-center">
                 <div class="flex items-center gap-3">
                     <div class="w-10 h-10 bg-white rounded-lg flex items-center justify-center">
                         <i data-lucide="soup" class="w-6 h-6 text-sidebar"></i>
@@ -75,6 +92,10 @@
                         <p class="text-blue-200 text-xs">Point of Sales</p>
                     </div>
                 </div>
+                <!-- Close Button (Mobile Only) -->
+                <button @click="sidebarOpen = false" class="lg:hidden text-blue-200 hover:text-white">
+                    <i data-lucide="x" class="w-6 h-6"></i>
+                </button>
             </div>
 
             <!-- Navigation -->
@@ -117,8 +138,6 @@
                     <i data-lucide="receipt" class="w-5 h-5"></i>
                     <span>Transaksi</span>
                 </a>
-
-
                 
                 <a href="{{ route('admin.shifts.index') }}" class="flex items-center gap-3 px-4 py-3 rounded-lg {{ request()->routeIs('admin.shifts.*') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
                     <i data-lucide="clock" class="w-5 h-5"></i>
@@ -160,15 +179,12 @@
                 </a>
             </nav>
 
-            <!-- Logout -->
+            <!-- Logout Button Trigger -->
             <div class="p-4 border-t border-sidebar-light">
-                <form action="{{ route('logout') }}" method="POST">
-                    @csrf
-                    <button type="submit" class="flex items-center gap-3 w-full px-4 py-3 rounded-lg bg-red-500/20 text-red-300 hover:bg-red-500/30 transition-colors">
-                        <i data-lucide="log-out" class="w-5 h-5"></i>
-                        <span>Logout</span>
-                    </button>
-                </form>
+                <button @click="showLogoutModal = true" type="button" class="flex items-center gap-3 w-full px-4 py-3 rounded-lg bg-red-500/20 text-red-300 hover:bg-red-500/30 transition-colors">
+                    <i data-lucide="log-out" class="w-5 h-5"></i>
+                    <span>Logout</span>
+                </button>
             </div>
         </aside>
 
@@ -177,23 +193,31 @@
             <!-- Header -->
             <header class="bg-white border-b px-6 py-4">
                 <div class="flex items-center justify-between">
-                    <div>
-                        <h2 class="text-xl font-bold text-gray-800">{{ $header ?? 'Dashboard' }}</h2>
-                        @if(isset($subtitle))
-                            <p class="text-gray-500 text-sm">{{ $subtitle }}</p>
-                        @endif
-                    </div>
                     <div class="flex items-center gap-4">
-                        <div class="flex items-center gap-2 text-gray-600">
+                        <!-- Hamburger Button -->
+                        <button @click="sidebarOpen = true" class="lg:hidden text-gray-500 hover:text-gray-700">
+                            <i data-lucide="menu" class="w-6 h-6"></i>
+                        </button>
+                        
+                        <div>
+                            <h2 class="text-xl font-bold text-gray-800">{{ $header ?? 'Dashboard' }}</h2>
+                            @if(isset($subtitle))
+                                <p class="text-gray-500 text-sm hidden sm:block">{{ $subtitle }}</p>
+                            @endif
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-4">
+                        <div class="hidden sm:flex items-center gap-2 text-gray-600">
                             <i data-lucide="calendar" class="w-4 h-4"></i>
                             <span>{{ now()->locale('id')->isoFormat('dddd, D MMMM Y') }}</span>
                         </div>
-                        <div class="h-8 w-px bg-gray-200"></div>
+                        <div class="h-8 w-px bg-gray-200 hidden sm:block"></div>
                         <div class="flex items-center gap-3">
                             <div class="w-9 h-9 bg-primary-100 rounded-full flex items-center justify-center">
                                 <i data-lucide="user" class="w-5 h-5 text-primary-600"></i>
                             </div>
-                            <div class="text-right">
+                            <div class="text-right hidden sm:block">
                                 <p class="text-sm font-medium text-gray-800">{{ auth()->user()->name }}</p>
                                 <p class="text-xs text-gray-500">{{ auth()->user()->roles->first()?->name ?? 'User' }}</p>
                             </div>
@@ -203,10 +227,56 @@
             </header>
 
             <!-- Content -->
-            <div class="flex-1 overflow-y-auto p-6 custom-scroll">
+            <div class="flex-1 overflow-y-auto p-4 sm:p-6 custom-scroll">
                 {{ $slot }}
             </div>
         </main>
+
+        <!-- Cool Logout Modal (Glassmorphism) -->
+        <div 
+            x-show="showLogoutModal" 
+            style="display: none;"
+            class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+        >
+            <div 
+                x-show="showLogoutModal"
+                x-transition:enter="transition ease-out duration-300"
+                x-transition:enter-start="opacity-0 scale-90"
+                x-transition:enter-end="opacity-100 scale-100"
+                x-transition:leave="transition ease-in duration-200"
+                x-transition:leave-start="opacity-100 scale-100"
+                x-transition:leave-end="opacity-0 scale-90"
+                @click.away="showLogoutModal = false"
+                class="bg-white/80 backdrop-blur-md rounded-2xl shadow-2xl p-8 max-w-sm w-full mx-4 border border-white/50 text-center"
+            >
+                <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <i data-lucide="log-out" class="w-8 h-8 text-red-600"></i>
+                </div>
+                
+                <h3 class="text-xl font-bold text-gray-800 mb-2">Konfirmasi Logout</h3>
+                <p class="text-gray-600 mb-6">Apakah Anda yakin ingin keluar dari aplikasi?</p>
+                
+                <div class="flex gap-3">
+                    <button 
+                        @click="showLogoutModal = false" 
+                        class="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl transition-colors"
+                    >
+                        Batal
+                    </button>
+                    
+                    <form action="{{ route('logout') }}" method="POST" class="flex-1">
+                        @csrf
+                        <button 
+                            type="submit" 
+                            class="w-full py-2.5 bg-red-600 hover:bg-red-700 text-white font-medium rounded-xl shadow-lg shadow-red-600/30 transition-colors"
+                        >
+                            Ya, Keluar
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
     </div>
 
     <!-- Toast Notifications -->

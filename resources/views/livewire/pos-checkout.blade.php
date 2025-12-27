@@ -1,5 +1,5 @@
-<div class="h-screen flex" 
-    x-data="{ showProductModal: false, selectedProduct: null }"
+<div class="fixed inset-0 w-full flex bg-gray-100 overflow-hidden" style="height: 100dvh;"
+    x-data="{ showProductModal: false, selectedProduct: null, showCartMobile: false }"
     @keydown.f1.window.prevent="$wire.openPaymentModal()"
     @keydown.f2.window.prevent="$wire.processPayment()"
     @keydown.f3.window.prevent="if(confirm('Hapus semua item?')) $wire.clearCart()"
@@ -7,7 +7,7 @@
     @keydown.escape.window="$wire.closePaymentModal(); $wire.closeReceiptModal(); $wire.set('showCloseShiftModal', false)">
     
     <!-- Left Panel: Products -->
-    <div class="flex-1 flex flex-col bg-gray-50">
+    <div class="flex-1 flex flex-col bg-gray-50 min-w-0 overflow-x-hidden">
         <!-- Header -->
         <header class="bg-white px-6 py-3 border-b flex justify-between items-center sticky top-0 z-20">
             <div class="flex items-center gap-3">
@@ -24,7 +24,7 @@
                 @if($this->todayShift)
                     <button wire:click="openHistoryModal" class="flex items-center gap-2 px-3 py-2 bg-gray-50 hover:bg-gray-100 rounded-lg text-gray-700 transition-colors border border-gray-200">
                         <i data-lucide="history" class="w-4 h-4 text-gray-500"></i>
-                        <span class="text-sm font-medium">Riwayat</span>
+                        <span class="text-sm font-medium hidden md:inline">Riwayat</span>
                         <span class="bg-green-100 text-green-700 text-xs py-0.5 px-2 rounded-full font-bold ml-1">
                             {{ $this->todayTransactions->count() }}
                         </span>
@@ -32,14 +32,14 @@
                     
                     <button wire:click="openReturnModal" class="flex items-center gap-2 px-3 py-2 bg-red-50 hover:bg-red-100 rounded-lg text-red-600 transition-colors border border-red-200">
                         <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
-                        <span class="text-sm font-medium">Retur</span>
+                        <span class="text-sm font-medium hidden md:inline">Retur</span>
                     </button>
                 @endif
 
                 @if($this->todayShift && $this->todayShift->status === 'open')
                     <button wire:click="openCloseShiftModal" class="flex items-center gap-2 px-3 py-2 bg-red-50 hover:bg-red-50 text-red-600 rounded-lg transition-colors border border-red-100">
                         <i data-lucide="power" class="w-4 h-4"></i>
-                        <span class="text-sm font-medium">Tutup Shift (F4)</span>
+                        <span class="text-sm font-medium hidden md:inline">Tutup Shift (F4)</span>
                     </button>
                 @endif
                 
@@ -91,8 +91,8 @@
         </div>
 
         <!-- Products Grid -->
-        <div class="flex-1 overflow-y-auto p-6 custom-scroll">
-            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+        <div class="flex-1 overflow-y-auto p-4 md:p-6 custom-scroll pb-24 lg:pb-6">
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
                 @forelse($this->products as $product)
                     <div 
                         wire:click="addToCart({{ $product->id }}, [])"
@@ -130,21 +130,56 @@
         </div>
 
         <!-- Shortcut hints -->
-        <div class="bg-gray-800 text-white px-6 py-2 flex gap-6 text-xs">
+        <div class="hidden lg:flex bg-gray-800 text-white px-6 py-2 gap-6 text-xs">
             <span><kbd class="px-2 py-1 bg-gray-700 rounded">F1</kbd> Bayar</span>
             <span><kbd class="px-2 py-1 bg-gray-700 rounded">F2</kbd> Proses</span>
             <span><kbd class="px-2 py-1 bg-gray-700 rounded">F3</kbd> Hapus</span>
             <span><kbd class="px-2 py-1 bg-gray-700 rounded">F4</kbd> Tutup Shift</span>
             <span><kbd class="px-2 py-1 bg-gray-700 rounded">Esc</kbd> Tutup Modal</span>
         </div>
+        <!-- Mobile Sticky Bottom Bar -->
+        <div class="lg:hidden bg-white border-t p-4 px-6 flex justify-between items-center sticky bottom-0 z-30 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
+            <div>
+                <p class="text-xs text-gray-500">Total Tagihan</p>
+                <p class="text-xl font-bold text-primary-600">Rp {{ number_format($this->total, 0, ',', '.') }}</p>
+            </div>
+            <button 
+                @click="showCartMobile = true"
+                class="flex items-center gap-2 px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-xl shadow-lg shadow-primary-500/30 transition-all active:scale-95"
+            >
+                <div class="relative">
+                    <i data-lucide="shopping-cart" class="w-5 h-5"></i>
+                    @if(count($cart) > 0)
+                        <span class="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold border border-white">
+                            {{ count($cart) }}
+                        </span>
+                    @endif
+                </div>
+                <span>Keranjang</span>
+            </button>
+        </div>
     </div>
 
+    <!-- Mobile Cart Backdrop -->
+    <div 
+        x-show="showCartMobile"
+        x-transition.opacity
+        @click="showCartMobile = false"
+        class="fixed inset-0 z-40 bg-black/50 lg:hidden"
+    ></div>
+
     <!-- Right Panel: Cart -->
-    <div class="w-96 bg-white border-l flex flex-col">
+    <div 
+        :class="showCartMobile ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'"
+        class="fixed inset-y-0 right-0 z-50 w-full md:w-96 bg-white border-l flex flex-col transform transition-transform duration-300 lg:static lg:transform-none shadow-2xl lg:shadow-none"
+    >
         <!-- Cart Header -->
         <div class="p-4 border-b">
             <div class="flex items-center justify-between">
                 <h2 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+                    <button @click="showCartMobile = false" class="lg:hidden text-gray-500 hover:text-gray-700 mr-2">
+                        <i data-lucide="arrow-left" class="w-6 h-6"></i>
+                    </button>
                     <i data-lucide="shopping-cart" class="w-5 h-5"></i>
                     Keranjang
                 </h2>
