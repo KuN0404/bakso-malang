@@ -5,6 +5,7 @@ namespace App\Livewire\Admin;
 use App\Models\Category;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Rule;
+use Livewire\Attributes\Computed;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -25,17 +26,36 @@ class Categories extends Component
     #[Rule('nullable|max:50')]
     public string $icon = 'folder';
 
-    #[Rule('integer|min:0')]
     public int $sort_order = 0;
 
     public bool $is_active = true;
 
     public string $search = '';
 
+    // Cache lastSortOrder to avoid repeated queries
+    public ?int $cachedLastOrder = null;
+
+    public function getLastSortOrderProperty(): int
+    {
+        if ($this->cachedLastOrder === null) {
+            $this->cachedLastOrder = Category::max('sort_order') ?? 0;
+        }
+        return $this->cachedLastOrder;
+    }
+    
+    // Reset cache when data changes
+    public function refreshOrderCache(): void
+    {
+        $this->cachedLastOrder = null;
+    }
+
     public function create(): void
     {
         $this->reset(['editingId', 'name', 'description', 'icon', 'sort_order', 'is_active']);
         $this->icon = 'folder';
+        $this->is_active = true;
+        // Auto-fill with next sort order
+        $this->sort_order = $this->lastSortOrder + 1;
         $this->showModal = true;
     }
 
@@ -53,7 +73,26 @@ class Categories extends Component
 
     public function save(): void
     {
-        $this->validate();
+        // Custom validation for unique sort_order
+        $rules = [
+            'name' => 'required|min:2|max:100',
+            'description' => 'nullable|max:500',
+            'icon' => 'nullable|max:50',
+            'sort_order' => 'required|integer|min:0',
+            'is_active' => 'boolean',
+        ];
+        
+        $this->validate($rules);
+        
+        // Check unique sort_order (except current editing)
+        $existingOrder = Category::where('sort_order', $this->sort_order)
+            ->when($this->editingId, fn($q) => $q->where('id', '!=', $this->editingId))
+            ->exists();
+            
+        if ($existingOrder) {
+            $this->addError('sort_order', 'Urutan ini sudah digunakan oleh kategori lain.');
+            return;
+        }
 
         $data = [
             'name' => $this->name,
@@ -73,6 +112,7 @@ class Categories extends Component
 
         $this->showModal = false;
         $this->reset(['editingId', 'name', 'description', 'icon', 'sort_order', 'is_active']);
+        $this->refreshOrderCache();
     }
 
     public function delete(int $id): void
@@ -86,6 +126,7 @@ class Categories extends Component
 
         $category->delete();
         $this->dispatch('notify', type: 'success', message: 'Kategori berhasil dihapus');
+        $this->refreshOrderCache();
     }
 
     public function render()

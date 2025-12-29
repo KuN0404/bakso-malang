@@ -120,6 +120,57 @@
         document.addEventListener('livewire:navigated', () => {
             lucide.createIcons();
         });
+        
+        // Global Alpine.js Money Input Component
+        // Usage: x-data="moneyInput(initialValue, wireModel)"
+        document.addEventListener('alpine:init', () => {
+            Alpine.data('moneyInput', (initialValue = 0, wireModel = null) => ({
+                rawValue: initialValue,
+                formatted: '',
+                wireModel: wireModel,
+                
+                init() {
+                    this.formatted = this.rawValue > 0 ? this.formatNumber(this.rawValue) : '';
+                },
+                
+                formatNumber(num) {
+                    return new Intl.NumberFormat('id-ID').format(num || 0);
+                },
+                
+                parseNumber(str) {
+                    return parseInt(String(str).replace(/\./g, '').replace(/,/g, '') || 0);
+                },
+                
+                onInput(e) {
+                    const input = e.target;
+                    const cursorPos = input.selectionStart;
+                    const oldLen = this.formatted.length;
+                    
+                    // Get raw digits only
+                    const digits = this.formatted.replace(/\D/g, '');
+                    this.rawValue = parseInt(digits) || 0;
+                    this.formatted = this.rawValue > 0 ? this.formatNumber(this.rawValue) : '';
+                    
+                    // Adjust cursor position after formatting
+                    const newLen = this.formatted.length;
+                    const diff = newLen - oldLen;
+                    this.$nextTick(() => {
+                        const newPos = Math.max(0, cursorPos + diff);
+                        input.setSelectionRange(newPos, newPos);
+                    });
+                },
+                
+                syncToWire() {
+                    if (this.wireModel) {
+                        this.$wire.set(this.wireModel, this.rawValue);
+                    }
+                },
+                
+                getValue() {
+                    return this.rawValue;
+                }
+            }));
+        });
     </script>
 </body>
 </html>

@@ -68,10 +68,23 @@ class Roles extends Component
         $roles = Role::with('permissions')->withCount('users')->get();
         $permissions = Permission::orderBy('name')->get();
 
-        // Group permissions
-        $permissionGroups = $permissions->groupBy(function ($perm) {
-            return explode('_', $perm->name)[0] ?? 'other';
-        });
+        // Group permissions using config groups (Indonesian labels)
+        $configGroups = config('permissions.groups', []);
+        $permissionGroups = [];
+        
+        foreach ($configGroups as $groupName => $permNames) {
+            $groupPerms = $permissions->filter(fn($p) => in_array($p->name, $permNames));
+            if ($groupPerms->isNotEmpty()) {
+                $permissionGroups[$groupName] = $groupPerms;
+            }
+        }
+        
+        // Add any ungrouped permissions to 'Lainnya'
+        $allGroupedPerms = collect($configGroups)->flatten()->toArray();
+        $ungrouped = $permissions->filter(fn($p) => !in_array($p->name, $allGroupedPerms));
+        if ($ungrouped->isNotEmpty()) {
+            $permissionGroups['Lainnya'] = $ungrouped;
+        }
 
         return view('livewire.admin.roles', compact('roles', 'permissions', 'permissionGroups'))
             ->title('Role & Permission');

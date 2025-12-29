@@ -52,7 +52,17 @@
                             <button wire:click="edit({{ $source->id }})" class="p-2 text-gray-400 hover:text-primary-600 rounded-lg hover:bg-gray-100">
                                 <i data-lucide="edit" class="w-4 h-4"></i>
                             </button>
-                            <button wire:click="delete({{ $source->id }})" wire:confirm="Hapus metode ini?" class="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-gray-100">
+                            <button 
+                                @click="$dispatch('confirm-action', {
+                                    title: 'Hapus Metode Pembayaran',
+                                    message: 'Apakah Anda yakin ingin menghapus metode {{ $source->name }}?',
+                                    confirmText: 'Ya, Hapus',
+                                    type: 'danger',
+                                    action: { componentId: $wire.__instance.id, method: 'delete' },
+                                    params: {{ $source->id }}
+                                })"
+                                class="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-gray-100"
+                            >
                                 <i data-lucide="trash-2" class="w-4 h-4"></i>
                             </button>
                         </td>

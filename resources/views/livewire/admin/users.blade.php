@@ -52,7 +52,17 @@
                                 <i data-lucide="edit" class="w-4 h-4"></i>
                             </button>
                             @if($user->id !== auth()->id())
-                                <button wire:click="delete({{ $user->id }})" wire:confirm="Hapus user ini?" class="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-gray-100">
+                                <button 
+                                    @click="$dispatch('confirm-action', {
+                                        title: 'Hapus User',
+                                        message: 'Apakah Anda yakin ingin menghapus user {{ $user->name }}?',
+                                        confirmText: 'Ya, Hapus',
+                                        type: 'danger',
+                                        action: { componentId: $wire.__instance.id, method: 'delete' },
+                                        params: {{ $user->id }}
+                                    })"
+                                    class="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-gray-100"
+                                >
                                     <i data-lucide="trash-2" class="w-4 h-4"></i>
                                 </button>
                             @endif

@@ -5,11 +5,13 @@ namespace App\Livewire\Admin;
 use App\Models\Category;
 use App\Models\ModifierGroup;
 use App\Models\Product;
+use Intervention\Image\Laravel\Facades\Image;
 use Livewire\Attributes\Layout;
-use Livewire\Attributes\Rule;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 use Livewire\WithPagination;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 #[Layout('layouts.admin')]
 class Products extends Component
@@ -17,29 +19,18 @@ class Products extends Component
     use WithPagination, WithFileUploads;
 
     public bool $showModal = false;
+    public bool $showViewModal = false;
     public ?int $editingId = null;
+    public ?Product $selectedProduct = null;
 
-    #[Rule('required|exists:categories,id')]
     public ?int $category_id = null;
-
-    #[Rule('required|min:2|max:150')]
     public string $name = '';
-
-    #[Rule('required|max:50')]
     public string $sku = '';
-
-    #[Rule('nullable|max:500')]
     public ?string $description = '';
-
-    #[Rule('required|numeric|min:0')]
     public float $price = 0;
-
-    #[Rule('nullable|numeric|min:0')]
     public float $cost_price = 0;
-
-    #[Rule('nullable|image|max:2048')]
+    
     public $image;
-
     public ?string $existingImage = null;
 
     public bool $is_active = true;
@@ -52,10 +43,71 @@ class Products extends Component
     public string $search = '';
     public ?int $filterCategory = null;
 
+    /**
+     * Generate auto SKU based on timestamp and random string
+     */
+    public function generateSku(): string
+    {
+        $prefix = 'PRD';
+        $timestamp = now()->format('ymd');
+        $random = strtoupper(substr(uniqid(), -4));
+        return "{$prefix}{$timestamp}{$random}";
+    }
+
+    /**
+     * Convert and compress image to WebP format
+     * Optimized for POS product thumbnails
+     */
+    protected function processImage($uploadedImage): ?string
+    {
+        if (!$uploadedImage) {
+            return null;
+        }
+
+        // Generate unique filename
+        $filename = 'products/' . Str::uuid() . '.webp';
+        
+        // Read and process image with Intervention Image
+        $image = Image::read($uploadedImage->getRealPath());
+        
+        // Resize for product thumbnails (max 600px - optimal for POS display)
+        $image->scaleDown(width: 600, height: 600);
+        
+        // Encode to WebP with 75% quality (sweet spot: size vs quality)
+        // Results in ~20-50KB for most product photos
+        $encoded = $image->toWebp(quality: 75);
+        
+        // Store the processed image
+        Storage::disk('public')->put($filename, (string) $encoded);
+        
+        return $filename;
+    }
+
+    /**
+     * Delete old image from storage
+     */
+    protected function deleteOldImage(?string $imagePath): void
+    {
+        if ($imagePath && Storage::disk('public')->exists($imagePath)) {
+            Storage::disk('public')->delete($imagePath);
+        }
+    }
+
+    /**
+     * View product details
+     */
+    public function view(int $id): void
+    {
+        $this->selectedProduct = Product::with(['category', 'modifierGroups'])->findOrFail($id);
+        $this->showViewModal = true;
+    }
+
     public function create(): void
     {
         $this->reset(['editingId', 'name', 'sku', 'description', 'price', 'cost_price', 'image', 'existingImage', 'is_active', 'is_featured', 'track_stock', 'stock', 'category_id', 'selectedModifierGroups']);
         $this->is_active = true;
+        // Auto-fill SKU
+        $this->sku = $this->generateSku();
         $this->showModal = true;
     }
 
@@ -80,7 +132,26 @@ class Products extends Component
 
     public function save(): void
     {
-        $this->validate();
+        // Custom validation rules
+        $rules = [
+            'category_id' => 'required|exists:categories,id',
+            'name' => 'required|min:2|max:150',
+            'sku' => 'required|max:50|unique:products,sku' . ($this->editingId ? ",{$this->editingId}" : ''),
+            'description' => 'nullable|max:500',
+            'price' => 'required|numeric|min:0',
+            'cost_price' => 'nullable|numeric|min:0',
+            'image' => 'nullable|image|mimes:png,jpg,jpeg,svg|max:2048',
+        ];
+        
+        $messages = [
+            'sku.unique' => 'SKU ini sudah digunakan oleh produk lain.',
+            'sku.required' => 'SKU wajib diisi.',
+            'image.mimes' => 'Format gambar harus PNG, JPG, JPEG, atau SVG.',
+            'image.max' => 'Ukuran gambar maksimal 2MB.',
+            'image.image' => 'File harus berupa gambar.',
+        ];
+        
+        $this->validate($rules, $messages);
 
         $data = [
             'category_id' => $this->category_id,
@@ -95,8 +166,19 @@ class Products extends Component
             'stock' => $this->stock,
         ];
 
+        // Handle image upload
         if ($this->image) {
-            $data['image'] = $this->image->store('products', 'public');
+            // Process and convert to WebP
+            $newImagePath = $this->processImage($this->image);
+            
+            if ($newImagePath) {
+                // Delete old image if updating
+                if ($this->editingId && $this->existingImage) {
+                    $this->deleteOldImage($this->existingImage);
+                }
+                
+                $data['image'] = $newImagePath;
+            }
         }
 
         if ($this->editingId) {
@@ -116,8 +198,31 @@ class Products extends Component
 
     public function delete(int $id): void
     {
-        Product::findOrFail($id)->delete();
+        $product = Product::findOrFail($id);
+        
+        // Delete image first
+        $product->deleteImage();
+        
+        // Then delete product
+        $product->delete();
+        
         $this->dispatch('notify', type: 'success', message: 'Produk berhasil dihapus');
+    }
+
+    /**
+     * Remove existing image without deleting product
+     */
+    public function removeImage(): void
+    {
+        if ($this->editingId && $this->existingImage) {
+            $product = Product::find($this->editingId);
+            if ($product) {
+                $product->deleteImage();
+                $product->update(['image' => null]);
+                $this->existingImage = null;
+                $this->dispatch('notify', type: 'success', message: 'Gambar berhasil dihapus');
+            }
+        }
     }
 
     public function render()

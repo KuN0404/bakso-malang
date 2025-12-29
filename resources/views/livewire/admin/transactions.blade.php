@@ -57,7 +57,17 @@
                                 <i data-lucide="eye" class="w-4 h-4"></i>
                             </button>
                             @if($trx->status !== 'cancelled')
-                                <button wire:click="cancel({{ $trx->id }})" wire:confirm="Batalkan transaksi ini?" class="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-gray-100">
+                                <button 
+                                    @click="$dispatch('confirm-action', {
+                                        title: 'Batalkan Transaksi',
+                                        message: 'Apakah Anda yakin ingin membatalkan transaksi {{ $trx->invoice_number }}?',
+                                        confirmText: 'Ya, Batalkan',
+                                        type: 'danger',
+                                        action: { componentId: $wire.__instance.id, method: 'cancel' },
+                                        params: {{ $trx->id }}
+                                    })"
+                                    class="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-gray-100"
+                                >
                                     <i data-lucide="x-circle" class="w-4 h-4"></i>
                                 </button>
                             @endif

@@ -200,17 +200,17 @@
                         </button>
                         
                         <div>
-                            <h2 class="text-xl font-bold text-gray-800">{{ $header ?? 'Dashboard' }}</h2>
-                            @if(isset($subtitle))
-                                <p class="text-gray-500 text-sm hidden sm:block">{{ $subtitle }}</p>
-                            @endif
+                            <h2 class="text-xl font-bold text-gray-800">{{ $title ?? 'Dashboard' }}</h2>
                         </div>
                     </div>
 
                     <div class="flex items-center gap-4">
-                        <div class="hidden sm:flex items-center gap-2 text-gray-600">
+                        <div class="hidden sm:flex items-center gap-2 text-gray-600" x-data="realtimeClock()" x-init="startClock()">
                             <i data-lucide="calendar" class="w-4 h-4"></i>
                             <span>{{ now()->locale('id')->isoFormat('dddd, D MMMM Y') }}</span>
+                            <span class="text-gray-400">•</span>
+                            <i data-lucide="clock" class="w-4 h-4"></i>
+                            <span x-text="time" class="font-medium tabular-nums"></span>
                         </div>
                         <div class="h-8 w-px bg-gray-200 hidden sm:block"></div>
                         <div class="flex items-center gap-3">
@@ -307,9 +307,82 @@
                 }"
                 class="px-4 py-3 rounded-lg shadow-lg text-white font-medium flex items-center gap-2"
             >
-                <span x-text="notification.message"></span>
+            <span x-text="notification.message"></span>
             </div>
         </template>
+    </div>
+    
+    <!-- Global Confirm Modal -->
+    <div 
+        x-data="confirmModal()"
+        x-on:confirm-action.window="open($event.detail)"
+        x-show="isOpen"
+        x-cloak
+        class="fixed inset-0 z-[100] flex items-center justify-center p-4"
+    >
+        <!-- Backdrop -->
+        <div 
+            x-show="isOpen"
+            x-transition:enter="transition ease-out duration-200"
+            x-transition:enter-start="opacity-0"
+            x-transition:enter-end="opacity-100"
+            x-transition:leave="transition ease-in duration-150"
+            x-transition:leave-start="opacity-100"
+            x-transition:leave-end="opacity-0"
+            @click="cancel()"
+            class="absolute inset-0 bg-black/50"
+        ></div>
+        
+        <!-- Modal -->
+        <div 
+            x-show="isOpen"
+            x-transition:enter="transition ease-out duration-200"
+            x-transition:enter-start="opacity-0 scale-95"
+            x-transition:enter-end="opacity-100 scale-100"
+            x-transition:leave="transition ease-in duration-150"
+            x-transition:leave-start="opacity-100 scale-100"
+            x-transition:leave-end="opacity-0 scale-95"
+            class="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden"
+        >
+            <!-- Header with Icon -->
+            <div class="p-6 pb-2 text-center">
+                <div 
+                    class="w-16 h-16 mx-auto rounded-full flex items-center justify-center mb-4"
+                    :class="type === 'danger' ? 'bg-red-100' : 'bg-yellow-100'"
+                >
+                    <svg 
+                        class="w-8 h-8" 
+                        :class="type === 'danger' ? 'text-red-600' : 'text-yellow-600'"
+                        fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                    >
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                    </svg>
+                </div>
+                <h3 class="text-xl font-bold text-gray-800" x-text="title"></h3>
+            </div>
+            
+            <!-- Body -->
+            <div class="px-6 pb-4 text-center">
+                <p class="text-gray-600" x-text="message"></p>
+            </div>
+            
+            <!-- Footer -->
+            <div class="p-4 bg-gray-50 flex gap-3">
+                <button 
+                    @click="cancel()"
+                    class="flex-1 py-2.5 px-4 bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium rounded-xl transition-colors"
+                >
+                    Batal
+                </button>
+                <button 
+                    @click="confirm()"
+                    class="flex-1 py-2.5 px-4 font-medium rounded-xl transition-colors"
+                    :class="type === 'danger' ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-primary-600 hover:bg-primary-700 text-white'"
+                    x-text="confirmText"
+                >
+                </button>
+            </div>
+        </div>
     </div>
     
     <!-- Livewire Scripts -->
@@ -322,6 +395,158 @@
         // Re-initialize on Livewire navigation
         document.addEventListener('livewire:navigated', () => {
             lucide.createIcons();
+        });
+        
+        // Global Alpine.js Money Input Component
+        // Usage: x-data="moneyInput(initialValue, wireModel)"
+        document.addEventListener('alpine:init', () => {
+            Alpine.data('moneyInput', (initialValue = 0, wireModel = null) => ({
+                rawValue: initialValue,
+                formatted: '',
+                wireModel: wireModel,
+                
+                init() {
+                    this.formatted = this.rawValue > 0 ? this.formatNumber(this.rawValue) : '';
+                },
+                
+                formatNumber(num) {
+                    return new Intl.NumberFormat('id-ID').format(num || 0);
+                },
+                
+                parseNumber(str) {
+                    return parseInt(String(str).replace(/\./g, '').replace(/,/g, '') || 0);
+                },
+                
+                onInput(e) {
+                    const input = e.target;
+                    const cursorPos = input.selectionStart;
+                    const oldLen = this.formatted.length;
+                    
+                    // Get raw digits only
+                    const digits = this.formatted.replace(/\D/g, '');
+                    this.rawValue = parseInt(digits) || 0;
+                    this.formatted = this.rawValue > 0 ? this.formatNumber(this.rawValue) : '';
+                    
+                    // Adjust cursor position after formatting
+                    const newLen = this.formatted.length;
+                    const diff = newLen - oldLen;
+                    this.$nextTick(() => {
+                        const newPos = Math.max(0, cursorPos + diff);
+                        input.setSelectionRange(newPos, newPos);
+                    });
+                },
+                
+                syncToWire() {
+                    if (this.wireModel) {
+                        this.$wire.set(this.wireModel, this.rawValue);
+                    }
+                },
+                
+                getValue() {
+                    return this.rawValue;
+                }
+            }));
+            
+            // Icon Dropdown Component for Categories
+            Alpine.data('iconDropdown', (initialName = 'folder', initialLabel = 'Lainnya') => ({
+                open: false,
+                selectedName: initialName,
+                selectedLabel: initialLabel,
+                
+                init() {
+                    this.$nextTick(() => lucide.createIcons());
+                },
+                
+                toggleDropdown() {
+                    this.open = !this.open;
+                    if (this.open) {
+                        this.$nextTick(() => lucide.createIcons());
+                    }
+                },
+                
+                selectIcon(name, label) {
+                    this.selectedName = name;
+                    this.selectedLabel = label;
+                    this.open = false;
+                    this.$wire.set('icon', name, false);
+                    
+                    // Update the icon in the button
+                    const iconContainer = this.$refs.iconContainer;
+                    if (iconContainer) {
+                        iconContainer.innerHTML = `<i data-lucide="${name}" class="w-4 h-4 text-primary-600"></i>`;
+                        lucide.createIcons({ nodes: iconContainer.querySelectorAll('[data-lucide]') });
+                    }
+                }
+            }));
+            
+            // Confirm Modal Component
+            Alpine.data('confirmModal', () => ({
+                isOpen: false,
+                title: 'Konfirmasi',
+                message: 'Apakah Anda yakin?',
+                confirmText: 'Ya, Lanjutkan',
+                type: 'danger',
+                action: null,
+                actionParams: null,
+                
+                open(detail) {
+                    this.title = detail.title || 'Konfirmasi';
+                    this.message = detail.message || 'Apakah Anda yakin?';
+                    this.confirmText = detail.confirmText || 'Ya, Lanjutkan';
+                    this.type = detail.type || 'danger';
+                    this.action = detail.action || null;
+                    this.actionParams = detail.params || null;
+                    this.isOpen = true;
+                },
+                
+                cancel() {
+                    this.isOpen = false;
+                    this.action = null;
+                    this.actionParams = null;
+                },
+                
+                confirm() {
+                    if (this.action) {
+                        // Dispatch Livewire action
+                        const wire = Livewire.find(this.action.componentId);
+                        if (wire) {
+                            if (this.actionParams !== null) {
+                                wire.call(this.action.method, this.actionParams);
+                            } else {
+                                wire.call(this.action.method);
+                            }
+                        }
+                    }
+                    this.isOpen = false;
+                    this.action = null;
+                    this.actionParams = null;
+                }
+            }));
+            
+            // Realtime Clock Component
+            Alpine.data('realtimeClock', () => ({
+                time: '',
+                interval: null,
+                
+                startClock() {
+                    this.updateTime();
+                    this.interval = setInterval(() => this.updateTime(), 1000);
+                },
+                
+                updateTime() {
+                    const now = new Date();
+                    const hours = String(now.getHours()).padStart(2, '0');
+                    const minutes = String(now.getMinutes()).padStart(2, '0');
+                    const seconds = String(now.getSeconds()).padStart(2, '0');
+                    this.time = `${hours}:${minutes}:${seconds}`;
+                },
+                
+                destroy() {
+                    if (this.interval) {
+                        clearInterval(this.interval);
+                    }
+                }
+            }));
         });
     </script>
 </body>

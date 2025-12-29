@@ -56,6 +56,10 @@ class PosCheckout extends Component
     public string $returnReason = '';
     public string $returnNotes = '';
     
+    // Unclosed Shift Blocking
+    public bool $showUnclosedShiftModal = false;
+    public ?int $unclosedShiftId = null;
+    
     public function openHistoryModal()
     {
         $this->showHistoryModal = true;
@@ -227,6 +231,16 @@ class PosCheckout extends Component
     {
         return Shift::where('user_id', auth()->id())
             ->whereDate('started_at', today())
+            ->first();
+    }
+
+    #[Computed]
+    public function unclosedPreviousShift(): ?Shift
+    {
+        return Shift::where('user_id', auth()->id())
+            ->where('status', 'open')
+            ->whereDate('started_at', '<', today())
+            ->with('transactions')
             ->first();
     }
 
@@ -562,6 +576,70 @@ class PosCheckout extends Component
         $this->showCloseShiftModal = false;
         $this->dispatch('notify', type: 'success', message: 'Shift berhasil ditutup');
         $this->dispatch('print-shift-receipt');
+    }
+
+    public function openClosePreviousShiftModal(): void
+    {
+        $shift = $this->unclosedPreviousShift;
+        if (!$shift) {
+            return;
+        }
+        
+        $this->unclosedShiftId = $shift->id;
+        $this->openingCash = 0;
+        $this->actualCash = 0;
+        $this->closeNotes = '';
+        $this->expenses = [];
+        $this->showUnclosedShiftModal = true;
+    }
+
+    public function closePreviousShift(): void
+    {
+        $shift = Shift::find($this->unclosedShiftId);
+        if (!$shift || $shift->user_id !== auth()->id()) {
+            $this->dispatch('notify', type: 'error', message: 'Shift tidak ditemukan');
+            return;
+        }
+
+        DB::transaction(function () use ($shift) {
+            // Update opening cash
+            $shift->opening_cash = $this->openingCash;
+
+            // Add expenses
+            $totalExpenses = 0;
+            foreach ($this->expenses as $expense) {
+                if (!empty($expense['description']) && $expense['amount'] > 0) {
+                    $shift->expenses()->create([
+                        'description' => $expense['description'],
+                        'amount' => $expense['amount'],
+                        'category' => 'operational',
+                    ]);
+                    $totalExpenses += $expense['amount'];
+                }
+            }
+
+            // Calculate expected cash
+            $cashSales = $shift->transactions()
+                ->where('status', 'completed')
+                ->where('payment_method', 'cash')
+                ->sum('total');
+
+            $expectedCash = $this->openingCash + $cashSales - $totalExpenses;
+
+            // Close shift with late closure flag
+            $shift->update([
+                'ended_at' => now(),
+                'actual_cash' => $this->actualCash,
+                'expected_cash' => $expectedCash,
+                'cash_difference' => $this->actualCash - $expectedCash,
+                'close_notes' => $this->closeNotes . ' [DITUTUP TERLAMBAT]',
+                'status' => 'closed',
+            ]);
+        });
+
+        $this->showUnclosedShiftModal = false;
+        $this->unclosedShiftId = null;
+        $this->dispatch('notify', type: 'success', message: 'Shift sebelumnya berhasil ditutup. Anda bisa mulai transaksi.');
     }
 
     protected function generateCartKey(int $productId, array $modifiers): string

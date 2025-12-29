@@ -24,7 +24,7 @@
                             </div>
                             <div class="flex gap-1">
                                 <button wire:click.stop="editGroup({{ $group->id }})" class="p-1.5 text-gray-400 hover:text-primary-600 rounded"><i data-lucide="edit" class="w-4 h-4"></i></button>
-                                <button wire:click.stop="deleteGroup({{ $group->id }})" wire:confirm="Hapus grup ini?" class="p-1.5 text-gray-400 hover:text-red-600 rounded"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                                <button @click.stop="$dispatch('confirm-action', { title: 'Hapus Grup', message: 'Hapus grup {{ $group->name }}?', confirmText: 'Ya, Hapus', type: 'danger', action: { componentId: $wire.__instance.id, method: 'deleteGroup' }, params: {{ $group->id }} })" class="p-1.5 text-gray-400 hover:text-red-600 rounded"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
                             </div>
                         </div>
                     </div>
@@ -74,7 +74,7 @@
                                     <span class="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full">Nonaktif</span>
                                 @endif
                                 <button wire:click="editModifier({{ $mod->id }})" class="p-1.5 text-gray-400 hover:text-primary-600 rounded"><i data-lucide="edit" class="w-4 h-4"></i></button>
-                                <button wire:click="deleteModifier({{ $mod->id }})" wire:confirm="Hapus modifier ini?" class="p-1.5 text-gray-400 hover:text-red-600 rounded"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                                <button @click="$dispatch('confirm-action', { title: 'Hapus Modifier', message: 'Hapus modifier {{ $mod->name }}?', confirmText: 'Ya, Hapus', type: 'danger', action: { componentId: $wire.__instance.id, method: 'deleteModifier' }, params: {{ $mod->id }} })" class="p-1.5 text-gray-400 hover:text-red-600 rounded"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
                             </div>
                         </div>
                     @empty
@@ -144,9 +144,17 @@
                         <input type="text" wire:model="modifierName" class="w-full px-4 py-2 border border-gray-200 rounded-lg" placeholder="Level 1">
                         @error('modifierName') <p class="text-red-500 text-sm mt-1">{{ $message }}</p> @enderror
                     </div>
-                    <div>
+                    <div x-data="moneyInput({{ $priceAdjustment }}, 'priceAdjustment')">
                         <label class="block text-sm font-medium text-gray-700 mb-1">Tambahan Harga</label>
-                        <input type="number" wire:model="priceAdjustment" class="w-full px-4 py-2 border border-gray-200 rounded-lg" placeholder="0">
+                        <input 
+                            type="text"
+                            inputmode="numeric"
+                            x-model="formatted"
+                            @input="onInput($event)"
+                            @blur="syncToWire()"
+                            class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+                            placeholder="0"
+                        >
                     </div>
                     <label class="inline-flex items-center gap-2">
                         <input type="checkbox" wire:model="modifierIsActive" class="w-4 h-4 text-primary-600 border-gray-300 rounded">

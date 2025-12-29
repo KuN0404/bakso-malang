@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Storage;
 
 class Product extends Model
 {
@@ -33,6 +34,41 @@ class Product extends Model
         'track_stock' => 'boolean',
         'stock' => 'integer',
     ];
+
+    /**
+     * Boot method for model events
+     */
+    protected static function boot()
+    {
+        parent::boot();
+
+        // Delete image when product is force deleted
+        static::forceDeleting(function ($product) {
+            $product->deleteImage();
+        });
+    }
+
+    /**
+     * Delete the product image from storage
+     */
+    public function deleteImage(): bool
+    {
+        if ($this->image && Storage::disk('public')->exists($this->image)) {
+            return Storage::disk('public')->delete($this->image);
+        }
+        return false;
+    }
+
+    /**
+     * Get the full image URL
+     */
+    public function getImageUrlAttribute(): ?string
+    {
+        if ($this->image) {
+            return Storage::disk('public')->url($this->image);
+        }
+        return null;
+    }
 
     public function category(): BelongsTo
     {

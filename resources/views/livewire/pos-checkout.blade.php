@@ -1,11 +1,234 @@
 <div class="fixed inset-0 w-full flex bg-gray-100 overflow-hidden" style="height: 100dvh;"
-    x-data="{ showProductModal: false, selectedProduct: null, showCartMobile: false }"
+    x-data="{
+        showProductModal: false, 
+        selectedProduct: null, 
+        showCartMobile: false,
+        // Modifier selection
+        showModifierModal: false,
+        modifierProduct: null,
+        selectedModifiers: {},
+        modifierTotal: 0,
+        
+        openModifierModal(product) {
+            this.modifierProduct = product;
+            this.selectedModifiers = {};
+            this.modifierTotal = 0;
+            // Set defaults for single selection groups (first option)
+            if (product.modifier_groups) {
+                product.modifier_groups.forEach(group => {
+                    if (group.selection_type === 'single' && group.modifiers && group.modifiers.length > 0) {
+                        this.selectModifier(group.id, group.modifiers[0], 'single');
+                    }
+                });
+            }
+            this.showModifierModal = true;
+        },
+        selectModifier(groupId, modifier, selectionType) {
+            if (selectionType === 'single') {
+                this.selectedModifiers[groupId] = [modifier];
+            } else {
+                if (!this.selectedModifiers[groupId]) {
+                    this.selectedModifiers[groupId] = [];
+                }
+                const index = this.selectedModifiers[groupId].findIndex(m => m.id === modifier.id);
+                if (index > -1) {
+                    this.selectedModifiers[groupId].splice(index, 1);
+                } else {
+                    this.selectedModifiers[groupId].push(modifier);
+                }
+            }
+            this.calculateModifierTotal();
+        },
+        isModifierSelected(groupId, modifierId) {
+            if (!this.selectedModifiers[groupId]) return false;
+            return this.selectedModifiers[groupId].some(m => m.id === modifierId);
+        },
+        calculateModifierTotal() {
+            let total = 0;
+            Object.values(this.selectedModifiers).forEach(modifiers => {
+                modifiers.forEach(m => {
+                    total += Number(m.price_adjustment) || 0;
+                });
+            });
+            this.modifierTotal = total;
+        },
+        formatRupiah(num) {
+            return new Intl.NumberFormat('id-ID').format(Number(num) || 0);
+        },
+        getTotalPrice() {
+            return (Number(this.modifierProduct?.price) || 0) + (Number(this.modifierTotal) || 0);
+        },
+        getModifiersForCart() {
+            const result = {};
+            Object.values(this.selectedModifiers).forEach(modifiers => {
+                modifiers.forEach(m => {
+                    result[m.id] = { name: m.name, price: Number(m.price_adjustment) || 0 };
+                });
+            });
+            return result;
+        },
+        addWithModifiers() {
+            if (this.modifierProduct) {
+                $wire.addToCart(this.modifierProduct.id, this.getModifiersForCart());
+                this.showModifierModal = false;
+                this.modifierProduct = null;
+                this.selectedModifiers = {};
+            }
+        }
+    }"
     @keydown.f1.window.prevent="$wire.openPaymentModal()"
     @keydown.f2.window.prevent="$wire.processPayment()"
     @keydown.f3.window.prevent="if(confirm('Hapus semua item?')) $wire.clearCart()"
     @keydown.f4.window.prevent="$wire.openCloseShiftModal()"
-    @keydown.escape.window="$wire.closePaymentModal(); $wire.closeReceiptModal(); $wire.set('showCloseShiftModal', false)">
+    @keydown.escape.window="$wire.closePaymentModal(); $wire.closeReceiptModal(); $wire.set('showCloseShiftModal', false); showModifierModal = false">
     
+    <!-- Unclosed Previous Shift Blocking Modal -->
+    @if($this->unclosedPreviousShift && !$showUnclosedShiftModal)
+        <div class="fixed inset-0 bg-black/70 z-[100] flex items-center justify-center p-4">
+            <div class="bg-white rounded-2xl w-full max-w-lg shadow-2xl">
+                <div class="p-6 border-b bg-red-50 rounded-t-2xl">
+                    <div class="flex items-center gap-3 text-red-600">
+                        <div class="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
+                            <i data-lucide="alert-triangle" class="w-6 h-6"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-xl font-bold">Shift Belum Ditutup</h3>
+                            <p class="text-sm text-red-500">Anda harus menutup shift sebelumnya</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="p-6 space-y-4">
+                    <div class="bg-gray-50 rounded-xl p-4">
+                        <div class="grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                                <p class="text-gray-500">Tanggal Shift</p>
+                                <p class="font-bold text-gray-800">{{ $this->unclosedPreviousShift->started_at->format('d/m/Y') }}</p>
+                            </div>
+                            <div>
+                                <p class="text-gray-500">Jam Mulai</p>
+                                <p class="font-bold text-gray-800">{{ $this->unclosedPreviousShift->started_at->format('H:i') }}</p>
+                            </div>
+                            <div>
+                                <p class="text-gray-500">Total Transaksi</p>
+                                <p class="font-bold text-gray-800">{{ $this->unclosedPreviousShift->transactions->count() }} transaksi</p>
+                            </div>
+                            <div>
+                                <p class="text-gray-500">Total Penjualan</p>
+                                <p class="font-bold text-primary-600">Rp {{ number_format($this->unclosedPreviousShift->transactions->sum('total'), 0, ',', '.') }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
+                        <p class="text-yellow-800 text-sm flex items-start gap-2">
+                            <i data-lucide="info" class="w-5 h-5 flex-shrink-0 mt-0.5"></i>
+                            <span>POS akan diblokir sampai shift ini ditutup. Silakan tutup shift atau hubungi Super Admin.</span>
+                        </p>
+                    </div>
+                </div>
+                
+                <div class="p-6 border-t bg-gray-50 rounded-b-2xl">
+                    <button 
+                        wire:click="openClosePreviousShiftModal"
+                        class="w-full py-4 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
+                    >
+                        <i data-lucide="clock" class="w-5 h-5"></i>
+                        Tutup Shift Sekarang
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
+    
+    <!-- Unclosed Shift Close Form Modal -->
+    @if($showUnclosedShiftModal)
+        <div class="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center overflow-y-auto py-8">
+            <div class="bg-white rounded-2xl w-full max-w-lg mx-4 shadow-2xl max-h-[90vh] flex flex-col">
+                <div class="p-6 border-b flex-none">
+                    <div class="flex justify-between items-center">
+                        <h3 class="text-xl font-bold text-gray-800 flex items-center gap-2">
+                            <i data-lucide="clock" class="w-6 h-6 text-red-600"></i>
+                            Tutup Shift {{ \App\Models\Shift::find($unclosedShiftId)?->started_at?->format('d/m/Y') }}
+                        </h3>
+                    </div>
+                    <p class="text-sm text-red-500 mt-1">Shift ini akan ditandai sebagai "Ditutup Terlambat"</p>
+                </div>
+                <div class="p-6 space-y-4 overflow-y-auto flex-1 custom-scroll">
+                    <!-- Summary -->
+                    @php $unclosedShift = \App\Models\Shift::with('transactions')->find($unclosedShiftId); @endphp
+                    @if($unclosedShift)
+                        <div class="bg-blue-50 rounded-lg p-4">
+                            <p class="text-sm text-blue-600">Penjualan Shift Ini</p>
+                            <p class="text-2xl font-bold text-blue-700">Rp {{ number_format($unclosedShift->transactions->sum('total'), 0, ',', '.') }}</p>
+                            <p class="text-sm text-blue-600 mt-1">{{ $unclosedShift->transactions->count() }} transaksi</p>
+                        </div>
+                    @endif
+
+                    <!-- Opening Cash -->
+                    <div x-data="moneyInput({{ $openingCash }}, 'openingCash')">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Modal Awal (Cash)</label>
+                        <input 
+                            type="text" 
+                            inputmode="numeric"
+                            x-model="formatted"
+                            @input="onInput($event)"
+                            @blur="syncToWire()"
+                            class="w-full px-4 py-3 border border-gray-200 rounded-lg text-lg focus:ring-2 focus:ring-primary-500" 
+                            placeholder="0"
+                        >
+                    </div>
+
+                    <!-- Expenses -->
+                    <div>
+                        <div class="flex items-center justify-between mb-2">
+                            <label class="block text-sm font-medium text-gray-700">Pengeluaran</label>
+                            <button type="button" wire:click="addExpense" class="text-primary-600 text-sm font-medium flex items-center gap-1">
+                                <i data-lucide="plus" class="w-4 h-4"></i> Tambah
+                            </button>
+                        </div>
+                        @foreach($expenses as $index => $expense)
+                            <div class="flex gap-2 mb-2" wire:key="prev-expense-{{ $index }}">
+                                <input type="text" wire:model="expenses.{{ $index }}.description" class="flex-1 px-3 py-2 border border-gray-200 rounded-lg" placeholder="Keterangan">
+                                <input type="number" wire:model="expenses.{{ $index }}.amount" class="w-28 px-3 py-2 border border-gray-200 rounded-lg" placeholder="Jumlah">
+                                <button wire:click="removeExpense({{ $index }})" class="p-2 text-red-500 hover:bg-red-50 rounded-lg">
+                                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                </button>
+                            </div>
+                        @endforeach
+                    </div>
+
+                    <!-- Actual Cash -->
+                    <div x-data="moneyInput({{ $actualCash }}, 'actualCash')">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Uang Fisik di Laci</label>
+                        <input 
+                            type="text" 
+                            inputmode="numeric"
+                            x-model="formatted"
+                            @input="onInput($event)"
+                            @blur="syncToWire()"
+                            class="w-full px-4 py-3 border border-gray-200 rounded-lg text-lg focus:ring-2 focus:ring-primary-500" 
+                            placeholder="0"
+                        >
+                    </div>
+
+                    <!-- Notes -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Catatan</label>
+                        <textarea wire:model="closeNotes" rows="2" class="w-full px-4 py-2 border border-gray-200 rounded-lg" placeholder="Catatan opsional"></textarea>
+                    </div>
+                </div>
+                <div class="p-6 border-t bg-gray-50 flex gap-3 flex-none">
+                    <button wire:click="$set('showUnclosedShiftModal', false)" class="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl">Kembali</button>
+                    <button wire:click="closePreviousShift" class="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white font-medium rounded-xl flex items-center justify-center gap-2">
+                        <i data-lucide="check" class="w-5 h-5"></i>
+                        Tutup Shift
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
+
     <!-- Left Panel: Products -->
     <div class="flex-1 flex flex-col bg-gray-50 min-w-0 overflow-x-hidden">
         <!-- Header -->
@@ -94,11 +317,41 @@
         <div class="flex-1 overflow-y-auto p-4 md:p-6 custom-scroll pb-24 lg:pb-6">
             <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
                 @forelse($this->products as $product)
+                    @php
+                        $productData = [
+                            'id' => $product->id,
+                            'name' => $product->name,
+                            'price' => $product->price,
+                            'image' => $product->image ? asset('storage/' . $product->image) : null,
+                            'modifier_groups' => $product->modifierGroups->map(fn($g) => [
+                                'id' => $g->id,
+                                'name' => $g->name,
+                                'selection_type' => $g->selection_type,
+                                'is_required' => $g->is_required,
+                                'modifiers' => $g->activeModifiers->map(fn($m) => [
+                                    'id' => $m->id,
+                                    'name' => $m->name,
+                                    'price_adjustment' => $m->price_adjustment,
+                                ])->toArray()
+                            ])->toArray()
+                        ];
+                        $hasModifiers = $product->modifierGroups->count() > 0;
+                    @endphp
                     <div 
-                        wire:click="addToCart({{ $product->id }}, [])"
+                        @if($hasModifiers)
+                            @click="openModifierModal({{ json_encode($productData) }})"
+                        @else
+                            wire:click="addToCart({{ $product->id }}, [])"
+                        @endif
                         wire:key="product-{{ $product->id }}"
-                        class="bg-white rounded-xl p-4 shadow-sm hover:shadow-md transition-all cursor-pointer group border border-gray-100 hover:border-primary-300"
+                        class="bg-white rounded-xl p-4 shadow-sm hover:shadow-md transition-all cursor-pointer group border border-gray-100 hover:border-primary-300 relative"
                     >
+                        @if($hasModifiers)
+                            <div class="absolute top-2 right-2 bg-primary-500 text-white text-xs px-2 py-0.5 rounded-full flex items-center gap-1">
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+                                Opsi
+                            </div>
+                        @endif
                         @if($product->image)
                             <img src="{{ asset('storage/' . $product->image) }}" alt="{{ $product->name }}" class="w-full h-24 object-cover rounded-lg mb-3">
                         @else
@@ -126,6 +379,99 @@
                         <p class="text-sm mt-2">Pastikan ada produk aktif di database</p>
                     </div>
                 @endforelse
+            </div>
+        </div>
+
+        <!-- Modifier Selection Modal -->
+        <div 
+            x-show="showModifierModal" 
+            x-cloak
+            class="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4"
+            @click.self="showModifierModal = false"
+        >
+            <div 
+                x-show="showModifierModal"
+                x-transition:enter="transition ease-out duration-200"
+                x-transition:enter-start="opacity-0 scale-95"
+                x-transition:enter-end="opacity-100 scale-100"
+                class="bg-white rounded-2xl w-full max-w-md shadow-2xl max-h-[85vh] flex flex-col"
+                @click.stop
+            >
+                <!-- Header -->
+                <div class="p-4 border-b flex justify-between items-center flex-none">
+                    <div class="flex items-center gap-3">
+                        <template x-if="modifierProduct && modifierProduct.image">
+                            <img :src="modifierProduct.image" class="w-12 h-12 object-cover rounded-lg">
+                        </template>
+                        <template x-if="modifierProduct && !modifierProduct.image">
+                            <div class="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center">
+                                <svg class="w-6 h-6 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                            </div>
+                        </template>
+                        <div>
+                            <h3 class="font-bold text-gray-800" x-text="modifierProduct?.name"></h3>
+                            <p class="text-sm text-primary-600 font-medium">Rp <span x-text="formatRupiah(modifierProduct?.price)"></span></p>
+                        </div>
+                    </div>
+                    <button @click="showModifierModal = false" class="text-gray-400 hover:text-gray-600 p-2 hover:bg-gray-100 rounded-lg">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                </div>
+                
+                <!-- Modifier Options -->
+                <div class="p-4 overflow-y-auto flex-1 custom-scroll space-y-4">
+                    <template x-for="group in modifierProduct?.modifier_groups || []" :key="group.id">
+                        <div class="bg-gray-50 rounded-xl p-4">
+                            <div class="flex items-center justify-between mb-3">
+                                <h4 class="font-semibold text-gray-800" x-text="group.name"></h4>
+                                <span class="text-xs px-2 py-1 rounded-full" :class="group.selection_type === 'single' ? 'bg-blue-100 text-blue-600' : 'bg-green-100 text-green-600'" x-text="group.selection_type === 'single' ? 'Pilih 1' : 'Pilih banyak'"></span>
+                            </div>
+                            <div class="space-y-2">
+                                <template x-for="modifier in group.modifiers" :key="modifier.id">
+                                    <button 
+                                        type="button"
+                                        @click="selectModifier(group.id, modifier, group.selection_type)"
+                                        :class="isModifierSelected(group.id, modifier.id) ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-gray-200 bg-white hover:bg-gray-50'"
+                                        class="w-full flex items-center justify-between px-4 py-3 border rounded-lg transition-all"
+                                    >
+                                        <div class="flex items-center gap-3">
+                                            <span 
+                                                :class="isModifierSelected(group.id, modifier.id) ? 'bg-primary-500' : 'border-2 border-gray-300 bg-white'"
+                                                class="w-5 h-5 rounded-full flex items-center justify-center transition-all flex-shrink-0"
+                                            >
+                                                <svg x-show="isModifierSelected(group.id, modifier.id)" class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
+                                            </span>
+                                            <span class="font-medium" x-text="modifier.name"></span>
+                                        </div>
+                                        <span :class="modifier.price_adjustment > 0 ? 'text-primary-600' : 'text-gray-400'" class="text-sm font-medium">
+                                            <template x-if="Number(modifier.price_adjustment) > 0">
+                                                <span>+Rp <span x-text="formatRupiah(modifier.price_adjustment)"></span></span>
+                                            </template>
+                                            <template x-if="modifier.price_adjustment == 0">
+                                                <span>Gratis</span>
+                                            </template>
+                                        </span>
+                                    </button>
+                                </template>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+                
+                <!-- Footer -->
+                <div class="p-4 border-t bg-gray-50 flex-none rounded-b-2xl">
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="text-gray-600">Total Harga</span>
+                        <span class="text-xl font-bold text-primary-600">Rp <span x-text="formatRupiah(getTotalPrice())"></span></span>
+                    </div>
+                    <button 
+                        @click="addWithModifiers()"
+                        class="w-full py-4 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
+                    >
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+                        Tambah ke Keranjang
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -279,8 +625,8 @@
     <!-- Payment Modal -->
     @if($showPaymentModal)
         <div class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
-            <div class="bg-white rounded-2xl w-full max-w-lg mx-4 shadow-2xl">
-                <div class="p-6 border-b">
+            <div class="bg-white rounded-2xl w-full max-w-lg mx-4 shadow-2xl max-h-[90vh] flex flex-col">
+                <div class="p-6 border-b flex-none">
                     <div class="flex justify-between items-center">
                         <h3 class="text-xl font-bold text-gray-800 flex items-center gap-2">
                             <i data-lucide="wallet" class="w-6 h-6"></i>
@@ -292,7 +638,7 @@
                     </div>
                 </div>
 
-                <div class="p-6 space-y-6">
+                <div class="p-6 space-y-6 overflow-y-auto flex-1 custom-scroll">
                     <!-- Payment Method -->
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-3">Metode Pembayaran</label>
@@ -319,25 +665,74 @@
                     <!-- Paid Amount (for cash) -->
                     @php $selectedSource = $this->paymentSources->firstWhere('id', $paymentSourceId); @endphp
                     @if($selectedSource && $selectedSource->type === 'cash')
-                        <div>
+                        <div x-data="{
+                            rawValue: {{ $paidAmount }},
+                            formatted: '',
+                            init() {
+                                this.formatted = this.rawValue > 0 ? this.formatNumber(this.rawValue) : '';
+                            },
+                            formatNumber(num) {
+                                return new Intl.NumberFormat('id-ID').format(num || 0);
+                            },
+                            parseNumber(str) {
+                                return parseInt(String(str).replace(/\./g, '').replace(/,/g, '') || 0);
+                            },
+                            onInput(e) {
+                                const input = e.target;
+                                const cursorPos = input.selectionStart;
+                                const oldLen = this.formatted.length;
+                                
+                                // Get raw digits only
+                                const digits = this.formatted.replace(/\D/g, '');
+                                this.rawValue = parseInt(digits) || 0;
+                                this.formatted = this.rawValue > 0 ? this.formatNumber(this.rawValue) : '';
+                                
+                                // Adjust cursor position after formatting
+                                const newLen = this.formatted.length;
+                                const diff = newLen - oldLen;
+                                this.$nextTick(() => {
+                                    const newPos = Math.max(0, cursorPos + diff);
+                                    input.setSelectionRange(newPos, newPos);
+                                });
+                            },
+                            syncToWire() {
+                                $wire.set('paidAmount', this.rawValue);
+                            }
+                        }">
                             <label class="block text-sm font-medium text-gray-700 mb-2">Jumlah Bayar</label>
                             <input 
-                                type="number" 
-                                wire:model.live="paidAmount"
+                                type="text"
+                                inputmode="numeric"
+                                x-model="formatted"
+                                @input="onInput($event)"
+                                @blur="syncToWire()"
+                                @keyup.enter="syncToWire()"
                                 class="w-full px-4 py-3 border border-gray-200 rounded-xl text-xl font-bold text-center focus:ring-2 focus:ring-primary-500"
+                                placeholder="0"
                             >
                             
                             <!-- Quick amounts -->
                             <div class="grid grid-cols-4 gap-2 mt-3">
                                 @foreach([50000, 100000, 150000, 200000] as $amount)
                                     <button 
-                                        wire:click="setPaidAmount({{ $amount }})"
+                                        type="button"
+                                        @click="rawValue = {{ $amount }}; formatted = formatNumber({{ $amount }}); $wire.set('paidAmount', {{ $amount }})"
                                         class="py-2 px-3 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium"
                                     >
                                         {{ number_format($amount / 1000) }}rb
                                     </button>
                                 @endforeach
                             </div>
+
+                            <!-- Warning if paid < total -->
+                            @if($paidAmount > 0 && $paidAmount < $this->total)
+                                <div class="mt-4 bg-red-50 border border-red-200 rounded-xl p-4 text-center">
+                                    <p class="text-red-600 font-medium flex items-center justify-center gap-2">
+                                        <i data-lucide="alert-circle" class="w-5 h-5"></i>
+                                        Uang kurang Rp {{ number_format($this->total - $paidAmount, 0, ',', '.') }}
+                                    </p>
+                                </div>
+                            @endif
 
                             @if($paidAmount >= $this->total)
                                 <div class="mt-4 bg-green-50 rounded-xl p-4 text-center">
@@ -362,7 +757,7 @@
                     </div>
                 </div>
 
-                <div class="p-6 border-t bg-gray-50 rounded-b-2xl">
+                <div class="p-6 border-t bg-gray-50 rounded-b-2xl flex-none">
                     <button 
                         wire:click="processPayment"
                         wire:loading.attr="disabled"
@@ -405,9 +800,17 @@
                     </div>
 
                     <!-- Opening Cash -->
-                    <div>
+                    <div x-data="moneyInput({{ $openingCash }}, 'openingCash')">
                         <label class="block text-sm font-medium text-gray-700 mb-1">Modal Awal (Cash)</label>
-                        <input type="number" wire:model="openingCash" class="w-full px-4 py-3 border border-gray-200 rounded-lg text-lg" placeholder="0">
+                        <input 
+                            type="text" 
+                            inputmode="numeric"
+                            x-model="formatted"
+                            @input="onInput($event)"
+                            @blur="syncToWire()"
+                            class="w-full px-4 py-3 border border-gray-200 rounded-lg text-lg focus:ring-2 focus:ring-primary-500" 
+                            placeholder="0"
+                        >
                     </div>
 
                     <!-- Expenses -->
@@ -430,9 +833,17 @@
                     </div>
 
                     <!-- Actual Cash -->
-                    <div>
+                    <div x-data="moneyInput({{ $actualCash }}, 'actualCash')">
                         <label class="block text-sm font-medium text-gray-700 mb-1">Uang Fisik di Laci</label>
-                        <input type="number" wire:model="actualCash" class="w-full px-4 py-3 border border-gray-200 rounded-lg text-lg" placeholder="0">
+                        <input 
+                            type="text" 
+                            inputmode="numeric"
+                            x-model="formatted"
+                            @input="onInput($event)"
+                            @blur="syncToWire()"
+                            class="w-full px-4 py-3 border border-gray-200 rounded-lg text-lg focus:ring-2 focus:ring-primary-500" 
+                            placeholder="0"
+                        >
                     </div>
 
                     <!-- Notes -->
@@ -601,9 +1012,9 @@
 
     <!-- Receipt Modal -->
     @if($showReceiptModal && $lastTransaction)
-        <div class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
-            <div class="bg-white rounded-2xl w-full max-w-md mx-4 shadow-2xl">
-                <div class="p-4 border-b flex justify-between items-center">
+        <div class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div class="bg-white rounded-2xl w-full max-w-md shadow-2xl max-h-[90vh] flex flex-col">
+                <div class="p-4 border-b flex justify-between items-center flex-none">
                     <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
                         <i data-lucide="receipt" class="w-5 h-5"></i>
                         Struk Transaksi
@@ -614,11 +1025,11 @@
                 </div>
 
                 <!-- Receipt Content -->
-                <div id="receipt-container" class="p-4">
+                <div id="receipt-container" class="p-4 overflow-y-auto flex-1 custom-scroll">
                     @include('livewire.partials.receipt', ['transaction' => $lastTransaction])
                 </div>
 
-                <div class="p-4 border-t flex gap-3">
+                <div class="p-4 border-t flex gap-3 flex-none">
                     <button 
                         wire:click="printReceipt"
                         class="flex-1 py-3 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-xl flex items-center justify-center gap-2"
