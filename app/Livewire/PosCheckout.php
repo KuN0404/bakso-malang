@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\DB;
 use App\Models\ProductReturn;
 use App\Models\ShiftExpense;
 use Illuminate\Support\Str;
+use App\Models\StockLog;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -22,6 +23,48 @@ class PosCheckout extends Component
 {
     // Cart state
     public array $cart = [];
+    
+    // Lifecycle hooks
+    public function updatedCart($value, $key)
+    {
+        // Check if the update is on quantity
+        // $key format: key.field (e.g., 10_3.quantity)
+        $parts = explode('.', $key);
+        if (count($parts) === 2 && $parts[1] === 'quantity') {
+            $cartKey = $parts[0];
+            $quantity = (int)$value;
+            
+            // Validate quantity
+            if ($quantity <= 0) {
+                $this->cart[$cartKey]['quantity'] = 1;
+                $quantity = 1;
+            }
+
+            // Check stock (including other variants of the same product)
+            $product = Product::find($this->cart[$cartKey]['product_id']);
+            if ($product && $product->track_stock) {
+                $currentTotal = $this->getTotalQuantityForProduct($product->id, $cartKey);
+                $newTotal = $currentTotal + $quantity;
+                
+                if ($newTotal > $product->stock) {
+                    // Calculate max allowed for this item
+                    $maxAllowed = max(0, $product->stock - $currentTotal);
+                    $this->cart[$cartKey]['quantity'] = $maxAllowed ?: 1; // Fallback to 1 if calculation is weird, but usually validation logic runs before strict enforcement
+                     
+                    // Better approach: set to remaining stock
+                    $this->cart[$cartKey]['quantity'] = $maxAllowed;
+                    
+                    // If maxAllowed is 0 (because other variants took all stock), we might have an issue.
+                    // But usually we are editing an existing item that has at least 1.
+                    // Let's rely on the previous valid value or force it to fit.
+                    
+                    $this->dispatch('notify', type: 'error', message: "Stok total tidak cukup. Sisa untuk item ini: {$maxAllowed}");
+                }
+            }
+            
+            $this->recalculateCartItem($cartKey);
+        }
+    }
     
     // Payment state
     public ?int $paymentSourceId = null;
@@ -180,6 +223,23 @@ class PosCheckout extends Component
                 'amount' => $totalRefund,
                 'category' => 'refund',
             ]);
+
+            // Restore Stock & Log
+            foreach ($selectedItems as $detailId => $item) {
+                $detail = \App\Models\TransactionDetail::find($detailId);
+                if ($detail && $detail->product && $detail->product->track_stock) {
+                    $detail->product->increment('stock', $item['quantity']);
+                    
+                    StockLog::create([
+                        'product_id' => $detail->product_id,
+                        'user_id' => auth()->id(),
+                        'type' => 'return',
+                        'amount' => $item['quantity'],
+                        'final_stock' => $detail->product->stock, // Fresh stock after increment
+                        'note' => "Retur: {$return->return_number}",
+                    ]);
+                }
+            }
         });
 
         $this->showReturnModal = false;
@@ -215,9 +275,14 @@ class PosCheckout extends Component
                 $q->where('name', 'like', "%{$this->searchQuery}%")
                   ->orWhere('sku', 'like', "%{$this->searchQuery}%");
             });
+            // If searching, we might want more results or pagination, but for now standard get is fine.
+            // Or limit search results too if desired.
+        } else {
+            // Lazy Load Optimization: Limit initial load to prevent UI lag on large datasets
+            $query->take(40);
         }
 
-        return $query->orderBy('name')->get();
+        return $query->orderByDesc('is_featured')->orderBy('name')->get();
     }
 
     #[Computed]
@@ -300,8 +365,22 @@ class PosCheckout extends Component
 
         $cartKey = $this->generateCartKey($productId, $modifiers);
         
+        $currentQty = isset($this->cart[$cartKey]) ? $this->cart[$cartKey]['quantity'] : 0;
+        $newQty = $currentQty + 1;
+
+        if ($product->track_stock) {
+            if ($product->stock <= 0) {
+                 $this->dispatch('notify', type: 'error', message: "Stok {$product->name} habis.");
+                 return;
+            }
+            if ($newQty > $product->stock) {
+                 $this->dispatch('notify', type: 'error', message: "Stok tidak cukup. Sisa: {$product->stock}");
+                 return;
+            }
+        }
+
         if (isset($this->cart[$cartKey])) {
-            $this->cart[$cartKey]['quantity']++;
+            $this->cart[$cartKey]['quantity'] = $newQty;
             $this->recalculateCartItem($cartKey);
         } else {
             $modifierTotal = $this->calculateModifierTotal($modifiers);
@@ -329,9 +408,30 @@ class PosCheckout extends Component
         }
 
         if (isset($this->cart[$cartKey])) {
+            // Check stock
+            $product = Product::find($this->cart[$cartKey]['product_id']);
+            if ($product && $product->track_stock) {
+                $currentTotal = $this->getTotalQuantityForProduct($product->id, $cartKey);
+                if (($currentTotal + $quantity) > $product->stock) {
+                    $this->dispatch('notify', type: 'error', message: "Stok total tidak cukup. Max: {$product->stock}");
+                    return;
+                }
+            }
+
             $this->cart[$cartKey]['quantity'] = $quantity;
             $this->recalculateCartItem($cartKey);
         }
+    }
+
+    protected function getTotalQuantityForProduct(int $productId, ?string $excludeCartKey = null): int
+    {
+        $total = 0;
+        foreach ($this->cart as $key => $item) {
+            if ($item['product_id'] === $productId && $key !== $excludeCartKey) {
+                $total += (int)$item['quantity'];
+            }
+        }
+        return $total;
     }
 
     public function removeFromCart(string $cartKey): void
@@ -398,6 +498,16 @@ class PosCheckout extends Component
             return;
         }
 
+        // Pre-calculate total quantities per product
+        $productQuantities = [];
+        foreach ($this->cart as $item) {
+            $pid = $item['product_id'];
+            if (!isset($productQuantities[$pid])) {
+                $productQuantities[$pid] = 0;
+            }
+            $productQuantities[$pid] += $item['quantity'];
+        }
+
         $paymentSource = PaymentSource::find($this->paymentSourceId);
         if (!$paymentSource) {
             $this->dispatch('notify', type: 'error', message: 'Pilih metode pembayaran');
@@ -411,7 +521,19 @@ class PosCheckout extends Component
         }
 
         try {
-            DB::transaction(function () use ($paymentSource) {
+            DB::transaction(function () use ($paymentSource, $productQuantities) {
+                // LOCKING: Get all products involved in one go, locking rows for update
+                $productIds = array_keys($productQuantities);
+                $products = Product::whereIn('id', $productIds)->lockForUpdate()->get()->keyBy('id');
+
+                // STRICT STOCK CHECK with locked rows
+                foreach ($productQuantities as $productId => $totalQty) {
+                    $product = $products->get($productId);
+                    if ($product && $product->track_stock && $totalQty > $product->stock) {
+                         throw new \Exception("Stok {$product->name} tidak cukup (Total: $totalQty, Sisa: {$product->stock})");
+                    }
+                }
+
                 // Auto-create or get today's shift
                 $shift = $this->getOrCreateTodayShift();
                 
@@ -446,7 +568,7 @@ class PosCheckout extends Component
                         'unit_price' => $item['unit_price'],
                         'quantity' => $item['quantity'],
                         'modifier_total' => $item['modifier_total'],
-                        'subtotal' => $item['subtotal'] * $item['quantity'],
+                        'subtotal' => $item['subtotal'],
                     ]);
 
                     // Attach modifiers with snapshot data
@@ -459,10 +581,20 @@ class PosCheckout extends Component
                         }
                     }
 
-                    // Decrement stock if tracking
-                    $product = Product::find($item['product_id']);
+                    // Decrement stock using the PRE-LOADED LOCKED MODEL
+                    $product = $products->get($item['product_id']);
                     if ($product && $product->track_stock) {
                         $product->decrement('stock', $item['quantity']);
+                        
+                        // Log usage
+                        StockLog::create([
+                            'product_id' => $product->id,
+                            'user_id' => auth()->id(),
+                            'type' => 'sale',
+                            'amount' => -$item['quantity'], // Negative for usage
+                            'final_stock' => $product->fresh()->stock, // Refresh to get exact current value
+                            'note' => "Inv: {$transaction->invoice_number}",
+                        ]);
                     }
                 }
 

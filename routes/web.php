@@ -52,6 +52,7 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
     // Master Data
     Route::get('/categories', Categories::class)->name('categories.index');
     Route::get('/products', Products::class)->name('products.index');
+    Route::get('/products/{product}', App\Livewire\Admin\ProductDetail::class)->name('products.show');
     Route::get('/modifiers', Modifiers::class)->name('modifiers.index');
     Route::get('/payment-sources', PaymentSources::class)->name('payment-sources.index');
     

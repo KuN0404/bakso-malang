@@ -136,10 +136,13 @@ class Modifiers extends Component
     public function render()
     {
         $groups = ModifierGroup::withCount('modifiers')->get();
+        
         $modifiers = $this->selectedGroupId 
             ? Modifier::where('modifier_group_id', $this->selectedGroupId)->get()
             : collect();
-        $selectedGroup = $this->selectedGroupId ? ModifierGroup::find($this->selectedGroupId) : null;
+            
+        // Optimization: Find from collection instead of new DB query
+        $selectedGroup = $this->selectedGroupId ? $groups->firstWhere('id', $this->selectedGroupId) : null;
 
         return view('livewire.admin.modifiers', compact('groups', 'modifiers', 'selectedGroup'))
             ->title('Modifier');

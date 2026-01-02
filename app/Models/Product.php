@@ -11,10 +11,12 @@ use Illuminate\Support\Facades\Storage;
 class Product extends Model
 {
     use SoftDeletes;
-
+    use \Spatie\Activitylog\Traits\LogsActivity;
+    
     protected $fillable = [
         'category_id',
         'name',
+        'slug',
         'sku',
         'description',
         'price',
@@ -25,6 +27,25 @@ class Product extends Model
         'stock',
         'track_stock',
     ];
+
+    public function getActivitylogOptions(): \Spatie\Activitylog\LogOptions
+    {
+        return \Spatie\Activitylog\LogOptions::defaults()
+            ->logAll()
+            ->logExcept(['stock']) // Handle stock via StockLog
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs();
+    }
+
+    /**
+     * Get the route key for the model.
+     */
+    public function getRouteKeyName()
+    {
+        return 'slug';
+    }
+
+
 
     protected $casts = [
         'price' => 'decimal:2',
@@ -41,6 +62,20 @@ class Product extends Model
     protected static function boot()
     {
         parent::boot();
+
+        // Auto-generate slug on save
+        static::saving(function ($product) {
+            if (empty($product->slug) || $product->isDirty('name')) {
+                $product->slug = \Illuminate\Support\Str::slug($product->name);
+                
+                // Ensure unique slug
+                $originalSlug = $product->slug;
+                $count = 1;
+                while (static::where('slug', $product->slug)->where('id', '!=', $product->id)->exists()) {
+                    $product->slug = $originalSlug . '-' . $count++;
+                }
+            }
+        });
 
         // Delete image when product is force deleted
         static::forceDeleting(function ($product) {
@@ -101,6 +136,11 @@ class Product extends Model
     public function getFormattedPriceAttribute(): string
     {
         return 'Rp ' . number_format($this->price, 0, ',', '.');
+    }
+
+    public function stockLogs()
+    {
+        return $this->hasMany(StockLog::class)->latest();
     }
 
     public function isAvailable(): bool

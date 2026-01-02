@@ -1,4 +1,15 @@
-<div>
+<div class="relative">
+    <!-- Loading Overlay -->
+    <div wire:loading wire:target="edit, openStockModal, create" class="absolute inset-0 bg-white/50 backdrop-blur-[1px] z-50 rounded-xl">
+        <div class="sticky top-[40vh] flex flex-col items-center justify-center w-full gap-2">
+            <svg class="animate-spin h-8 w-8 text-primary-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span class="text-sm font-medium text-primary-600">Memuat...</span>
+        </div>
+    </div>
+
     <!-- Header -->
     <div class="flex items-center justify-between mb-6">
         <div>
@@ -24,7 +35,7 @@
             <select wire:model.live="filterCategory" class="px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500">
                 <option value="">Semua Kategori</option>
                 @foreach($categories as $cat)
-                    <option value="{{ $cat->id }}">{{ $cat->name }}</option>
+                    <option value="{{ $cat->slug }}">{{ $cat->name }}</option>
                 @endforeach
             </select>
         </div>
@@ -65,24 +76,60 @@
                         <td class="px-6 py-4 font-medium text-gray-800">{{ $product->formatted_price }}</td>
                         <td class="px-6 py-4 text-gray-600">
                             @if($product->track_stock)
-                                {{ $product->stock }}
+                                @can('adjust_stock')
+                                    <button 
+                                        wire:click="openStockModal({{ $product->id }})"
+                                        class="px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors flex items-center gap-1 group"
+                                        title="Atur Stok"
+                                    >
+                                        {{ $product->stock }}
+                                        <i data-lucide="chevrons-up-down" class="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity"></i>
+                                    </button>
+                                @else
+                                    <span class="px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">{{ $product->stock }}</span>
+                                @endcan
                             @else
-                                <span class="text-gray-400">-</span>
+                                @can('adjust_stock')
+                                    <button 
+                                        wire:click="openStockModal({{ $product->id }})"
+                                        class="text-gray-400 hover:text-blue-600 transition-colors flex items-center gap-1 text-sm"
+                                        title="Aktifkan Stok"
+                                    >
+                                        -
+                                        <i data-lucide="plus-circle" class="w-4 h-4"></i>
+                                    </button>
+                                @else
+                                    <span class="text-gray-400">-</span>
+                                @endcan
                             @endif
                         </td>
                         <td class="px-6 py-4">
-                            @if($product->is_active)
-                                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">Aktif</span>
-                            @else
-                                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">Nonaktif</span>
-                            @endif
+                            <div class="flex flex-col gap-1">
+                                @if($product->is_active)
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700 w-fit">Aktif</span>
+                                @else
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 w-fit">Nonaktif</span>
+                                @endif
+
+                                @if($product->is_featured)
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700 w-fit">
+                                        <i data-lucide="star" class="w-3 h-3 fill-current"></i> Unggulan
+                                    </span>
+                                @endif
+
+                                @if(!$product->track_stock)
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-50 text-purple-600 w-fit">
+                                        <i data-lucide="infinity" class="w-3 h-3"></i> Unlimited
+                                    </span>
+                                @endif
+                            </div>
                         </td>
                         <td class="px-6 py-4 text-right">
                             <div class="flex items-center justify-end gap-1">
                                 {{-- View Detail --}}
-                                <button wire:click="view({{ $product->id }})" class="p-2 text-gray-400 hover:text-blue-600 rounded-lg hover:bg-gray-100" title="Lihat Detail">
+                                <a href="{{ route('admin.products.show', $product) }}" class="p-2 text-gray-400 hover:text-blue-600 rounded-lg hover:bg-gray-100" title="Lihat Detail">
                                     <i data-lucide="eye" class="w-4 h-4"></i>
-                                </button>
+                                </a>
                                 
                                 {{-- Edit - with permission --}}
                                 @can('edit_products')
@@ -121,102 +168,177 @@
                 @endforelse
             </tbody>
         </table>
-        @if($products->hasPages())
-            <div class="px-6 py-4 border-t">{{ $products->links() }}</div>
+        @if($products->count() > 0)
+            <div class="px-6 py-4 border-t border-gray-100 flex items-center justify-between">
+                <div class="flex items-center gap-2 text-sm text-gray-600">
+                    <span>Tampilkan</span>
+                    <select wire:model.live="perPage" class="border-gray-200 rounded-lg text-sm focus:ring-primary-500 focus:border-primary-500 py-1.5 px-3">
+                        <option value="10">10</option>
+                        <option value="25">25</option>
+                        <option value="50">50</option>
+                    </select>
+                    <span>produk</span>
+                </div>
+                
+                <div>
+                    {{ $products->links() }}
+                </div>
+            </div>
         @endif
     </div>
 
-    <!-- View Detail Modal -->
-    @if($showViewModal && $selectedProduct)
+
+
+    <!-- Stock Management Modal -->
+    @if($showStockModal && $selectedProduct)
         <div 
             class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
-            @keydown.escape.window="$wire.set('showViewModal', false)"
+            @keydown.escape.window="$wire.set('showStockModal', false)"
         >
-            <div class="bg-white rounded-2xl w-full max-w-lg shadow-2xl max-h-[90vh] flex flex-col">
-                <!-- Header -->
+            <div 
+                class="bg-white rounded-2xl w-full max-w-md shadow-2xl max-h-[90vh] flex flex-col"
+                x-data="{
+                    type: 'add',
+                    amount: 0,
+                    note: '',
+                    stock: {{ $selectedProduct->stock }},
+                    formattedAmount: '',
+                    
+                    get prediction() {
+                        let current = parseInt(this.stock);
+                        let amt = parseInt(this.amount) || 0;
+                        
+                        if (this.type === 'add') return current + amt;
+                        if (this.type === 'sub') return current - amt;
+                        return amt;
+                    },
+                    
+                    formatAmount(val) {
+                        return new Intl.NumberFormat('id-ID').format(val || 0);
+                    },
+                    
+                    parseAmount(str) {
+                         return parseInt(String(str).replace(/\D/g, '')) || 0;
+                    },
+                    
+                    updateAmount(e) {
+                        let raw = this.parseAmount(e.target.value);
+                        this.amount = raw;
+                        this.formattedAmount = raw > 0 ? this.formatAmount(raw) : '';
+                    },
+                    
+                    submit() {
+                        if (this.amount < 1) return;
+                        $wire.saveStock(this.type, this.amount, this.note);
+                    }
+                }"
+            >
                 <div class="p-6 border-b flex justify-between items-center flex-none">
-                    <h3 class="text-xl font-bold text-gray-800">Detail Produk</h3>
-                    <button type="button" wire:click="$set('showViewModal', false)" class="text-gray-400 hover:text-gray-600 p-2 hover:bg-gray-100 rounded-lg">
+                    <h3 class="text-xl font-bold text-gray-800">Atur Stok</h3>
+                    <button type="button" wire:click="$set('showStockModal', false)" class="text-gray-400 hover:text-gray-600 p-2 hover:bg-gray-100 rounded-lg">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                     </button>
                 </div>
                 
-                <!-- Content -->
-                <div class="p-6 space-y-4 overflow-y-auto flex-1 custom-scroll">
-                    <!-- Image -->
-                    @if($selectedProduct->image)
-                        <div class="flex justify-center">
-                            <img src="{{ asset('storage/' . $selectedProduct->image) }}" class="w-40 h-40 object-cover rounded-xl border border-gray-200" alt="{{ $selectedProduct->name }}">
-                        </div>
-                    @endif
-                    
-                    <!-- Info Grid -->
-                    <div class="grid grid-cols-2 gap-4">
-                        <div class="col-span-2">
-                            <p class="text-xs text-gray-500 uppercase">Nama Produk</p>
-                            <p class="font-semibold text-gray-800">{{ $selectedProduct->name }}</p>
-                        </div>
+                <div class="p-6 overflow-y-auto flex-1 custom-scroll">
+                    <div class="mb-4 bg-gray-50 border border-gray-100 rounded-xl p-4 flex items-center justify-between">
                         <div>
-                            <p class="text-xs text-gray-500 uppercase">SKU</p>
-                            <p class="font-mono text-gray-700">{{ $selectedProduct->sku }}</p>
+                            <p class="text-sm text-gray-500 mb-1">Stok Saat Ini</p>
+                            <p class="text-3xl font-bold text-gray-800">{{ $selectedProduct->stock }}</p>
                         </div>
-                        <div>
-                            <p class="text-xs text-gray-500 uppercase">Kategori</p>
-                            <p class="text-gray-700">{{ $selectedProduct->category?->name ?? '-' }}</p>
-                        </div>
-                        <div>
-                            <p class="text-xs text-gray-500 uppercase">Harga Jual</p>
-                            <p class="font-bold text-primary-600">Rp {{ number_format($selectedProduct->price, 0, ',', '.') }}</p>
-                        </div>
-                        <div>
-                            <p class="text-xs text-gray-500 uppercase">Harga Modal</p>
-                            @can('view_financial_reports')
-                                <p class="text-gray-700">Rp {{ number_format($selectedProduct->cost_price, 0, ',', '.') }}</p>
-                            @else
-                                <p class="text-gray-400 italic">Tidak memiliki akses</p>
-                            @endcan
+                        <div class="text-right">
+                            <p class="text-xs text-gray-400 mb-1">SKU</p>
+                            <p class="font-mono text-sm font-medium text-gray-600">{{ $selectedProduct->sku }}</p>
                         </div>
                     </div>
-                    
-                    @if($selectedProduct->description)
+
+                    <div class="space-y-4">
                         <div>
-                            <p class="text-xs text-gray-500 uppercase">Deskripsi</p>
-                            <p class="text-gray-700">{{ $selectedProduct->description }}</p>
-                        </div>
-                    @endif
-                    
-                    <!-- Status Badges -->
-                    <div class="flex flex-wrap gap-2">
-                        @if($selectedProduct->is_active)
-                            <span class="px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">Aktif</span>
-                        @else
-                            <span class="px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">Nonaktif</span>
-                        @endif
-                        @if($selectedProduct->is_featured)
-                            <span class="px-2.5 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">Unggulan</span>
-                        @endif
-                        @if($selectedProduct->track_stock)
-                            <span class="px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">Stok: {{ $selectedProduct->stock }}</span>
-                        @endif
-                    </div>
-                    
-                    <!-- Modifier Groups -->
-                    @if($selectedProduct->modifierGroups->isNotEmpty())
-                        <div>
-                            <p class="text-xs text-gray-500 uppercase mb-2">Modifier Groups</p>
-                            <div class="flex flex-wrap gap-2">
-                                @foreach($selectedProduct->modifierGroups as $mg)
-                                    <span class="px-2.5 py-1 rounded-lg text-xs font-medium bg-primary-100 text-primary-700">{{ $mg->name }}</span>
-                                @endforeach
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Jenis Penyesuaian</label>
+                            <div class="grid grid-cols-3 gap-2">
+                                <button 
+                                    @click="type = 'add'" 
+                                    :class="type === 'add' ? 'bg-white border-primary-500 text-primary-600 ring-1 ring-primary-500' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'"
+                                    class="py-2 px-3 border rounded-lg text-sm font-medium transition-all"
+                                >
+                                    Tambah (+)
+                                </button>
+                                <button 
+                                    @click="type = 'sub'" 
+                                    :class="type === 'sub' ? 'bg-white border-red-500 text-red-600 ring-1 ring-red-500' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'"
+                                    class="py-2 px-3 border rounded-lg text-sm font-medium transition-all"
+                                >
+                                    Kurang (-)
+                                </button>
+                                <button 
+                                    @click="type = 'set'" 
+                                    :class="type === 'set' ? 'bg-white border-blue-500 text-blue-600 ring-1 ring-blue-500' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'"
+                                    class="py-2 px-3 border rounded-lg text-sm font-medium transition-all"
+                                >
+                                    Setel (=)
+                                </button>
                             </div>
                         </div>
-                    @endif
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">
+                                <span x-show="type === 'add'">Jumlah (Penambahan)</span>
+                                <span x-show="type === 'sub'">Jumlah (Pengurangan)</span>
+                                <span x-show="type === 'set'">Stok Baru</span>
+                            </label>
+                            
+                            <input 
+                                type="text"
+                                inputmode="numeric"
+                                x-model="formattedAmount"
+                                @input="updateAmount($event)"
+                                class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+                                placeholder="0"
+                            >
+                            <p x-show="amount < 1 && formattedAmount !== ''" class="text-red-500 text-sm mt-1">Jumlah penyesuaian minimal 1.</p>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">
+                                Catatan 
+                                <span x-show="type !== 'add'" class="text-red-500">*</span>
+                                <span x-show="type === 'add'" class="text-gray-400 text-xs font-normal">(Optional)</span>
+                            </label>
+                            <input 
+                                type="text" 
+                                x-model="note" 
+                                class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+                                :placeholder="type !== 'add' ? 'Wajib diisi (misal: Barang rusak)' : 'Contoh: Restock supplier'"
+                            >
+                        </div>
+                        
+                        <div class="pt-2">
+                            <p class="text-sm text-gray-600 flex justify-between">
+                                <span>Prediksi Stok Akhir (Belum Disimpan):</span>
+                                <span class="font-bold" x-text="prediction"></span>
+                            </p>
+                        </div>
+                    </div>
                 </div>
-                
-                <!-- Footer -->
-                <div class="p-4 border-t bg-gray-50 flex-none">
-                    <button type="button" wire:click="$set('showViewModal', false)" class="w-full py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium rounded-lg transition-colors">
-                        Tutup
+
+                <div class="p-6 border-t bg-gray-50 flex justify-end gap-3 rounded-b-2xl flex-none">
+                    <button type="button" wire:click="$set('showStockModal', false)" class="px-4 py-2 bg-white text-gray-700 font-medium rounded-lg border border-gray-200 hover:bg-gray-50">
+                        Batal
+                    </button>
+                    <button 
+                        type="button" 
+                        @click="submit()" 
+                        wire:loading.attr="disabled"
+                        class="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    >
+                        <span wire:loading.remove wire:target="saveStock">Simpan Perubahan</span>
+                        <span wire:loading wire:target="saveStock" class="flex items-center gap-2">
+                            <svg class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            Menyimpan...
+                        </span>
                     </button>
                 </div>
             </div>
@@ -366,13 +488,13 @@
                             <span class="text-sm text-gray-700">Unggulan</span>
                         </label>
                         <label class="inline-flex items-center gap-2">
-                            <input type="checkbox" wire:model="track_stock" class="w-4 h-4 text-primary-600 border-gray-300 rounded">
-                            <span class="text-sm text-gray-700">Lacak Stok</span>
+                            <input type="checkbox" wire:model="is_unlimited" class="w-4 h-4 text-primary-600 border-gray-300 rounded">
+                            <span class="text-sm text-gray-700">Stok Unlimited</span>
                         </label>
                     </div>
-                    @if($track_stock)
+                    @if(!$is_unlimited && !$editingId)
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Stok</label>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Stok Awal</label>
                             <input type="number" wire:model="stock" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500">
                         </div>
                     @endif

@@ -336,22 +336,36 @@
                             ])->toArray()
                         ];
                         $hasModifiers = $product->modifierGroups->count() > 0;
+                        $isOutOfStock = $product->track_stock && $product->stock <= 0;
                     @endphp
                     <div 
-                        @if($hasModifiers)
-                            @click="openModifierModal({{ json_encode($productData) }})"
-                        @else
-                            wire:click="addToCart({{ $product->id }}, [])"
+                        @if(!$isOutOfStock)
+                            @if($hasModifiers)
+                                @click="openModifierModal({{ json_encode($productData) }})"
+                            @else
+                                wire:click="addToCart({{ $product->id }}, [])"
+                            @endif
                         @endif
                         wire:key="product-{{ $product->id }}"
-                        class="bg-white rounded-xl p-4 shadow-sm hover:shadow-md transition-all cursor-pointer group border border-gray-100 hover:border-primary-300 relative"
+                        class="bg-white rounded-xl p-4 shadow-sm hover:shadow-md transition-all cursor-pointer group border border-gray-100 hover:border-primary-300 relative {{ $isOutOfStock ? 'opacity-60 grayscale cursor-not-allowed hover:border-gray-200 hover:shadow-none' : '' }}"
                     >
-                        @if($hasModifiers)
-                            <div class="absolute top-2 right-2 bg-primary-500 text-white text-xs px-2 py-0.5 rounded-full flex items-center gap-1">
-                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
-                                Opsi
-                            </div>
-                        @endif
+                        <!-- Badges -->
+                        <div class="absolute top-2 right-2 flex flex-col gap-1 items-end z-10">
+                            @if($product->is_featured)
+                                <div class="bg-yellow-400 text-yellow-900 text-xs px-2 py-0.5 rounded-full flex items-center gap-1 font-bold shadow-sm">
+                                    <svg class="w-3 h-3 fill-current" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                                    Unggulan
+                                </div>
+                            @endif
+                            @if($hasModifiers)
+                                <div class="bg-primary-500 text-white text-xs px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm">
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+                                    Opsi
+                                </div>
+                            @endif
+                        </div>
+
+                        <!-- Image -->
                         @if($product->image)
                             <img src="{{ asset('storage/' . $product->image) }}" alt="{{ $product->name }}" class="w-full h-24 object-cover rounded-lg mb-3">
                         @else
@@ -359,6 +373,16 @@
                                 <i data-lucide="package" class="w-8 h-8 text-primary-500"></i>
                             </div>
                         @endif
+                        
+                        <!-- Out of Stock Overlay -->
+                        @if($isOutOfStock)
+                            <div class="absolute inset-0 bg-white/50 z-[5] rounded-xl flex items-center justify-center backdrop-blur-[1px]">
+                                <div class="bg-red-600 text-white px-3 py-1 rounded-lg font-bold text-sm shadow-md transform -rotate-12 border-2 border-white">
+                                    HABIS
+                                </div>
+                            </div>
+                        @endif
+
                         <h3 class="font-medium text-gray-800 group-hover:text-primary-600 transition-colors line-clamp-2">
                             {{ $product->name }}
                         </h3>
@@ -366,7 +390,7 @@
                             Rp {{ number_format($product->price, 0, ',', '.') }}
                         </p>
                         @if($product->track_stock)
-                            <p class="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                            <p class="text-xs mt-1 flex items-center gap-1 {{ $product->stock <= 0 ? 'text-red-600 font-bold' : 'text-gray-500' }}">
                                 <i data-lucide="box" class="w-3 h-3"></i>
                                 Stok: {{ $product->stock }}
                             </p>
@@ -564,24 +588,67 @@
                         </button>
                     </div>
                     
-                    <div class="flex items-center justify-between mt-3">
+                    <div 
+                        class="flex items-center justify-between mt-3" 
+                        x-data="{ 
+                            qty: {{ $item['quantity'] }},
+                            init() {
+                                // Watch local quantity to update server (Debounced)
+                                this.$watch('qty', value => {
+                                    clearTimeout(this._timer);
+                                    this._timer = setTimeout(() => {
+                                        // Only update if valid positive number
+                                        let val = parseInt(value);
+                                        if (val > 0) {
+                                            $wire.updateQuantity('{{ $cartKey }}', val);
+                                        }
+                                    }, 500);
+                                });
+
+                                // Watch server quantity to update local
+                                this.$watch('$wire.cart[\'{{ $cartKey }}\'].quantity', value => {
+                                    if (value !== undefined && value != this.qty) {
+                                        this.qty = value;
+                                    }
+                                });
+                            }
+                        }"
+                    >
                         <div class="flex items-center gap-2">
                             <button 
-                                wire:click="updateQuantity('{{ $cartKey }}', {{ $item['quantity'] - 1 }})"
-                                class="w-8 h-8 rounded-lg bg-gray-200 hover:bg-gray-300 flex items-center justify-center"
+                                @click="qty > 1 ? qty-- : null"
+                                class="w-8 h-8 rounded-lg bg-gray-200 hover:bg-gray-300 flex items-center justify-center active:scale-95 transition-transform"
+                                type="button"
                             >
                                 <i data-lucide="minus" class="w-4 h-4"></i>
                             </button>
-                            <span class="w-8 text-center font-medium">{{ $item['quantity'] }}</span>
+                            <input 
+                                type="number" 
+                                min="1"
+                                x-model="qty"
+                                onkeypress="return event.charCode >= 48 && event.charCode <= 57"
+                                onpaste="return false"
+                                @blur="
+                                    if(!qty || qty < 1) { 
+                                        qty = $wire.cart['{{ $cartKey }}'].quantity 
+                                    } else {
+                                        // Sync on Blur: Cancel debounce and force update immediately
+                                        clearTimeout(_timer);
+                                        $wire.updateQuantity('{{ $cartKey }}', parseInt(qty));
+                                    }
+                                "
+                                class="w-16 text-center font-medium border-0 bg-transparent focus:ring-2 focus:ring-primary-500 rounded-lg p-0"
+                            >
                             <button 
-                                wire:click="updateQuantity('{{ $cartKey }}', {{ $item['quantity'] + 1 }})"
-                                class="w-8 h-8 rounded-lg bg-primary-100 hover:bg-primary-200 text-primary-600 flex items-center justify-center"
+                                @click="qty++"
+                                class="w-8 h-8 rounded-lg bg-primary-100 hover:bg-primary-200 text-primary-600 flex items-center justify-center active:scale-95 transition-transform"
+                                type="button"
                             >
                                 <i data-lucide="plus" class="w-4 h-4"></i>
                             </button>
                         </div>
                         <span class="font-bold text-gray-800">
-                            Rp {{ number_format($item['subtotal'] * $item['quantity'], 0, ',', '.') }}
+                            Rp {{ number_format($item['subtotal'], 0, ',', '.') }}
                         </span>
                     </div>
                 </div>
@@ -1012,14 +1079,14 @@
 
     <!-- Receipt Modal -->
     @if($showReceiptModal && $lastTransaction)
-        <div class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div class="fixed inset-0 bg-black/50 flex items-center justify-center p-4" style="z-index: 9999;">
             <div class="bg-white rounded-2xl w-full max-w-md shadow-2xl max-h-[90vh] flex flex-col">
                 <div class="p-4 border-b flex justify-between items-center flex-none">
                     <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
                         <i data-lucide="receipt" class="w-5 h-5"></i>
                         Struk Transaksi
                     </h3>
-                    <button wire:click="closeReceiptModal" class="text-gray-400 hover:text-gray-600 p-1">
+                    <button wire:click="closeReceiptModal" class="text-gray-400 hover:text-gray-600 p-1" type="button">
                         <i data-lucide="x" class="w-6 h-6"></i>
                     </button>
                 </div>
@@ -1033,6 +1100,7 @@
                     <button 
                         wire:click="printReceipt"
                         class="flex-1 py-3 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-xl flex items-center justify-center gap-2"
+                        type="button"
                     >
                         <i data-lucide="printer" class="w-5 h-5"></i>
                         Cetak Ulang
@@ -1040,6 +1108,7 @@
                     <button 
                         wire:click="closeReceiptModal"
                         class="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl"
+                        type="button"
                     >
                         Tutup
                     </button>

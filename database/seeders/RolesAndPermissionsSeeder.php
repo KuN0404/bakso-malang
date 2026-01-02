@@ -21,6 +21,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'create_products',
             'edit_products',
             'delete_products',
+            'adjust_stock',
             
             // Categories
             'view_categories',
@@ -83,7 +84,7 @@ class RolesAndPermissionsSeeder extends Seeder
         // Manager - can manage products, view reports, manage shifts
         $manager = Role::firstOrCreate(['name' => 'Manager']);
         $manager->syncPermissions([
-            'view_products', 'create_products', 'edit_products',
+            'view_products', 'create_products', 'edit_products', 'adjust_stock',
             'view_categories', 'create_categories', 'edit_categories',
             'view_modifiers', 'create_modifiers', 'edit_modifiers',
             'access_pos', 'view_transactions', 'cancel_transactions',

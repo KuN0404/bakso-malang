@@ -385,6 +385,47 @@
         </div>
     </div>
     
+    <!-- Toast Notifications -->
+    <div 
+        x-data="notificationHandler"
+        class="fixed top-4 right-4 z-50 space-y-2 pointer-events-none"
+    >
+        <template x-for="notification in notifications" :key="notification.id">
+            <div 
+                x-show="notification.show"
+                x-transition:enter="transition transform ease-out duration-300"
+                x-transition:enter-start="translate-x-full opacity-0"
+                x-transition:enter-end="translate-x-0 opacity-100"
+                x-transition:leave="transition transform ease-in duration-300"
+                x-transition:leave-start="translate-x-0 opacity-100"
+                x-transition:leave-end="translate-x-full opacity-0"
+                class="bg-white rounded-lg shadow-lg border-l-4 p-4 pointer-events-auto min-w-[300px] flex items-start gap-3"
+                :class="{
+                    'border-green-500': notification.type === 'success',
+                    'border-red-500': notification.type === 'error',
+                    'border-blue-500': notification.type === 'info'
+                }"
+            >
+                <!-- Icon -->
+                <div class="flex-shrink-0">
+                    <svg x-show="notification.type === 'success'" class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                    <svg x-show="notification.type === 'error'" class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <svg x-show="notification.type === 'info'" class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </div>
+                
+                <!-- Content -->
+                <div class="flex-1">
+                    <p class="text-sm font-medium text-gray-900" x-text="notification.message"></p>
+                </div>
+                
+                <!-- Close -->
+                <button @click="remove(notification.id)" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+        </template>
+    </div>
+
     <!-- Livewire Scripts -->
     @livewireScripts
     
@@ -544,6 +585,41 @@
                 destroy() {
                     if (this.interval) {
                         clearInterval(this.interval);
+                    }
+                }
+            }));
+        });
+            // Notification Handler
+            Alpine.data('notificationHandler', () => ({
+                notifications: [],
+                
+                init() {
+                    window.addEventListener('notify', (event) => {
+                        this.add(event.detail);
+                    });
+                },
+                
+                add(notification) {
+                    const id = Date.now();
+                    this.notifications.push({
+                        id: id,
+                        type: notification.type || 'info', // success, error, info
+                        message: notification.message,
+                        show: true,
+                    });
+                    
+                    setTimeout(() => {
+                        this.remove(id);
+                    }, 3000);
+                },
+                
+                remove(id) {
+                    const index = this.notifications.findIndex(n => n.id === id);
+                    if (index > -1) {
+                        this.notifications[index].show = false;
+                        setTimeout(() => {
+                            this.notifications = this.notifications.filter(n => n.id !== id);
+                        }, 300); // Wait for transition
                     }
                 }
             }));

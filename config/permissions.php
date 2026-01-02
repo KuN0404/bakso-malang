@@ -20,6 +20,7 @@ return [
         'create_products' => 'Buat Produk',
         'edit_products' => 'Edit Produk',
         'delete_products' => 'Hapus Produk',
+        'adjust_stock' => 'Atur Stok',
         
         // Modifiers
         'view_modifiers' => 'Lihat Modifier',
@@ -76,6 +77,7 @@ return [
             'create_products',
             'edit_products',
             'delete_products',
+            'adjust_stock',
         ],
         'Modifier' => [
             'view_modifiers',
