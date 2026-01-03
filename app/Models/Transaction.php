@@ -29,6 +29,7 @@ class Transaction extends Model
         'customer_name',
         'order_type',
         'notes',
+        'print_count',
     ];
 
     protected $casts = [
@@ -39,6 +40,7 @@ class Transaction extends Model
         'paid_amount' => 'decimal:2',
         'change_amount' => 'decimal:2',
         'queue_number' => 'integer',
+        'print_count' => 'integer',
         'cancelled_at' => 'datetime',
     ];
 

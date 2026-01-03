@@ -1,16 +1,18 @@
 <?php
 
+use App\Http\Controllers\ExportController;
 use App\Livewire\Admin\Categories;
 use App\Livewire\Admin\Dashboard;
 use App\Livewire\Admin\Modifiers;
 use App\Livewire\Admin\PaymentSources;
 use App\Livewire\Admin\Products;
+use App\Livewire\Admin\ProductSalesReport;
 use App\Livewire\Admin\Roles;
 use App\Livewire\Admin\SalesReport;
 use App\Livewire\Admin\Settings;
 use App\Livewire\Admin\ShiftReport;
 use App\Livewire\Admin\Shifts;
-use App\Livewire\Admin\Transactions;
+use App\Livewire\Admin\TransactionHistory;
 use App\Livewire\Admin\Users;
 use App\Livewire\PosCheckout;
 use Illuminate\Support\Facades\Route;
@@ -46,7 +48,7 @@ Route::post('/logout', function () {
 })->name('logout');
 
 // Admin Routes
-Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () {
+Route::middleware(['auth', 'throttle:admin'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/', Dashboard::class)->name('dashboard');
     
     // Master Data
@@ -56,13 +58,14 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
     Route::get('/modifiers', Modifiers::class)->name('modifiers.index');
     Route::get('/payment-sources', PaymentSources::class)->name('payment-sources.index');
     
-    // Transactions
-    Route::get('/transactions', Transactions::class)->name('transactions.index');
+    // Transactions & Shifts
     Route::get('/shifts', Shifts::class)->name('shifts.index');
     Route::get('/returns', App\Livewire\Admin\Returns::class)->name('returns');
     
     // Reports
+    Route::get('/reports/transactions', TransactionHistory::class)->name('reports.transactions');
     Route::get('/reports/sales', SalesReport::class)->name('reports.sales');
+    Route::get('/reports/products', ProductSalesReport::class)->name('reports.products');
     Route::get('/reports/shifts', ShiftReport::class)->name('reports.shifts');
     
     // Settings
@@ -71,7 +74,28 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
     Route::get('/settings', Settings::class)->name('settings.index');
 });
 
-// POS Routes
+// Print Routes
+Route::middleware(['auth'])->prefix('print')->name('print.')->group(function () {
+    Route::get('/transactions/table', [App\Http\Controllers\PrintController::class, 'transactionsTable'])->name('transactions.table');
+    Route::get('/transactions/detail', [App\Http\Controllers\PrintController::class, 'transactionsDetail'])->name('transactions.detail');
+    Route::get('/returns-report', [App\Http\Controllers\PrintController::class, 'returnsReport'])->name('returns-report');
+});
+
+// Export Routes (separate for streaming)
+Route::middleware(['auth', 'throttle:5,1'])->name('export.')->prefix('export')->group(function () {
+    Route::get('/transactions', [ExportController::class, 'transactions'])->name('transactions');
+    Route::get('/transactions-detail', [ExportController::class, 'transactionsDetail'])->name('transactions.detail');
+    Route::get('/product-sales', [ExportController::class, 'productSales'])->name('product-sales');
+    Route::get('/sales-by-category', [ExportController::class, 'salesByCategory'])->name('sales-by-category');
+    Route::get('/sales-by-payment-method', [ExportController::class, 'salesByPaymentMethod'])->name('sales-by-payment-method');
+    Route::get('/product-returns', [App\Http\Controllers\ExportController::class, 'productReturns'])->name('product-returns');
+});
+
 Route::middleware(['auth'])->group(function () {
+    Route::get('/returns/{return}/print', [App\Http\Controllers\ExportController::class, 'printReturn'])->name('returns.print');
+});
+
+// POS Routes
+Route::middleware(['auth', 'throttle:pos'])->group(function () {
     Route::get('/pos', PosCheckout::class)->name('pos');
 });

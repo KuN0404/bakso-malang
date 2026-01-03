@@ -47,6 +47,12 @@
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
     
+    <!-- Flatpickr Date Picker -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/airbnb.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/id.js"></script>
+    
     <!-- Livewire Styles (includes Alpine.js) -->
     @livewireStyles
     
@@ -58,6 +64,41 @@
         .custom-scroll::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 3px; }
         .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
         .custom-scroll::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        /* Flatpickr Custom Styling */
+        .flatpickr-calendar {
+            border-radius: 12px !important;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.15) !important;
+            border: 1px solid #e5e7eb !important;
+        }
+        .flatpickr-day.selected, 
+        .flatpickr-day.startRange, 
+        .flatpickr-day.endRange {
+            background: #2563eb !important;
+            border-color: #2563eb !important;
+        }
+        .flatpickr-day.inRange {
+            background: #dbeafe !important;
+            border-color: #dbeafe !important;
+            box-shadow: none !important;
+        }
+        .flatpickr-day:hover {
+            background: #eff6ff !important;
+            border-color: #eff6ff !important;
+        }
+        .flatpickr-months .flatpickr-month {
+            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important;
+            color: white !important;
+            border-radius: 10px 10px 0 0 !important;
+        }
+        .flatpickr-current-month .flatpickr-monthDropdown-months,
+        .flatpickr-current-month input.cur-year {
+            color: white !important;
+        }
+        .flatpickr-weekday {
+            color: #6b7280 !important;
+            font-weight: 600 !important;
+        }
     </style>
 </head>
 <body class="h-full bg-gray-100 antialiased">
@@ -134,11 +175,6 @@
                     <span>POS Kasir</span>
                 </a>
                 
-                <a href="{{ route('admin.transactions.index') }}" class="flex items-center gap-3 px-4 py-3 rounded-lg {{ request()->routeIs('admin.transactions.*') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
-                    <i data-lucide="receipt" class="w-5 h-5"></i>
-                    <span>Transaksi</span>
-                </a>
-                
                 <a href="{{ route('admin.shifts.index') }}" class="flex items-center gap-3 px-4 py-3 rounded-lg {{ request()->routeIs('admin.shifts.*') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
                     <i data-lucide="clock" class="w-5 h-5"></i>
                     <span>Shift</span>
@@ -146,10 +182,22 @@
 
                 <p class="px-4 pt-4 pb-2 text-xs font-semibold text-blue-300 uppercase tracking-wider">Laporan</p>
                 
-                <a href="{{ route('admin.reports.sales') }}" class="flex items-center gap-3 px-4 py-3 rounded-lg {{ request()->routeIs('admin.reports.sales') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
-                    <i data-lucide="bar-chart-3" class="w-5 h-5"></i>
+                <a href="{{ route('admin.reports.transactions') }}" class="flex items-center gap-3 px-4 py-3 rounded-lg {{ request()->routeIs('admin.reports.transactions') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
+                    <i data-lucide="receipt" class="w-5 h-5"></i>
                     <span>Laporan Penjualan</span>
                 </a>
+
+                <a href="{{ route('admin.reports.sales') }}" class="flex items-center gap-3 px-4 py-3 rounded-lg {{ request()->routeIs('admin.reports.sales') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
+                    <i data-lucide="bar-chart-3" class="w-5 h-5"></i>
+                    <span>Analisa & Performa</span>
+                </a>
+
+                {{-- Merged into Analisa
+                <a href="{{ route('admin.reports.products') }}" class="flex items-center gap-3 px-4 py-3 rounded-lg {{ request()->routeIs('admin.reports.products') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
+                    <i data-lucide="package-search" class="w-5 h-5"></i>
+                    <span>Penjualan per Produk</span>
+                </a>
+                --}}
 
                 <a href="{{ route('admin.reports.shifts') }}" class="flex items-center gap-3 px-4 py-3 rounded-lg {{ request()->routeIs('admin.reports.shifts') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
                     <i data-lucide="file-clock" class="w-5 h-5"></i>

@@ -225,4 +225,28 @@ class ReportService
             ->limit($limit)
             ->get();
     }
+
+    /**
+     * Laporan ringkasan berdasarkan rentang tanggal
+     */
+    public function getRangeSummaryReport(Carbon $startDate, Carbon $endDate): array
+    {
+        $rangeTransactions = Transaction::query()
+            ->where('status', 'completed')
+            ->whereBetween('created_at', [$startDate, $endDate])
+            ->selectRaw('COUNT(*) as count, SUM(total) as total')
+            ->first();
+
+        $cancelledCount = Transaction::query()
+            ->where('status', 'cancelled')
+            ->whereBetween('cancelled_at', [$startDate, $endDate])
+            ->count();
+
+        return [
+            'total_sales' => $rangeTransactions->total ?? 0,
+            'completed_count' => $rangeTransactions->count ?? 0,
+            'average_transaction' => ($rangeTransactions->count > 0) ? ($rangeTransactions->total / $rangeTransactions->count) : 0,
+            'cancelled_count' => $cancelledCount,
+        ];
+    }
 }

@@ -114,6 +114,8 @@ class PosCheckout extends Component
         if ($this->lastTransaction) {
             $this->showReceiptModal = true;
             $this->dispatch('print-receipt');
+            // Increment print count for reprint from history
+            $this->lastTransaction->increment('print_count');
         }
     }
     
@@ -136,7 +138,7 @@ class PosCheckout extends Component
             return;
         }
 
-        $transaction = Transaction::with('details')
+        $transaction = Transaction::with(['details.modifiers'])
             ->where('invoice_number', $this->returnInvoiceSearch)
             ->where('status', 'completed')
             ->first();
@@ -154,8 +156,15 @@ class PosCheckout extends Component
                 'selected' => false,
                 'quantity' => $detail->quantity,
                 'max_quantity' => $detail->quantity,
+                'product_id' => $detail->product_id,
                 'product_name' => $detail->product_name,
                 'unit_price' => $detail->unit_price + $detail->modifier_total,
+                'modifiers' => $detail->modifiers->map(function($m) {
+                    return [
+                        'name' => $m->pivot->modifier_name,
+                        'price' => $m->pivot->price_adjustment
+                    ];
+                })->values()->toArray(),
             ];
         }
     }
@@ -209,7 +218,9 @@ class PosCheckout extends Component
             foreach ($selectedItems as $detailId => $item) {
                 $return->items()->create([
                     'transaction_detail_id' => $detailId,
+                    'product_id' => $item['product_id'] ?? null,
                     'product_name' => $item['product_name'],
+                    'modifiers' => $item['modifiers'] ?? null,
                     'quantity' => $item['quantity'],
                     'unit_price' => $item['unit_price'],
                     'subtotal' => $item['unit_price'] * $item['quantity'],
@@ -615,6 +626,8 @@ class PosCheckout extends Component
             $printerConfig = $this->printerConfig;
             if ($printerConfig?->auto_print) {
                 $this->dispatch('print-receipt');
+                // Increment print count for auto-print
+                $this->lastTransaction?->increment('print_count');
             }
 
             $this->dispatch('notify', type: 'success', message: 'Transaksi berhasil!');
@@ -633,6 +646,8 @@ class PosCheckout extends Component
     public function printReceipt(): void
     {
         $this->dispatch('print-receipt');
+        // Increment print count for manual reprint
+        $this->lastTransaction?->increment('print_count');
     }
 
     // Close Shift Methods

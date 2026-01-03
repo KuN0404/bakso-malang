@@ -8,16 +8,44 @@ use Livewire\Attributes\Layout;
 use Livewire\Attributes\Rule;
 use Livewire\Component;
 use Livewire\WithPagination;
+use Livewire\Attributes\Url; // Added import
 
 #[Layout('layouts.admin')]
 class Modifiers extends Component
 {
     use WithPagination;
 
+    public function mount()
+    {
+        // Validation: Page must be numeric and >= 1
+        $page = request()->query('page');
+        if ($page && (!is_numeric($page) || $page < 1)) {
+            $this->setPage(1);
+            // Optional: force redirect to clean URL if needed, but setPage is usually enough for Livewire state
+        }
+
+        // Validation: selectedGroupId must be numeric and > 0
+        // If empty string "" or non-numeric, reset to null immediately
+        if ($this->selectedGroupId !== null && (!is_numeric($this->selectedGroupId) || $this->selectedGroupId < 1)) {
+            $this->selectedGroupId = null;
+        }
+
+        // Validation: If selectedGroupId from URL is invalid (not in DB), reset it and go to page 1
+        if ($this->selectedGroupId) {
+            $exists = ModifierGroup::where('id', $this->selectedGroupId)->exists();
+            if (!$exists) {
+                $this->selectedGroupId = null;
+                $this->resetPage(); // Back to page 1
+            }
+        }
+    }
+
     public bool $showGroupModal = false;
     public bool $showModifierModal = false;
     public ?int $editingGroupId = null;
     public ?int $editingModifierId = null;
+
+    #[Url(except: null)]
     public ?int $selectedGroupId = null;
 
     // Group fields
@@ -30,7 +58,10 @@ class Modifiers extends Component
     // Modifier fields
     #[Rule('required|min:2|max:100')]
     public string $modifierName = '';
+
+    #[Rule('numeric|min:0')]
     public float $priceAdjustment = 0;
+
     public bool $modifierIsActive = true;
 
     public function createGroup(): void
@@ -133,16 +164,37 @@ class Modifiers extends Component
         $this->dispatch('notify', type: 'success', message: 'Modifier berhasil dihapus');
     }
 
+    // Search
+    public string $search = '';
+
+    public function updatingSearch()
+    {
+        $this->resetPage();
+    }
+
     public function render()
     {
-        $groups = ModifierGroup::withCount('modifiers')->get();
-        
+        $groups = ModifierGroup::withCount('modifiers')
+            ->when($this->search, fn($q) => $q->where('name', 'like', "%{$this->search}%"))
+            ->latest()
+            ->paginate(10); // Scalability: Pagination
+
+        // Smart Redirect: If page > lastPage, redirect to lastPage
+        if ($groups->lastPage() < $this->getPage() && $groups->lastPage() > 0) {
+            $this->setPage($groups->lastPage());
+            // Re-query with correct page
+            $groups = ModifierGroup::withCount('modifiers')
+                ->when($this->search, fn($q) => $q->where('name', 'like', "%{$this->search}%"))
+                ->latest()
+                ->paginate(10);
+        }
+            
         $modifiers = $this->selectedGroupId 
             ? Modifier::where('modifier_group_id', $this->selectedGroupId)->get()
             : collect();
             
-        // Optimization: Find from collection instead of new DB query
-        $selectedGroup = $this->selectedGroupId ? $groups->firstWhere('id', $this->selectedGroupId) : null;
+        // Correctness: Must query DB because selected group might not be in current page pagination
+        $selectedGroup = $this->selectedGroupId ? ModifierGroup::find($this->selectedGroupId) : null;
 
         return view('livewire.admin.modifiers', compact('groups', 'modifiers', 'selectedGroup'))
             ->title('Modifier');

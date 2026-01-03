@@ -5,13 +5,21 @@ namespace App\Livewire\Admin;
 use App\Models\PaymentSource;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Rule;
+use Livewire\Attributes\Url;
 use Livewire\Component;
+use Livewire\WithPagination;
 
 #[Layout('layouts.admin')]
 class PaymentSources extends Component
 {
+    use WithPagination;
+
     public bool $showModal = false;
     public ?int $editingId = null;
+
+    // Search
+    #[Url(except: '')]
+    public string $search = '';
 
     #[Rule('required|min:2|max:100')]
     public string $name = '';
@@ -19,14 +27,34 @@ class PaymentSources extends Component
     #[Rule('required|in:cash,card,transfer,ewallet,qris')]
     public string $type = 'cash';
 
+    #[Rule('nullable|max:255')]
     public ?string $description = '';
+
     public bool $is_active = true;
+
+    #[Rule('required|integer|min:0')]
     public int $sort_order = 0;
+
+    public function mount()
+    {
+        // URL Validation: Page must be numeric and >= 1
+        $page = request()->query('page');
+        if ($page && (!is_numeric($page) || $page < 1)) {
+            $this->setPage(1);
+        }
+    }
+
+    public function updatingSearch()
+    {
+        $this->resetPage();
+    }
 
     public function create(): void
     {
         $this->reset(['editingId', 'name', 'type', 'description', 'is_active', 'sort_order']);
         $this->is_active = true;
+        // Auto-fill sort_order with next available (max + 1)
+        $this->sort_order = (PaymentSource::max('sort_order') ?? 0) + 1;
         $this->showModal = true;
     }
 
@@ -44,7 +72,21 @@ class PaymentSources extends Component
 
     public function save(): void
     {
-        $this->validate();
+        // Custom validation: sort_order must be unique (except when editing same record)
+        $this->validate([
+            'name' => 'required|min:2|max:100',
+            'type' => 'required|in:cash,card,transfer,ewallet,qris',
+            'description' => 'nullable|max:255',
+            'sort_order' => [
+                'required',
+                'integer',
+                'min:0',
+                \Illuminate\Validation\Rule::unique('payment_sources', 'sort_order')
+                    ->ignore($this->editingId),
+            ],
+        ], [
+            'sort_order.unique' => 'Urutan ini sudah digunakan. Pilih urutan lain.',
+        ]);
 
         $data = [
             'name' => $this->name,
@@ -73,7 +115,19 @@ class PaymentSources extends Component
 
     public function render()
     {
-        $sources = PaymentSource::orderBy('sort_order')->get();
+        $sources = PaymentSource::query()
+            ->when($this->search, fn($q) => $q->where('name', 'like', "%{$this->search}%"))
+            ->orderBy('sort_order')
+            ->paginate(10);
+
+        // Smart Redirect: If page > lastPage, redirect to lastPage
+        if ($sources->lastPage() < $this->getPage() && $sources->lastPage() > 0) {
+            $this->setPage($sources->lastPage());
+            $sources = PaymentSource::query()
+                ->when($this->search, fn($q) => $q->where('name', 'like', "%{$this->search}%"))
+                ->orderBy('sort_order')
+                ->paginate(10);
+        }
 
         return view('livewire.admin.payment-sources', compact('sources'))
             ->title('Metode Pembayaran');
