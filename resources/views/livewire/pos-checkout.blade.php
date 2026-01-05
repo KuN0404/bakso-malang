@@ -245,23 +245,27 @@
 
             <div class="flex items-center gap-3">
                 @if($this->todayShift)
-                    <button wire:click="openHistoryModal" class="flex items-center gap-2 px-3 py-2 bg-gray-50 hover:bg-gray-100 rounded-lg text-gray-700 transition-colors border border-gray-200">
-                        <i data-lucide="history" class="w-4 h-4 text-gray-500"></i>
-                        <span class="text-sm font-medium hidden md:inline">Riwayat</span>
-                        <span class="bg-green-100 text-green-700 text-xs py-0.5 px-2 rounded-full font-bold ml-1">
-                            {{ $this->todayTransactions->count() }}
-                        </span>
-                    </button>
-                    
-                    <div class="flex items-center gap-1">
-                        <button wire:click="openReturnModal" class="flex items-center gap-2 px-3 py-2 bg-red-50 hover:bg-red-100 rounded-l-lg text-red-600 transition-colors border border-red-200 border-r-0">
-                            <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
-                            <span class="text-sm font-medium hidden md:inline">Retur</span>
+                    <!-- History Buttons Group -->
+                    <div class="flex items-center">
+                        <button wire:click="openHistoryModal" class="flex items-center gap-2 px-3 py-2 bg-blue-50 hover:bg-blue-100 rounded-l-lg text-blue-700 transition-colors border border-blue-200 border-r-0" title="Riwayat Transaksi">
+                            <i data-lucide="history" class="w-4 h-4 text-blue-600"></i>
+                            <span class="bg-blue-200 text-blue-800 text-xs py-0.5 px-2 rounded-full font-bold">
+                                {{ $this->todayTransactions->count() }}
+                            </span>
                         </button>
-                        <button wire:click="openReturnHistoryModal" class="flex items-center gap-2 px-2 py-2 bg-red-50 hover:bg-red-100 rounded-r-lg text-red-600 transition-colors border border-red-200" title="Riwayat Retur">
-                            <i data-lucide="list" class="w-4 h-4"></i>
+                        <button wire:click="openReturnHistoryModal" class="flex items-center gap-2 px-3 py-2 bg-orange-50 hover:bg-orange-100 rounded-r-lg text-orange-700 transition-colors border border-orange-200" title="Riwayat Retur">
+                            <i data-lucide="list" class="w-4 h-4 text-orange-600"></i>
+                            <span class="bg-orange-200 text-orange-800 text-xs py-0.5 px-2 rounded-full font-bold">
+                                {{ $this->todayReturns->count() }}
+                            </span>
                         </button>
                     </div>
+                    
+                    <!-- Return Action Button -->
+                    <button wire:click="openReturnModal" class="flex items-center gap-2 px-4 py-2 bg-red-50 hover:bg-red-100 rounded-lg text-red-600 transition-colors border border-red-200 shadow-sm">
+                        <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+                        <span class="text-sm font-bold uppercase tracking-wide">Retur</span>
+                    </button>
                 @endif
 
                 @if($this->todayShift && $this->todayShift->status === 'open')
