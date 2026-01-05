@@ -15,7 +15,7 @@ class TransactionHistory extends Component
 {
     use WithPagination;
 
-    public bool $showModal = false;
+    public bool $showDetailModal = false;
     public ?Transaction $selectedTransaction = null;
     
     // Receipt modal for printing
@@ -180,10 +180,16 @@ class TransactionHistory extends Component
         $this->dispatch('reset-date-picker', start: $this->startDate, end: $this->endDate);
     }
 
-    public function view(int $id): void
+    public function showDetail(int $id): void
     {
         $this->selectedTransaction = Transaction::with(['user', 'details.modifiers', 'paymentSource'])->findOrFail($id);
-        $this->showModal = true;
+        $this->showDetailModal = true;
+    }
+
+    public function closeDetailModal(): void
+    {
+        $this->showDetailModal = false;
+        $this->selectedTransaction = null;
     }
 
     public function printReceipt(int $id): void
@@ -322,6 +328,6 @@ class TransactionHistory extends Component
         ];
 
         return view('livewire.admin.transaction-history', compact('transactions', 'summary', 'cashiers', 'months'))
-            ->title('Riwayat Transaksi');
+            ->title('Laporan Penjualan');
     }
 }

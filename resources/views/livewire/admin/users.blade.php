@@ -1,4 +1,4 @@
-<div>
+<div x-init="lucide.createIcons()">
     <div class="flex items-center justify-between mb-6">
         <div>
             <h1 class="text-2xl font-bold text-gray-800">Pengguna</h1>
@@ -51,7 +51,7 @@
                             <button wire:click="edit({{ $user->id }})" class="p-2 text-gray-400 hover:text-primary-600 rounded-lg hover:bg-gray-100">
                                 <i data-lucide="edit" class="w-4 h-4"></i>
                             </button>
-                            @if($user->id !== auth()->id())
+                            @if($user->id !== auth()->id() && !$user->hasRole('Super Admin'))
                                 <button 
                                     @click="$dispatch('confirm-action', {
                                         title: 'Hapus User',
@@ -63,6 +63,10 @@
                                     })"
                                     class="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-gray-100"
                                 >
+                                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                </button>
+                            @elseif($user->hasRole('Super Admin') && $user->id !== auth()->id())
+                                <button disabled class="p-2 text-gray-300 rounded-lg cursor-not-allowed" title="Super Admin tidak dapat dihapus">
                                     <i data-lucide="trash-2" class="w-4 h-4"></i>
                                 </button>
                             @endif
@@ -81,7 +85,7 @@
     </div>
 
     @if($showModal)
-        <div class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
+        <div class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center" wire:click.self="$set('showModal', false)">
             <div class="bg-white rounded-2xl w-full max-w-lg mx-4 shadow-2xl">
                 <div class="p-6 border-b flex justify-between items-center">
                     <h3 class="text-xl font-bold text-gray-800">{{ $editingId ? 'Edit User' : 'Tambah User' }}</h3>
@@ -90,17 +94,23 @@
                 <form wire:submit="save" class="p-6 space-y-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Username *</label>
-                        <input type="text" wire:model="username" class="w-full px-4 py-2 border border-gray-200 rounded-lg">
+                        <input type="text" wire:model="username" 
+                            class="w-full px-4 py-2 border border-gray-200 rounded-lg {{ $isEditingSuperAdmin ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : '' }}"
+                            {{ $isEditingSuperAdmin ? 'disabled' : '' }}>
                         @error('username') <p class="text-red-500 text-sm mt-1">{{ $message }}</p> @enderror
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Nama Lengkap *</label>
-                        <input type="text" wire:model="name" class="w-full px-4 py-2 border border-gray-200 rounded-lg">
+                        <input type="text" wire:model="name"
+                            class="w-full px-4 py-2 border border-gray-200 rounded-lg {{ $isEditingSuperAdmin ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : '' }}"
+                            {{ $isEditingSuperAdmin ? 'disabled' : '' }}>
                         @error('name') <p class="text-red-500 text-sm mt-1">{{ $message }}</p> @enderror
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Email *</label>
-                        <input type="email" wire:model="email" class="w-full px-4 py-2 border border-gray-200 rounded-lg">
+                        <input type="email" wire:model="email"
+                            class="w-full px-4 py-2 border border-gray-200 rounded-lg {{ $isEditingSuperAdmin ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : '' }}"
+                            {{ $isEditingSuperAdmin ? 'disabled' : '' }}>
                         @error('email') <p class="text-red-500 text-sm mt-1">{{ $message }}</p> @enderror
                     </div>
                     <div>
@@ -108,17 +118,22 @@
                         <input type="password" wire:model="password" class="w-full px-4 py-2 border border-gray-200 rounded-lg">
                         @error('password') <p class="text-red-500 text-sm mt-1">{{ $message }}</p> @enderror
                     </div>
+                    
+                    @if(!$isEditingSuperAdmin)
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Roles</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Roles *</label>
                         <div class="flex flex-wrap gap-2">
                             @foreach($roles as $role)
                                 <label class="inline-flex items-center gap-2 px-3 py-2 border rounded-lg cursor-pointer hover:bg-gray-50 {{ in_array($role->name, $selectedRoles) ? 'border-primary-500 bg-primary-50' : 'border-gray-200' }}">
-                                    <input type="checkbox" wire:model="selectedRoles" value="{{ $role->name }}" class="sr-only">
-                                    <span class="text-sm">{{ $role->name }}</span>
+                                    <input type="checkbox" wire:model.live="selectedRoles" value="{{ $role->name }}" class="sr-only">
+                                    <span class="text-sm font-medium {{ in_array($role->name, $selectedRoles) ? 'text-primary-700' : 'text-gray-700' }}">{{ $role->name }}</span>
                                 </label>
                             @endforeach
                         </div>
+                        @error('selectedRoles') <p class="text-red-500 text-sm mt-1">{{ $message }}</p> @enderror
                     </div>
+                    @endif
+
                     <div class="flex gap-3 pt-4">
                         <button type="button" wire:click="$set('showModal', false)" class="flex-1 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg">Batal</button>
                         <button type="submit" class="flex-1 py-2 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-lg">Simpan</button>

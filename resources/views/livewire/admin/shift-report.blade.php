@@ -1,4 +1,4 @@
-<div>
+<div x-init="lucide.createIcons()">
     <div class="flex items-center justify-between mb-6">
         <div>
             <h1 class="text-2xl font-bold text-gray-800">Laporan Shift</h1>
@@ -46,27 +46,178 @@
     </div>
 
     <!-- Filters -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-100 mb-6 p-4">
-        <div class="flex gap-4">
-            <div>
-                <label class="block text-xs text-gray-500 mb-1">Tanggal</label>
-                <input type="date" wire:model.live="filterDate" class="px-4 py-2 border border-gray-200 rounded-lg">
-            </div>
-            <div>
-                <label class="block text-xs text-gray-500 mb-1">Kasir</label>
-                <select wire:model.live="filterUserId" class="px-4 py-2 border border-gray-200 rounded-lg">
-                    <option value="">Semua Kasir</option>
-                    @foreach($users as $user)
-                        <option value="{{ $user->id }}">{{ $user->name }}</option>
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-4">
+        <div class="flex flex-col gap-4">
+            <!-- Top Section: Period Filters & Actions -->
+            <div class="flex flex-wrap items-center gap-4">
+                <!-- Period Tabs -->
+                <div class="flex bg-gray-100 rounded-xl p-1">
+                    @foreach([
+                        'daily' => 'Per Hari',
+                        'weekly' => 'Per Minggu',
+                        'monthly' => 'Per Bulan',
+                        'yearly' => 'Per Tahun',
+                    ] as $key => $label)
+                        <button 
+                            wire:click="$set('periodType', '{{ $key }}')"
+                            class="px-4 py-2 rounded-lg text-sm font-medium transition-all {{ $periodType === $key ? 'bg-white text-primary-600 shadow-sm' : 'text-gray-600 hover:text-gray-800' }}"
+                        >
+                            {{ $label }}
+                        </button>
                     @endforeach
-                </select>
+                </div>
+
+                <!-- Active Filters & Actions -->
+                @if($periodType === 'daily')
+                    <!-- DAILY VIEW -->
+                    <!-- Date Range -->
+                    <div class="flex items-center gap-3 w-full sm:w-auto" 
+                         x-data="{ init() { initDatePicker(@js($startDate), @js($endDate)) } }" 
+                         x-init="init()"
+                         wire:key="date-picker-daily">
+                        <div class="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-white to-gray-50 border border-gray-200 rounded-xl hover:border-primary-400 hover:shadow-md transition-all cursor-pointer group" id="startDateContainer">
+                            <div class="flex flex-col">
+                                <span class="text-[9px] text-gray-400 uppercase tracking-wide leading-none mb-0.5">Dari</span>
+                                <input type="text" id="dateRangeStart" class="bg-transparent border-none outline-none text-xs font-bold text-gray-700 cursor-pointer w-24 p-0" placeholder="Pilih" readonly>
+                            </div>
+                        </div>
+                        <div class="text-gray-300">
+                             <i data-lucide="arrow-right" class="w-3 h-3"></i>
+                        </div>
+                        <div class="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-white to-gray-50 border border-gray-200 rounded-xl hover:border-primary-400 hover:shadow-md transition-all cursor-pointer group" id="endDateContainer">
+                            <div class="flex flex-col">
+                                <span class="text-[9px] text-gray-400 uppercase tracking-wide leading-none mb-0.5">Sampai</span>
+                                <input type="text" id="dateRangeEnd" class="bg-transparent border-none outline-none text-xs font-bold text-gray-700 cursor-pointer w-24 p-0" placeholder="Pilih" readonly>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Print Group (Compact Dark) -->
+                    <div class="flex items-center gap-1 bg-gray-900 rounded-xl p-1 shadow-lg shadow-gray-200/50">
+                        <div class="relative group">
+                            <select x-model="printFormat" class="bg-transparent text-white text-xs font-medium border-0 focus:ring-0 cursor-pointer pl-3 pr-6 py-1.5 appearance-none hover:bg-gray-800 rounded-lg transition-colors outline-none" title="Pilih Ukuran Kertas">
+                                <option value="A4" class="text-gray-900 bg-white">Laporan (A4)</option>
+                                <option value="A5" class="text-gray-900 bg-white">Laporan (A5)</option>
+                                <option value="58mm" class="text-gray-900 bg-white">Struk (58mm)</option>
+                                <option value="76mm" class="text-gray-900 bg-white">Struk (76mm)</option>
+                            </select>
+                            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-1 text-white/50 group-hover:text-white transition-colors">
+                                <i data-lucide="chevron-down" class="w-3 h-3"></i>
+                            </div>
+                        </div>
+                        <div class="w-px h-4 bg-gray-700"></div>
+                        <a :href="'{!! $this->getPrintTableUrl() !!}' + ('{!! $this->getPrintTableUrl() !!}'.includes('?') ? '&' : '?') + 'format=' + printFormat" target="_blank" class="flex items-center justify-center gap-1.5 px-3 py-1.5 text-white hover:bg-gray-800 rounded-lg transition-colors" title="Cetak Tabel">
+                            <i data-lucide="printer" class="w-3.5 h-3.5"></i>
+                            <span class="text-xs font-medium">Cetak</span>
+                        </a>
+                    </div>
+                    
+                    <!-- Vertical Stack: Excel & Reset -->
+                    <div class="flex flex-col gap-1">
+                         <a href="{{ $this->getExportUrl() }}" class="w-8 h-8 flex items-center justify-center bg-green-50 hover:bg-green-100 text-green-600 hover:text-green-700 rounded-lg transition-colors border border-green-200" title="Excel Ringkasan">
+                            <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
+                        </a>
+                        <a href="{{ $this->getExportDetailUrl() }}" class="w-8 h-8 flex items-center justify-center bg-emerald-50 hover:bg-emerald-100 text-emerald-600 hover:text-emerald-700 rounded-lg transition-colors border border-emerald-200" title="Excel Detail">
+                            <i data-lucide="download" class="w-4 h-4"></i>
+                        </a>
+                        <button wire:click="resetFilters" class="w-8 h-8 flex items-center justify-center bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 rounded-lg transition-colors border border-red-200" title="Reset Filter">
+                            <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+
+                @else
+                    <!-- OTHER VIEWS (Weekly/Monthly/Yearly) -->
+                    @if($periodType === 'weekly')
+                        <div class="flex items-center gap-3">
+                            <select wire:model.live="selectedWeek" class="px-4 py-2 border border-gray-200 rounded-xl bg-white text-sm font-medium focus:ring-2 focus:ring-primary-100 focus:border-primary-500 outline-none transition-all">
+                                @foreach($this->weeks as $weekNum => $weekLabel)
+                                    <option value="{{ $weekNum }}">{{ $weekLabel }}</option>
+                                @endforeach
+                            </select>
+                            <select wire:model.live="selectedWeekYear" class="px-4 py-2 border border-gray-200 rounded-xl bg-white text-sm font-medium focus:ring-2 focus:ring-primary-100 focus:border-primary-500 outline-none transition-all">
+                                @foreach($this->years as $year)
+                                    <option value="{{ $year }}">{{ $year }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    @elseif($periodType === 'monthly')
+                        <div class="flex items-center gap-3">
+                            <select wire:model.live="selectedMonth" class="px-4 py-2 border border-gray-200 rounded-xl bg-white text-sm font-medium focus:ring-2 focus:ring-primary-100 focus:border-primary-500 outline-none transition-all">
+                                @foreach($months as $num => $name)
+                                    <option value="{{ $num }}">{{ $name }}</option>
+                                @endforeach
+                            </select>
+                            <select wire:model.live="selectedMonthYear" class="px-4 py-2 border border-gray-200 rounded-xl bg-white text-sm font-medium focus:ring-2 focus:ring-primary-100 focus:border-primary-500 outline-none transition-all">
+                                @foreach($this->years as $year)
+                                    <option value="{{ $year }}">{{ $year }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    @elseif($periodType === 'yearly')
+                        <div class="flex items-center gap-3">
+                            <select wire:model.live="selectedYear" class="px-4 py-2 border border-gray-200 rounded-xl bg-white text-sm font-medium focus:ring-2 focus:ring-primary-100 focus:border-primary-500 outline-none transition-all">
+                                @foreach($this->years as $year)
+                                    <option value="{{ $year }}">Tahun {{ $year }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    @endif
+                    
+                    <div class="h-8 w-px bg-gray-200 hidden sm:block"></div>
+
+                    <!-- Print Group (Dark) -->
+                    <div class="flex items-center gap-1 bg-gray-900 rounded-xl p-1 shadow-lg shadow-gray-200/50">
+                        <div class="relative group">
+                            <select x-model="printFormat" class="bg-transparent text-white text-xs font-medium border-0 focus:ring-0 cursor-pointer pl-3 pr-6 py-1.5 appearance-none hover:bg-gray-800 rounded-lg transition-colors outline-none" title="Pilih Ukuran Kertas">
+                                <option value="A4" class="text-gray-900 bg-white">Laporan (A4)</option>
+                                <option value="A5" class="text-gray-900 bg-white">Laporan (A5)</option>
+                                <option value="58mm" class="text-gray-900 bg-white">Struk (58mm)</option>
+                                <option value="76mm" class="text-gray-900 bg-white">Struk (76mm)</option>
+                            </select>
+                            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-1 text-white/50 group-hover:text-white transition-colors">
+                                <i data-lucide="chevron-down" class="w-3 h-3"></i>
+                            </div>
+                        </div>
+                        <div class="w-px h-4 bg-gray-700"></div>
+                        <a :href="'{!! $this->getPrintTableUrl() !!}' + ('{!! $this->getPrintTableUrl() !!}'.includes('?') ? '&' : '?') + 'format=' + printFormat" target="_blank" class="flex items-center justify-center gap-1.5 px-3 py-1.5 text-white hover:bg-gray-800 rounded-lg transition-colors" title="Cetak Tabel">
+                            <i data-lucide="printer" class="w-3.5 h-3.5"></i>
+                            <span class="text-xs font-medium">Cetak</span>
+                        </a>
+                    </div>
+                    
+                    <!-- Vertical Stack: Excel & Reset -->
+                    <div class="flex flex-col gap-1">
+                         <a href="{{ $this->getExportUrl() }}" class="w-8 h-8 flex items-center justify-center bg-green-50 hover:bg-green-100 text-green-600 hover:text-green-700 rounded-lg transition-colors border border-green-200" title="Excel Ringkasan">
+                            <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
+                        </a>
+                        <a href="{{ $this->getExportDetailUrl() }}" class="w-8 h-8 flex items-center justify-center bg-emerald-50 hover:bg-emerald-100 text-emerald-600 hover:text-emerald-700 rounded-lg transition-colors border border-emerald-200" title="Excel Detail">
+                            <i data-lucide="download" class="w-4 h-4"></i>
+                        </a>
+                        <button wire:click="resetFilters" class="w-8 h-8 flex items-center justify-center bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 rounded-lg transition-colors border border-red-200" title="Reset Filter">
+                            <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                @endif
+            </div>
+            
+            <!-- Bottom: Search & Cashier -->
+            <div class="flex flex-wrap items-center gap-4 border-t border-gray-100 pt-4 mt-2">
+                <!-- Cashier Filter -->
+                <div class="flex-1">
+                    <select wire:model.live="filterUserId" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-100 focus:border-primary-500 outline-none transition-all">
+                        <option value="">Semua Kasir</option>
+                        @foreach($users as $user)
+                            <option value="{{ $user->id }}">{{ $user->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
             </div>
         </div>
     </div>
 
     <!-- Table -->
     <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <table class="w-full">
+        <table class="w-full text-sm text-left">
             <thead class="bg-gray-50">
                 <tr>
                     <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Kasir</th>
@@ -132,8 +283,8 @@
 
     <!-- Detail Modal -->
     @if($showDetailModal && $selectedShift)
-        <div class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center overflow-y-auto py-8">
-            <div class="bg-white rounded-2xl w-full max-w-2xl mx-4 shadow-2xl">
+        <div class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center overflow-y-auto py-8" wire:click.self="$set('showDetailModal', false)">
+            <div class="bg-white rounded-2xl w-full max-w-2xl mx-4 shadow-2xl" x-init="setTimeout(() => lucide.createIcons(), 50)">
                 <div class="p-6 border-b flex justify-between items-center">
                     <h3 class="text-xl font-bold text-gray-800">Detail Shift</h3>
                     <button wire:click="$set('showDetailModal', false)" class="text-gray-400 hover:text-gray-600"><i data-lucide="x" class="w-6 h-6"></i></button>

@@ -1,4 +1,4 @@
-<div>
+<div x-data="{ printFormat: 'A4' }">
     <style>
         @media print {
             /* Hide non-printable elements */
@@ -66,19 +66,32 @@
             <h1 class="text-2xl font-bold text-gray-800">Analisa & Performa</h1>
             <p class="text-gray-500">Analisis penjualan dan performa produk</p>
         </div>
-        
-        <div class="flex items-center gap-2 no-print">
+        <div class="flex items-center gap-3">
             @if(in_array($activeTab, ['products', 'categories', 'payments']))
-                <a href="{{ $this->getExportUrl() }}" class="px-3 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg flex items-center gap-2 transition-colors">
+                <a href="{{ $this->getExportUrl() }}" class="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors shadow-sm">
                     <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
-                    <span>Excel</span>
+                    <span class="text-sm font-medium">Excel</span>
                 </a>
             @endif
-            
-            <button onclick="window.print()" class="px-3 py-2 bg-gray-800 hover:bg-gray-900 text-white font-medium rounded-lg flex items-center gap-2 transition-colors">
-                <i data-lucide="printer" class="w-4 h-4"></i>
-                <span>Cetak</span>
-            </button>
+
+            <div class="flex items-center gap-1 bg-white border border-gray-200 rounded-lg p-1 shadow-sm">
+                <div class="relative group">
+                    <select x-model="printFormat" class="bg-transparent text-gray-700 text-sm font-medium border-0 focus:ring-0 cursor-pointer pl-3 pr-7 py-1.5 appearance-none hover:bg-gray-50 rounded-md transition-colors outline-none" title="Pilih Ukuran Kertas">
+                        <option value="A4">Laporan (A4)</option>
+                        <option value="A5">Laporan (A5)</option>
+                        <option value="58mm">Struk (58mm)</option>
+                        <option value="76mm">Struk (76mm)</option>
+                    </select>
+                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400 group-hover:text-gray-600 transition-colors">
+                        <i data-lucide="chevron-down" class="w-3 h-3"></i>
+                    </div>
+                </div>
+                <div class="w-px h-5 bg-gray-200"></div>
+                <a :href="'{!! route('print.sales-report', ['start' => $startDate, 'end' => $endDate]) !!}' + ('{!! route('print.sales-report', ['start' => $startDate, 'end' => $endDate]) !!}'.includes('?') ? '&' : '?') + 'format=' + printFormat" target="_blank" class="flex items-center justify-center gap-2 px-3 py-1.5 text-gray-700 hover:bg-gray-50 rounded-md transition-colors" title="Cetak Sekarang">
+                    <i data-lucide="printer" class="w-4 h-4"></i>
+                    <span class="text-sm font-medium">Cetak</span>
+                </a>
+            </div>
         </div>
     </div>
 
@@ -128,56 +141,55 @@
 
             <!-- Date Inputs & Reset -->
             <div class="flex flex-wrap items-center gap-4 w-full md:w-auto">
-                <!-- Date Range Picker -->
-                @if($periodType === 'daily')
+                @if($periodType == 'daily')
                     <div class="flex items-center gap-3" 
                          x-data="{ init() { initDatePicker(@js($startDate), @js($endDate)) } }" 
                          x-init="init()"
-                         wire:key="date-picker-{{ $periodType }}">
-                        <div class="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-white to-gray-50 border border-gray-200 rounded-xl hover:border-primary-400 hover:shadow-md transition-all cursor-pointer group w-full sm:w-auto" id="startDateContainer">
-                            <i data-lucide="calendar" class="w-4 h-4 text-primary-500 group-hover:text-primary-600"></i>
+                         wire:key="date-picker-daily">
+                        <div class="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-lg shadow-sm group hover:border-primary-400 transition-all cursor-pointer" id="startDateContainer">
                             <div class="flex flex-col">
-                                <span class="text-[10px] text-gray-400 uppercase tracking-wide">Dari</span>
-                                <input type="text" id="dateRangeStart" class="bg-transparent border-none outline-none text-sm font-semibold text-gray-700 cursor-pointer w-full sm:w-28" placeholder="Pilih" readonly>
+                                <span class="text-[10px] text-gray-400 uppercase tracking-wide leading-none mb-0.5">Dari</span>
+                                <input type="text" id="dateRangeStart" class="bg-transparent border-none outline-none text-xs font-bold text-gray-700 cursor-pointer w-24 p-0" placeholder="Pilih" readonly>
                             </div>
                         </div>
-                        <div class="hidden sm:flex items-center justify-center w-8 h-8 bg-gray-100 rounded-full">
-                            <i data-lucide="arrow-right" class="w-4 h-4 text-gray-400"></i>
-                        </div>
-                        <div class="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-white to-gray-50 border border-gray-200 rounded-xl hover:border-primary-400 hover:shadow-md transition-all cursor-pointer group w-full sm:w-auto" id="endDateContainer">
-                            <i data-lucide="calendar" class="w-4 h-4 text-primary-500 group-hover:text-primary-600"></i>
+                        <i data-lucide="arrow-right" class="w-4 h-4 text-gray-400"></i>
+                        <div class="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-lg shadow-sm group hover:border-primary-400 transition-all cursor-pointer" id="endDateContainer">
                             <div class="flex flex-col">
-                                <span class="text-[10px] text-gray-400 uppercase tracking-wide">Sampai</span>
-                                <input type="text" id="dateRangeEnd" class="bg-transparent border-none outline-none text-sm font-semibold text-gray-700 cursor-pointer w-full sm:w-28" placeholder="Pilih" readonly>
+                                <span class="text-[10px] text-gray-400 uppercase tracking-wide leading-none mb-0.5">Sampai</span>
+                                <input type="text" id="dateRangeEnd" class="bg-transparent border-none outline-none text-xs font-bold text-gray-700 cursor-pointer w-24 p-0" placeholder="Pilih" readonly>
                             </div>
                         </div>
                     </div>
                 @elseif($periodType === 'weekly')
-                    <div class="flex items-center gap-2 w-full sm:w-auto">
-                        <select wire:model.live="selectedWeekYear" class="px-4 py-2.5 border border-gray-200 rounded-xl bg-white text-sm font-medium w-full sm:w-auto">
+                    <div class="flex items-center gap-2">
+                        <select wire:model.live="selectedWeekYear" class="px-3 py-2 border border-gray-200 rounded-lg bg-white text-sm focus:ring-2 focus:ring-primary-100 focus:border-primary-400 outline-none">
                             @foreach($this->years as $year)
                                 <option value="{{ $year }}">{{ $year }}</option>
                             @endforeach
                         </select>
-                        <select wire:model.live="selectedWeek" class="px-4 py-2.5 border border-gray-200 rounded-xl bg-white text-sm font-medium w-full sm:w-auto">
+                        <select wire:model.live="selectedWeek" class="px-3 py-2 border border-gray-200 rounded-lg bg-white text-sm focus:ring-2 focus:ring-primary-100 focus:border-primary-400 outline-none">
                             @foreach($this->weeks as $weekNum => $weekLabel)
                                 <option value="{{ $weekNum }}">{{ $weekLabel }}</option>
                             @endforeach
                         </select>
                     </div>
                 @elseif($periodType === 'monthly')
-                    <input type="month" wire:model.live="selectedMonth" class="px-4 py-2.5 border border-gray-200 rounded-xl bg-white text-sm font-medium w-full sm:w-auto">
+                    <input type="month" wire:model.live="selectedMonth" class="px-3 py-2 border border-gray-200 rounded-lg bg-white text-sm focus:ring-2 focus:ring-primary-100 focus:border-primary-400 outline-none">
                 @elseif($periodType === 'yearly')
-                    <select wire:model.live="selectedYear" class="px-4 py-2.5 border border-gray-200 rounded-xl bg-white text-sm font-medium w-full sm:w-auto">
+                    <select wire:model.live="selectedYear" class="px-3 py-2 border border-gray-200 rounded-lg bg-white text-sm focus:ring-2 focus:ring-primary-100 focus:border-primary-400 outline-none">
                         @foreach($this->years as $year)
                             <option value="{{ $year }}">{{ $year }}</option>
                         @endforeach
                     </select>
                 @endif
-                
-                <button wire:click="resetFilters" wire:loading.attr="disabled" class="flex items-center justify-center gap-2 px-4 py-2.5 text-gray-500 hover:text-gray-800 hover:bg-gray-50 rounded-xl transition-colors w-full sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed">
+
+                <button 
+                    wire:click="resetFilters" 
+                    wire:loading.attr="disabled"
+                    class="flex items-center gap-2 px-3 py-2 text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                >
                     <i wire:loading.remove wire:target="resetFilters" data-lucide="rotate-ccw" class="w-4 h-4"></i>
-                    <i wire:loading wire:target="resetFilters" data-lucide="loader" class="w-4 h-4 animate-spin text-primary-600"></i>
+                    <i wire:loading wire:target="resetFilters" data-lucide="loader" class="w-4 h-4 animate-spin"></i>
                     <span class="text-sm font-medium">Reset</span>
                 </button>
             </div>

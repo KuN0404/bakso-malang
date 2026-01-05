@@ -1,33 +1,9 @@
 <div>
+<div x-data="{ printFormat: 'A4' }" x-init="lucide.createIcons();">
     <div class="flex items-center justify-between mb-6">
         <div>
             <h1 class="text-2xl font-bold text-gray-800">Laporan Penjualan</h1>
             <p class="text-gray-500">Daftar lengkap riwayat transaksi penjualan</p>
-        </div>
-        <div class="flex items-center gap-2">
-            <!-- Print Table -->
-            <a href="{{ $this->getPrintTableUrl() }}" target="_blank" class="px-3 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 font-medium rounded-lg flex items-center gap-2 transition-colors" title="Cetak Tabel">
-                <i data-lucide="printer" class="w-4 h-4"></i>
-                <span class="hidden sm:inline">Cetak</span>
-            </a>
-            
-            <!-- Print Detail -->
-            <a href="{{ $this->getPrintDetailUrl() }}" target="_blank" class="px-3 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 font-medium rounded-lg flex items-center gap-2 transition-colors" title="Cetak Detail">
-                <i data-lucide="file-text" class="w-4 h-4"></i>
-                <span class="hidden sm:inline">Cetak Detail</span>
-            </a>
-            
-            <!-- Export Summary -->
-            <a href="{{ $this->getExportUrl() }}" class="px-3 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg flex items-center gap-2 transition-colors" title="Download Excel Ringkasan">
-                <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
-                <span class="hidden sm:inline">Excel</span>
-            </a>
-
-            <!-- Export Detail -->
-            <a href="{{ $this->getExportDetailUrl() }}" class="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg flex items-center gap-2 transition-colors" title="Download Excel Detail Item">
-                <i data-lucide="download" class="w-4 h-4"></i>
-                <span class="hidden sm:inline">Excel Detail</span>
-            </a>
         </div>
     </div>
 
@@ -49,120 +25,191 @@
 
     <!-- Filters -->
     <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-4">
-        <div class="flex flex-wrap items-center gap-4">
-            <!-- Period Type Tabs -->
-            <div class="flex bg-gray-100 rounded-xl p-1">
-                @foreach([
-                    'daily' => 'Per Hari',
-                    'weekly' => 'Per Minggu',
-                    'monthly' => 'Per Bulan',
-                    'yearly' => 'Per Tahun',
-                ] as $key => $label)
-                    <button 
-                        wire:click="$set('periodType', '{{ $key }}')"
-                        class="px-4 py-2 rounded-lg text-sm font-medium transition-all {{ $periodType === $key ? 'bg-white text-primary-600 shadow-sm' : 'text-gray-600 hover:text-gray-800' }}"
-                    >
-                        {{ $label }}
-                    </button>
-                @endforeach
+        <div class="flex flex-col gap-4">
+            <!-- Top Section: Period Filters & Actions -->
+            <div class="flex flex-wrap items-center gap-4">
+                <!-- Period Tabs -->
+                <div class="flex bg-gray-100 rounded-xl p-1">
+                    @foreach([
+                        'daily' => 'Per Hari',
+                        'weekly' => 'Per Minggu',
+                        'monthly' => 'Per Bulan',
+                        'yearly' => 'Per Tahun',
+                    ] as $key => $label)
+                        <button 
+                            wire:click="$set('periodType', '{{ $key }}')"
+                            class="px-4 py-2 rounded-lg text-sm font-medium transition-all {{ $periodType === $key ? 'bg-white text-primary-600 shadow-sm' : 'text-gray-600 hover:text-gray-800' }}"
+                        >
+                            {{ $label }}
+                        </button>
+                    @endforeach
+                </div>
+
+                <!-- Active Filters & Actions -->
+                @if($periodType === 'daily')
+                    <!-- DAILY VIEW -->
+                    <!-- Date Range -->
+                    <div class="flex items-center gap-3 w-full sm:w-auto" 
+                         x-data="{ init() { initDatePicker(@js($startDate), @js($endDate)) } }" 
+                         x-init="init()"
+                         wire:key="date-picker-daily">
+                        <div class="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-white to-gray-50 border border-gray-200 rounded-xl hover:border-primary-400 hover:shadow-md transition-all cursor-pointer group" id="startDateContainer">
+                            <div class="flex flex-col">
+                                <span class="text-[9px] text-gray-400 uppercase tracking-wide leading-none mb-0.5">Dari</span>
+                                <input type="text" id="dateRangeStart" class="bg-transparent border-none outline-none text-xs font-bold text-gray-700 cursor-pointer w-24 p-0" placeholder="Pilih" readonly>
+                            </div>
+                        </div>
+                        <div class="text-gray-300">
+                             <i data-lucide="arrow-right" class="w-3 h-3"></i>
+                        </div>
+                        <div class="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-white to-gray-50 border border-gray-200 rounded-xl hover:border-primary-400 hover:shadow-md transition-all cursor-pointer group" id="endDateContainer">
+                            <div class="flex flex-col">
+                                <span class="text-[9px] text-gray-400 uppercase tracking-wide leading-none mb-0.5">Sampai</span>
+                                <input type="text" id="dateRangeEnd" class="bg-transparent border-none outline-none text-xs font-bold text-gray-700 cursor-pointer w-24 p-0" placeholder="Pilih" readonly>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Print Group (Compact Dark) -->
+                    <div class="flex items-center gap-1 bg-gray-900 rounded-xl p-1 shadow-lg shadow-gray-200/50">
+                        <div class="relative group">
+                            <select x-model="printFormat" class="bg-transparent text-white text-xs font-medium border-0 focus:ring-0 cursor-pointer pl-3 pr-6 py-1.5 appearance-none hover:bg-gray-800 rounded-lg transition-colors outline-none" title="Pilih Ukuran Kertas">
+                                <option value="A4" class="text-gray-900 bg-white">Laporan (A4)</option>
+                                <option value="A5" class="text-gray-900 bg-white">Laporan (A5)</option>
+                                <option value="58mm" class="text-gray-900 bg-white">Struk (58mm)</option>
+                                <option value="76mm" class="text-gray-900 bg-white">Struk (76mm)</option>
+                            </select>
+                            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-1 text-white/50 group-hover:text-white transition-colors">
+                                <i data-lucide="chevron-down" class="w-3 h-3"></i>
+                            </div>
+                        </div>
+                        <div class="w-px h-4 bg-gray-700"></div>
+                        <a :href="'{!! $this->getPrintTableUrl() !!}' + ('{!! $this->getPrintTableUrl() !!}'.includes('?') ? '&' : '?') + 'format=' + printFormat" target="_blank" class="flex items-center justify-center gap-1.5 px-3 py-1.5 text-white hover:bg-gray-800 rounded-lg transition-colors" title="Cetak Tabel">
+                            <i data-lucide="printer" class="w-3.5 h-3.5"></i>
+                            <span class="text-xs font-medium">Cetak</span>
+                        </a>
+                        <div class="w-px h-4 bg-gray-700"></div>
+                        <a :href="'{!! $this->getPrintDetailUrl() !!}' + ('{!! $this->getPrintDetailUrl() !!}'.includes('?') ? '&' : '?') + 'format=' + printFormat" target="_blank" class="flex items-center justify-center gap-1.5 px-3 py-1.5 text-white hover:bg-gray-800 rounded-lg transition-colors" title="Cetak Detail">
+                            <i data-lucide="file-text" class="w-3.5 h-3.5"></i>
+                            <span class="text-xs font-medium">Detail</span>
+                        </a>
+                    </div>
+                    
+                    <!-- Excel Stack (Vertical) -->
+                    <div class="flex flex-col gap-1">
+                         <a href="{{ $this->getExportUrl() }}" class="w-8 h-8 flex items-center justify-center bg-green-50 hover:bg-green-100 text-green-600 hover:text-green-700 rounded-lg transition-colors border border-green-200" title="Excel Ringkasan">
+                            <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
+                        </a>
+                         <a href="{{ $this->getExportDetailUrl() }}" class="w-8 h-8 flex items-center justify-center bg-emerald-50 hover:bg-emerald-100 text-emerald-600 hover:text-emerald-700 rounded-lg transition-colors border border-emerald-200" title="Excel Detail">
+                            <i data-lucide="download" class="w-4 h-4"></i>
+                        </a>
+                        <button wire:click="resetFilters" class="w-8 h-8 flex items-center justify-center bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 rounded-lg transition-colors border border-red-200" title="Reset Filter">
+                            <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+
+                @else
+                    <!-- OTHER VIEWS (Weekly/Monthly/Yearly) -->
+                    @if($periodType === 'weekly')
+                        <div class="flex items-center gap-3">
+                            <select wire:model.live="selectedWeek" class="px-4 py-2 border border-gray-200 rounded-xl bg-white text-sm font-medium focus:ring-2 focus:ring-primary-100 focus:border-primary-500 outline-none transition-all">
+                                @foreach($this->weeks as $weekNum => $weekLabel)
+                                    <option value="{{ $weekNum }}">{{ $weekLabel }}</option>
+                                @endforeach
+                            </select>
+                            <select wire:model.live="selectedWeekYear" class="px-4 py-2 border border-gray-200 rounded-xl bg-white text-sm font-medium focus:ring-2 focus:ring-primary-100 focus:border-primary-500 outline-none transition-all">
+                                @foreach($this->years as $year)
+                                    <option value="{{ $year }}">{{ $year }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    @elseif($periodType === 'monthly')
+                        <div class="flex items-center gap-3">
+                            <select wire:model.live="selectedMonth" class="px-4 py-2 border border-gray-200 rounded-xl bg-white text-sm font-medium focus:ring-2 focus:ring-primary-100 focus:border-primary-500 outline-none transition-all">
+                                @foreach($months as $num => $name)
+                                    <option value="{{ $num }}">{{ $name }}</option>
+                                @endforeach
+                            </select>
+                            <select wire:model.live="selectedMonthYear" class="px-4 py-2 border border-gray-200 rounded-xl bg-white text-sm font-medium focus:ring-2 focus:ring-primary-100 focus:border-primary-500 outline-none transition-all">
+                                @foreach($this->years as $year)
+                                    <option value="{{ $year }}">{{ $year }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    @elseif($periodType === 'yearly')
+                        <div class="flex items-center gap-3">
+                            <select wire:model.live="selectedYear" class="px-4 py-2 border border-gray-200 rounded-xl bg-white text-sm font-medium focus:ring-2 focus:ring-primary-100 focus:border-primary-500 outline-none transition-all">
+                                @foreach($this->years as $year)
+                                    <option value="{{ $year }}">Tahun {{ $year }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    @endif
+                    
+                    <div class="h-8 w-px bg-gray-200 hidden sm:block"></div>
+
+                    <!-- Print Group (Dark) -->
+                    <div class="flex items-center gap-1 bg-gray-900 rounded-xl p-1 shadow-sm">
+                        <div class="relative group">
+                            <select x-model="printFormat" class="bg-transparent text-white text-sm font-medium border-0 focus:ring-0 cursor-pointer pl-3 pr-7 py-1.5 appearance-none hover:bg-gray-800 rounded-lg transition-colors outline-none" title="Pilih Ukuran Kertas">
+                                <option value="A4" class="text-gray-900 bg-white">Laporan (A4)</option>
+                                <option value="A5" class="text-gray-900 bg-white">Laporan (A5)</option>
+                                <option value="58mm" class="text-gray-900 bg-white">Struk (58mm)</option>
+                                <option value="76mm" class="text-gray-900 bg-white">Struk (76mm)</option>
+                            </select>
+                            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-white/50 group-hover:text-white transition-colors">
+                                <i data-lucide="chevron-down" class="w-3 h-3"></i>
+                            </div>
+                        </div>
+                        <div class="w-px h-5 bg-gray-700"></div>
+                        <a :href="'{!! $this->getPrintTableUrl() !!}' + ('{!! $this->getPrintTableUrl() !!}'.includes('?') ? '&' : '?') + 'format=' + printFormat" target="_blank" class="flex items-center justify-center gap-2 px-3 py-1.5 text-white hover:bg-gray-800 rounded-lg transition-colors" title="Cetak Tabel">
+                            <i data-lucide="printer" class="w-4 h-4"></i>
+                            <span class="text-sm font-medium">Cetak</span>
+                        </a>
+                        <div class="w-px h-5 bg-gray-700"></div>
+                        <a :href="'{!! $this->getPrintDetailUrl() !!}' + ('{!! $this->getPrintDetailUrl() !!}'.includes('?') ? '&' : '?') + 'format=' + printFormat" target="_blank" class="flex items-center justify-center gap-2 px-3 py-1.5 text-white hover:bg-gray-800 rounded-lg transition-colors" title="Cetak Detail">
+                            <i data-lucide="file-text" class="w-4 h-4"></i>
+                            <span class="text-sm font-medium">Detail</span>
+                        </a>
+                    </div>
+                    
+                    <!-- Vertical Stack: Excel & Reset -->
+                    <div class="flex flex-col gap-1">
+                         <a href="{{ $this->getExportUrl() }}" class="w-8 h-8 flex items-center justify-center bg-green-50 hover:bg-green-100 text-green-600 hover:text-green-700 rounded-lg transition-colors border border-green-200" title="Excel Ringkasan">
+                            <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
+                        </a>
+                         <a href="{{ $this->getExportDetailUrl() }}" class="w-8 h-8 flex items-center justify-center bg-emerald-50 hover:bg-emerald-100 text-emerald-600 hover:text-emerald-700 rounded-lg transition-colors border border-emerald-200" title="Excel Detail">
+                            <i data-lucide="download" class="w-4 h-4"></i>
+                        </a>
+                        <button wire:click="resetFilters" class="w-8 h-8 flex items-center justify-center bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 rounded-lg transition-colors border border-red-200" title="Reset Filter">
+                            <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                @endif
             </div>
 
-            <!-- Dynamic Filter Based on Period Type -->
-            @if($periodType === 'daily')
-                <!-- Date Range Picker -->
-                <div class="flex items-center gap-3" 
-                     x-data="{ init() { initDatePicker(@js($startDate), @js($endDate)) } }" 
-                     x-init="init()"
-                     wire:key="date-picker-{{ $periodType }}">
-                    <div class="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-white to-gray-50 border border-gray-200 rounded-xl hover:border-primary-400 hover:shadow-md transition-all cursor-pointer group" id="startDateContainer">
-                        <i data-lucide="calendar" class="w-4 h-4 text-primary-500 group-hover:text-primary-600"></i>
-                        <div class="flex flex-col">
-                            <span class="text-[10px] text-gray-400 uppercase tracking-wide">Dari</span>
-                            <input type="text" id="dateRangeStart" class="bg-transparent border-none outline-none text-sm font-semibold text-gray-700 cursor-pointer w-28" placeholder="Pilih" readonly>
-                        </div>
-                    </div>
-                    <div class="flex items-center justify-center w-8 h-8 bg-gray-100 rounded-full">
-                        <i data-lucide="arrow-right" class="w-4 h-4 text-gray-400"></i>
-                    </div>
-                    <div class="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-white to-gray-50 border border-gray-200 rounded-xl hover:border-primary-400 hover:shadow-md transition-all cursor-pointer group" id="endDateContainer">
-                        <i data-lucide="calendar" class="w-4 h-4 text-primary-500 group-hover:text-primary-600"></i>
-                        <div class="flex flex-col">
-                            <span class="text-[10px] text-gray-400 uppercase tracking-wide">Sampai</span>
-                            <input type="text" id="dateRangeEnd" class="bg-transparent border-none outline-none text-sm font-semibold text-gray-700 cursor-pointer w-28" placeholder="Pilih" readonly>
-                        </div>
-                    </div>
-                </div>
-            @elseif($periodType === 'weekly')
-                <!-- Week Selector -->
-                <div class="flex items-center gap-3">
-                    <select wire:model.live="selectedWeek" class="px-4 py-2.5 border border-gray-200 rounded-xl bg-white text-sm font-medium">
-                        @foreach($this->weeks as $weekNum => $weekLabel)
-                            <option value="{{ $weekNum }}">{{ $weekLabel }}</option>
-                        @endforeach
-                    </select>
-                    <select wire:model.live="selectedWeekYear" class="px-4 py-2.5 border border-gray-200 rounded-xl bg-white text-sm font-medium">
-                        @foreach($this->years as $year)
-                            <option value="{{ $year }}">{{ $year }}</option>
-                        @endforeach
-                    </select>
-                </div>
-            @elseif($periodType === 'monthly')
-                <!-- Month Selector -->
-                <div class="flex items-center gap-3">
-                    <select wire:model.live="selectedMonth" class="px-4 py-2.5 border border-gray-200 rounded-xl bg-white text-sm font-medium">
-                        @foreach($months as $num => $name)
-                            <option value="{{ $num }}">{{ $name }}</option>
-                        @endforeach
-                    </select>
-                    <select wire:model.live="selectedMonthYear" class="px-4 py-2.5 border border-gray-200 rounded-xl bg-white text-sm font-medium">
-                        @foreach($this->years as $year)
-                            <option value="{{ $year }}">{{ $year }}</option>
-                        @endforeach
-                    </select>
-                </div>
-            @elseif($periodType === 'yearly')
-                <!-- Year Selector -->
-                <div class="flex items-center gap-3">
-                    <select wire:model.live="selectedYear" class="px-4 py-2.5 border border-gray-200 rounded-xl bg-white text-sm font-medium">
-                        @foreach($this->years as $year)
-                            <option value="{{ $year }}">Tahun {{ $year }}</option>
-                        @endforeach
-                    </select>
-                </div>
-            @endif
+            <!-- Row 2 Removed (merged above) -->
+            <div class="hidden">
             
-            <!-- Reset Button -->
-            <button 
-                wire:click="resetFilters"
-                class="flex items-center gap-1.5 px-3 py-2 text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                title="Reset filter"
-            >
-                <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
-                <span class="text-sm">Reset</span>
-            </button>
-        </div>
-
-        <div class="flex flex-wrap items-center gap-4 mt-4">
-            <!-- Search -->
-            <div class="relative flex-1 min-w-[200px]">
-                <input 
-                    type="text" 
-                    wire:model.live.debounce.300ms="search" 
-                    placeholder="Cari invoice..." 
-                    class="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg"
-                >
-                <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400"></i>
+            <!-- Bottom: Search & Cashier -->
+            <div class="flex flex-wrap items-center gap-4 border-t border-gray-100 pt-4 mt-2">
+                <div class="relative flex-1 min-w-[200px]">
+                    <input 
+                        type="text" 
+                        wire:model.live.debounce.300ms="search" 
+                        placeholder="Cari invoice..." 
+                        class="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-100 focus:border-primary-500 outline-none transition-all"
+                    >
+                    <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400"></i>
+                </div>
+                <!-- Cashier Filter -->
+                <select wire:model.live="filterCashier" class="px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-100 focus:border-primary-500 outline-none transition-all">
+                    <option value="">Semua Kasir</option>
+                    @foreach($cashiers as $cashier)
+                        <option value="{{ $cashier->id }}">{{ $cashier->name }}</option>
+                    @endforeach
+                </select>
             </div>
-
-
-
-            <!-- Cashier Filter -->
-            <select wire:model.live="filterCashier" class="px-4 py-2 border border-gray-200 rounded-lg">
-                <option value="">Semua Kasir</option>
-                @foreach($cashiers as $cashier)
-                    <option value="{{ $cashier->id }}">{{ $cashier->name }}</option>
-                @endforeach
-            </select>
         </div>
     </div>
 
@@ -177,194 +224,172 @@
                         <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Kasir</th>
                         <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Pembayaran</th>
                         <th class="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Total</th>
-
                         <th class="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Cetak</th>
                         <th class="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Aksi</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
                     @forelse($transactions as $transaction)
-                        <tr class="hover:bg-gray-50">
-                            <td class="px-4 py-3">
-                                <span class="font-medium text-gray-800">{{ $transaction->invoice_number }}</span>
+                        <tr class="hover:bg-gray-50 transition-colors">
+                            <td class="px-4 py-3 text-sm font-medium text-gray-900">
+                                {{ $transaction->invoice_number }}
                             </td>
                             <td class="px-4 py-3 text-sm text-gray-600">
-                                {{ $transaction->created_at->format('d M Y, H:i') }}
+                                <div>{{ $transaction->created_at->format('d/m/Y') }}</div>
+                                <div class="text-xs text-gray-500">{{ $transaction->created_at->format('H:i') }}</div>
                             </td>
-                            <td class="px-4 py-3 text-gray-600">
-                                {{ $transaction->user?->name ?? '-' }}
+                            <td class="px-4 py-3 text-sm text-gray-600">
+                                {{ $transaction->cashier->name ?? '-' }}
                             </td>
-                            <td class="px-4 py-3">
-                                <span class="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
-                                    {{ $transaction->paymentSource?->name ?? 'Cash' }}
+                            <td class="px-4 py-3 text-sm">
+                                <span class="px-2 py-1 rounded-full text-xs font-medium {{ 
+                                    $transaction->payment_method === 'cash' ? 'bg-green-100 text-green-700' : 
+                                    ($transaction->payment_method === 'qris' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700') 
+                                }}">
+                                    {{ strtoupper($transaction->payment_method) }}
                                 </span>
                             </td>
-                            <td class="px-4 py-3 text-right font-semibold text-gray-800">
-                                Rp {{ number_format($transaction->total, 0, ',', '.') }}
+                            <td class="px-4 py-3 text-sm font-medium text-gray-900 text-right">
+                                Rp {{ number_format($transaction->total_amount, 0, ',', '.') }}
                             </td>
-
                             <td class="px-4 py-3 text-center">
-                                <span class="text-sm text-gray-500">{{ $transaction->print_count }}x</span>
+                                <a :href="'{{ route('print.transaction.single', $transaction->id) }}' + '?format=' + printFormat" 
+                                   target="_blank"
+                                   @click="setTimeout(() => $wire.$refresh(), 2000)"
+                                   class="inline-flex items-center justify-center w-8 h-8 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
+                                   title="Cetak Struk">
+                                    <i data-lucide="printer" class="w-4 h-4"></i>
+                                </a>
                             </td>
                             <td class="px-4 py-3 text-right">
-                                <div class="flex items-center justify-end gap-1">
-                                    <button wire:click="view({{ $transaction->id }})" class="p-1.5 text-gray-400 hover:text-primary-600 rounded" title="Lihat Detail">
-                                        <i data-lucide="eye" class="w-4 h-4"></i>
-                                    </button>
-                                    <button wire:click="printReceipt({{ $transaction->id }})" class="p-1.5 text-gray-400 hover:text-green-600 rounded" title="Cetak Struk">
-                                        <i data-lucide="printer" class="w-4 h-4"></i>
-                                    </button>
-                                </div>
+                                <button wire:click="showDetail({{ $transaction->id }})" class="text-sm text-primary-600 hover:text-primary-700 font-medium">
+                                    Detail
+                                </button>
                             </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="8" class="px-4 py-12 text-center text-gray-500">
-                                <i data-lucide="receipt" class="w-12 h-12 mx-auto mb-3 text-gray-300"></i>
-                                <p>Tidak ada transaksi ditemukan</p>
+                            <td colspan="7" class="px-4 py-8 text-center text-gray-500">
+                                Tidak ada transaksi ditemukan
                             </td>
                         </tr>
                     @endforelse
                 </tbody>
             </table>
         </div>
-
-        @if($transactions->hasPages())
-            <div class="p-4 border-t bg-gray-50">
-                {{ $transactions->links(data: ['scrollTo' => false]) }}
-            </div>
-        @endif
+        <div class="px-4 py-3 border-t border-gray-100">
+            {{ $transactions->links() }}
+        </div>
     </div>
 
-    <!-- Detail Modal with Modifiers -->
-    @if($showModal && $selectedTransaction)
-        <div class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center overflow-y-auto py-8">
-            <div class="bg-white rounded-2xl w-full max-w-lg mx-4 shadow-2xl max-h-[90vh] flex flex-col">
-                <div class="p-6 border-b flex justify-between items-center">
-                    <h3 class="text-xl font-bold text-gray-800">{{ $selectedTransaction->invoice_number }}</h3>
-                    <button wire:click="$set('showModal', false)" class="text-gray-400 hover:text-gray-600">
-                        <i data-lucide="x" class="w-6 h-6"></i>
-                    </button>
-                </div>
-                <div class="p-6 overflow-y-auto flex-1 space-y-4">
-                    <div class="grid grid-cols-2 gap-4 text-sm">
-                        <div>
-                            <p class="text-gray-500">Tanggal</p>
-                            <p class="font-medium">{{ $selectedTransaction->created_at->format('d M Y, H:i') }}</p>
-                        </div>
-                        <div>
-                            <p class="text-gray-500">Kasir</p>
-                            <p class="font-medium">{{ $selectedTransaction->user?->name ?? '-' }}</p>
-                        </div>
-                        <div>
-                            <p class="text-gray-500">Pelanggan</p>
-                            <p class="font-medium">{{ $selectedTransaction->customer_name ?: '-' }}</p>
-                        </div>
-                        <div>
-                            <p class="text-gray-500">Pembayaran</p>
-                            <p class="font-medium">{{ $selectedTransaction->paymentSource?->name ?? 'Cash' }}</p>
-                        </div>
-                    </div>
+    <!-- Detail Modal -->
+    @if($showDetailModal && $selectedTransaction)
+        <div class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+            <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+                <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true" wire:click="closeDetailModal"></div>
 
-                    <div class="border-t pt-4">
-                        <p class="text-sm font-semibold text-gray-700 mb-2">Item</p>
-                        <div class="space-y-3">
-                            @foreach($selectedTransaction->details as $detail)
-                                <div class="bg-gray-50 rounded-lg p-3">
-                                    <div class="flex justify-between text-sm">
+                <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+
+                <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
+                    <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                        <div class="sm:flex sm:items-start">
+                            <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
+                                <div class="flex justify-between items-center mb-4">
+                                    <h3 class="text-lg leading-6 font-medium text-gray-900" id="modal-title">
+                                        Detail Transaksi #{{ $selectedTransaction->invoice_number }}
+                                    </h3>
+                                    <button wire:click="closeDetailModal" class="text-gray-400 hover:text-gray-500">
+                                        <i data-lucide="x" class="w-5 h-5"></i>
+                                    </button>
+                                </div>
+                                
+                                <div class="mt-4 border-t border-gray-100 pt-4">
+                                    <div class="grid grid-cols-2 gap-4 mb-4">
                                         <div>
-                                            <span class="font-medium">{{ $detail->product_name }}</span>
-                                            <span class="text-gray-500">x{{ $detail->quantity }}</span>
+                                            <p class="text-xs text-gray-500">Waktu</p>
+                                            <p class="text-sm font-medium">{{ $selectedTransaction->created_at->format('d/m/Y H:i') }}</p>
                                         </div>
-                                        <span class="font-semibold">Rp {{ number_format($detail->subtotal, 0, ',', '.') }}</span>
+                                        <div>
+                                            <p class="text-xs text-gray-500">Kasir</p>
+                                            <p class="text-sm font-medium">{{ $selectedTransaction->cashier->name ?? '-' }}</p>
+                                        </div>
+                                        <div>
+                                            <p class="text-xs text-gray-500">Pembayaran</p>
+                                            <p class="text-sm font-medium uppercase">{{ $selectedTransaction->payment_method }}</p>
+                                        </div>
+                                        <div>
+                                            <p class="text-xs text-gray-500">Total</p>
+                                            <p class="text-sm font-bold text-gray-900">Rp {{ number_format($selectedTransaction->total_amount, 0, ',', '.') }}</p>
+                                        </div>
                                     </div>
-                                    @if($detail->modifiers && $detail->modifiers->isNotEmpty())
-                                        <div class="mt-1 text-xs text-gray-500">
-                                            @foreach($detail->modifiers as $mod)
-                                                <span class="inline-block mr-2">
-                                                    + {{ $mod->pivot->modifier_name }}
-                                                    @if($mod->pivot->price_adjustment > 0)
-                                                        <span class="text-green-600">(+Rp {{ number_format($mod->pivot->price_adjustment, 0, ',', '.') }})</span>
-                                                    @endif
-                                                </span>
+
+                                    <div class="bg-gray-50 rounded-lg p-4">
+                                        <p class="text-xs font-semibold text-gray-500 uppercase mb-2">Item Pembelian</p>
+                                        <div class="space-y-2">
+                                            @foreach($selectedTransaction->items as $item)
+                                                <div class="flex justify-between text-sm">
+                                                    <div>
+                                                        <span class="font-medium">{{ $item->product_name }}</span>
+                                                        <span class="text-gray-500">x{{ $item->quantity }}</span>
+                                                        @if($item->modifiers)
+                                                            <div class="text-xs text-gray-500 ml-2">
+                                                                @foreach(json_decode($item->modifiers, true) as $mod)
+                                                                    + {{ $mod['name'] }} (Rp {{ number_format($mod['price'], 0, ',', '.') }})<br>
+                                                                @endforeach
+                                                            </div>
+                                                        @endif
+                                                    </div>
+                                                    <span class="text-gray-700">Rp {{ number_format($item->subtotal, 0, ',', '.') }}</span>
+                                                </div>
                                             @endforeach
                                         </div>
-                                    @endif
+                                    </div>
+                                    
+                                    <!-- Print Button inside Modal -->
+                                     <div class="mt-4 flex justify-end">
+                                        <a :href="'{{ route('print.transaction.single', $selectedTransaction->id) }}' + '?format=' + printFormat" 
+                                           target="_blank"
+                                           @click="setTimeout(() => $wire.$refresh(), 2000)"
+                                           class="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors">
+                                            <i data-lucide="printer" class="w-4 h-4"></i>
+                                            <span>Cetak Struk</span>
+                                        </a>
+                                    </div>
                                 </div>
-                            @endforeach
-                        </div>
-                    </div>
-
-                    <div class="border-t pt-4 space-y-2 text-sm">
-                        <div class="flex justify-between">
-                            <span class="text-gray-500">Subtotal</span>
-                            <span>Rp {{ number_format($selectedTransaction->subtotal, 0, ',', '.') }}</span>
-                        </div>
-                        @if($selectedTransaction->tax_amount > 0)
-                            <div class="flex justify-between">
-                                <span class="text-gray-500">Pajak</span>
-                                <span>Rp {{ number_format($selectedTransaction->tax_amount, 0, ',', '.') }}</span>
                             </div>
-                        @endif
-                        <div class="flex justify-between font-bold text-lg pt-2 border-t">
-                            <span>Total</span>
-                            <span class="text-primary-600">Rp {{ number_format($selectedTransaction->total, 0, ',', '.') }}</span>
                         </div>
                     </div>
                 </div>
-                <div class="p-4 border-t bg-gray-50 flex gap-3">
-                    <button wire:click="$set('showModal', false)" class="flex-1 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg">Tutup</button>
-                    <button wire:click="printReceipt({{ $selectedTransaction->id }})" class="flex-1 py-2 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-lg flex items-center justify-center gap-2">
-                        <i data-lucide="printer" class="w-4 h-4"></i>
-                        Cetak Struk
-                    </button>
-                </div>
             </div>
         </div>
     @endif
 
-    <!-- Receipt Modal (for Printing) -->
+    <!-- Receipt Modal -->
     @if($showReceiptModal && $lastTransaction)
-        <div class="fixed inset-0 bg-black/50 flex items-center justify-center p-4" style="z-index: 9999;">
-            <div class="bg-white rounded-2xl w-full max-w-md shadow-2xl max-h-[90vh] flex flex-col">
-                <div class="p-4 border-b flex justify-between items-center flex-none">
-                    <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
-                        <i data-lucide="receipt" class="w-5 h-5"></i>
-                        Struk Transaksi
-                    </h3>
-                    <button wire:click="closeReceiptModal" class="text-gray-400 hover:text-gray-600 p-1" type="button">
-                        <i data-lucide="x" class="w-6 h-6"></i>
-                    </button>
-                </div>
+        <div class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+            <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+                <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true"></div>
 
-                <!-- Receipt Content -->
-                <div id="receipt-container" class="p-4 overflow-y-auto flex-1 custom-scroll">
+                <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+
+                <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
                     @include('livewire.partials.receipt', ['transaction' => $lastTransaction])
-                </div>
-
-                <div class="p-4 border-t flex gap-3 flex-none">
-                    <button 
-                        wire:click="reprintOnly"
-                        class="flex-1 py-3 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-xl flex items-center justify-center gap-2"
-                        type="button"
-                    >
-                        <i data-lucide="printer" class="w-5 h-5"></i>
-                        Cetak Ulang
-                    </button>
-                    <button 
-                        wire:click="closeReceiptModal"
-                        class="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl"
-                        type="button"
-                    >
-                        Tutup
-                    </button>
+                    <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                        <button type="button" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-primary-600 text-base font-medium text-white hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 sm:ml-3 sm:w-auto sm:text-sm" wire:click="printReceipt">
+                            Cetak
+                        </button>
+                        <button type="button" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm" wire:click="closeReceiptModal">
+                            Tutup
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
     @endif
-</div>
+
 @script
 <script>
+
 lucide.createIcons();
 Livewire.hook('morph.updated', () => queueMicrotask(() => lucide.createIcons()));
 
@@ -454,5 +479,8 @@ $wire.on('print-receipt', () => {
         window.print();
     }, 300);
 });
+
 </script>
 @endscript
+</div>
+</div>

@@ -102,7 +102,20 @@
     </style>
 </head>
 <body class="h-full bg-gray-100 antialiased">
-    <div x-data="{ sidebarOpen: false, showLogoutModal: false }" class="flex h-screen bg-gray-100">
+    <div 
+        x-data="{ 
+            sidebarOpen: false, 
+            showLogoutModal: false,
+            isSidebarCollapsed: localStorage.getItem('sidebarCollapsed') === 'true',
+            sidebarHover: false,
+            get isCompact() { return this.isSidebarCollapsed && !this.sidebarHover },
+            toggleSidebar() {
+                this.isSidebarCollapsed = !this.isSidebarCollapsed;
+                localStorage.setItem('sidebarCollapsed', this.isSidebarCollapsed);
+            }
+        }" 
+        class="flex h-screen bg-gray-100"
+    >
         
         <!-- Mobile Backdrop -->
         <div 
@@ -119,134 +132,219 @@
 
         <!-- Sidebar -->
         <aside 
-            :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'"
-            class="fixed inset-y-0 left-0 z-30 w-64 bg-sidebar flex flex-col transform transition-transform duration-300 lg:static lg:translate-x-0"
+            @mouseenter="sidebarHover = true"
+            @mouseleave="sidebarHover = false"
+            :class="[
+                sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
+                isCompact ? 'lg:w-20' : 'lg:w-64'
+            ]"
+            class="fixed inset-y-0 left-0 z-30 bg-sidebar flex flex-col transition-all duration-300 ease-in-out shadow-xl lg:shadow-none overflow-hidden"
         >
             <!-- Logo -->
-            <div class="p-5 border-b border-sidebar-light flex justify-between items-center">
-                <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 bg-white rounded-lg flex items-center justify-center">
-                        <i data-lucide="soup" class="w-6 h-6 text-sidebar"></i>
-                    </div>
-                    <div>
-                        <h1 class="text-white font-bold text-lg">BAKSO MALANG</h1>
-                        <p class="text-blue-200 text-xs">Point of Sales</p>
-                    </div>
+            <div class="p-5 border-b border-sidebar-light flex items-center gap-3 whitespace-nowrap overflow-hidden h-20">
+                <div class="flex-shrink-0 w-10 h-10 bg-white rounded-lg flex items-center justify-center">
+                    <i data-lucide="soup" class="w-6 h-6 text-sidebar"></i>
+                </div>
+                <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-40 opacity-100'">
+                    <h1 class="text-white font-bold text-lg leading-tight">BAKSO MALANG</h1>
+                    <p class="text-blue-200 text-xs">Point of Sales</p>
                 </div>
                 <!-- Close Button (Mobile Only) -->
-                <button @click="sidebarOpen = false" class="lg:hidden text-blue-200 hover:text-white">
+                <button @click="sidebarOpen = false" class="lg:hidden ml-auto text-blue-200 hover:text-white">
                     <i data-lucide="x" class="w-6 h-6"></i>
                 </button>
             </div>
 
             <!-- Navigation -->
-            <nav class="flex-1 p-4 space-y-1 overflow-y-auto custom-scroll">
-                <a href="{{ route('admin.dashboard') }}" class="flex items-center gap-3 px-4 py-3 rounded-lg {{ request()->routeIs('admin.dashboard') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
-                    <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
-                    <span>Dashboard</span>
+            <nav class="flex-1 p-3 space-y-1 overflow-y-auto custom-scroll overflow-x-hidden">
+                <a href="{{ route('admin.dashboard') }}" class="flex items-center gap-3 px-3 py-3 rounded-lg whitespace-nowrap {{ request()->routeIs('admin.dashboard') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
+                    <div class="flex-shrink-0 w-6 flex justify-center"><i data-lucide="layout-dashboard" class="w-5 h-5"></i></div>
+                     <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'">
+                        <span>Dashboard</span>
+                    </div>
                 </a>
 
-                <p class="px-4 pt-4 pb-2 text-xs font-semibold text-blue-300 uppercase tracking-wider">Master Data</p>
-                
-                <a href="{{ route('admin.categories.index') }}" class="flex items-center gap-3 px-4 py-3 rounded-lg {{ request()->routeIs('admin.categories.*') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
-                    <i data-lucide="folder" class="w-5 h-5"></i>
-                    <span>Kategori</span>
-                </a>
-                
-                <a href="{{ route('admin.products.index') }}" class="flex items-center gap-3 px-4 py-3 rounded-lg {{ request()->routeIs('admin.products.*') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
-                    <i data-lucide="package" class="w-5 h-5"></i>
-                    <span>Produk</span>
-                </a>
+                <!-- Group: Master Data -->
+                @php
+                    $isMasterActive = request()->routeIs('admin.categories.*') || 
+                                      request()->routeIs('admin.products.*') || 
+                                      request()->routeIs('admin.modifiers.*') || 
+                                      request()->routeIs('admin.payment-sources.*');
+                @endphp
+                <div x-data="{ open: {{ $isMasterActive ? 'true' : 'false' }} }" class="mt-4">
+                    <button @click="open = !open" class="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-blue-300 uppercase tracking-wider hover:text-white transition-colors group whitespace-nowrap text-left">
+                        <div class="flex items-center gap-3">
+                            <div class="flex-shrink-0 w-6 flex justify-center"><i data-lucide="database" class="w-5 h-5 text-blue-300 group-hover:text-white"></i></div>
+                            <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'">
+                                <span>Master Data</span>
+                            </div>
+                        </div>
+                        <i data-lucide="chevron-down" class="w-4 h-4 transition-transform duration-200 flex-shrink-0" :class="[open ? 'rotate-180' : '', isCompact ? 'hidden' : 'block']"></i>
+                    </button>
+                    <!-- Force hidden if compact to avoid popup artifacts, rely on hover to expand first -->
+                    <div x-show="open && !isCompact" 
+                         x-transition:enter="transition ease-out duration-200"
+                         x-transition:enter-start="opacity-0 -translate-y-2"
+                         x-transition:enter-end="opacity-100 translate-y-0"
+                         class="space-y-1 mt-1">
+                        <a href="{{ route('admin.categories.index') }}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.categories.*') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
+                            <div class="flex-shrink-0 w-6 flex justify-center"><i data-lucide="folder" class="w-4 h-4"></i></div>
+                            <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Kategori</span></div>
+                        </a>
+                        
+                        <a href="{{ route('admin.products.index') }}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.products.*') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
+                            <div class="flex-shrink-0 w-6 flex justify-center"><i data-lucide="package" class="w-4 h-4"></i></div>
+                            <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Produk</span></div>
+                        </a>
 
-                <a href="{{ route('admin.modifiers.index') }}" class="flex items-center gap-3 px-4 py-3 rounded-lg {{ request()->routeIs('admin.modifiers.*') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
-                    <i data-lucide="sliders" class="w-5 h-5"></i>
-                    <span>Modifier</span>
-                </a>
+                        <a href="{{ route('admin.modifiers.index') }}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.modifiers.*') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
+                            <div class="flex-shrink-0 w-6 flex justify-center"><i data-lucide="sliders" class="w-4 h-4"></i></div>
+                            <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Modifier</span></div>
+                        </a>
 
-                <a href="{{ route('admin.payment-sources.index') }}" class="flex items-center gap-3 px-4 py-3 rounded-lg {{ request()->routeIs('admin.payment-sources.*') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
-                    <i data-lucide="wallet" class="w-5 h-5"></i>
-                    <span>Metode Bayar</span>
-                </a>
+                        <a href="{{ route('admin.payment-sources.index') }}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.payment-sources.*') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
+                            <div class="flex-shrink-0 w-6 flex justify-center"><i data-lucide="wallet" class="w-4 h-4"></i></div>
+                            <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Metode Bayar</span></div>
+                        </a>
+                    </div>
+                </div>
 
-                <p class="px-4 pt-4 pb-2 text-xs font-semibold text-blue-300 uppercase tracking-wider">Transaksi</p>
-                
-                <a href="{{ route('pos') }}" class="flex items-center gap-3 px-4 py-3 rounded-lg text-blue-200 hover:bg-sidebar-light hover:text-white transition-colors">
-                    <i data-lucide="monitor" class="w-5 h-5"></i>
-                    <span>POS Kasir</span>
-                </a>
-                
-                <a href="{{ route('admin.shifts.index') }}" class="flex items-center gap-3 px-4 py-3 rounded-lg {{ request()->routeIs('admin.shifts.*') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
-                    <i data-lucide="clock" class="w-5 h-5"></i>
-                    <span>Shift</span>
-                </a>
+                <!-- Group: Transaksi -->
+                @php
+                    $isTransActive = request()->routeIs('pos') || request()->routeIs('admin.shifts.*');
+                @endphp
+                <div x-data="{ open: {{ $isTransActive ? 'true' : 'false' }} }" class="mt-2">
+                    <button @click="open = !open" class="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-blue-300 uppercase tracking-wider hover:text-white transition-colors group whitespace-nowrap text-left">
+                        <div class="flex items-center gap-3">
+                            <div class="flex-shrink-0 w-6 flex justify-center"><i data-lucide="shopping-bag" class="w-5 h-5 text-blue-300 group-hover:text-white"></i></div>
+                            <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'">
+                                <span>Transaksi</span>
+                            </div>
+                        </div>
+                        <i data-lucide="chevron-down" class="w-4 h-4 transition-transform duration-200 flex-shrink-0" :class="[open ? 'rotate-180' : '', isCompact ? 'hidden' : 'block']"></i>
+                    </button>
+                    <div x-show="open && !isCompact" 
+                         x-transition:enter="transition ease-out duration-200"
+                         x-transition:enter-start="opacity-0 -translate-y-2"
+                         x-transition:enter-end="opacity-100 translate-y-0"
+                         class="space-y-1 mt-1">
+                        <a href="{{ route('pos') }}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-blue-200 hover:bg-sidebar-light hover:text-white transition-colors">
+                             <div class="flex-shrink-0 w-6 flex justify-center"><i data-lucide="monitor" class="w-4 h-4"></i></div>
+                            <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>POS Kasir</span></div>
+                        </a>
+                        
+                        <a href="{{ route('admin.shifts.index') }}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.shifts.*') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
+                            <div class="flex-shrink-0 w-6 flex justify-center"><i data-lucide="clock" class="w-4 h-4"></i></div>
+                            <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Shift</span></div>
+                        </a>
+                    </div>
+                </div>
 
-                <p class="px-4 pt-4 pb-2 text-xs font-semibold text-blue-300 uppercase tracking-wider">Laporan</p>
-                
-                <a href="{{ route('admin.reports.transactions') }}" class="flex items-center gap-3 px-4 py-3 rounded-lg {{ request()->routeIs('admin.reports.transactions') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
-                    <i data-lucide="receipt" class="w-5 h-5"></i>
-                    <span>Laporan Penjualan</span>
-                </a>
+                <!-- Group: Laporan -->
+                @php
+                    $isReportActive = request()->routeIs('admin.reports.*') || request()->routeIs('admin.returns');
+                @endphp
+                <div x-data="{ open: {{ $isReportActive ? 'true' : 'false' }} }" class="mt-2">
+                    <button @click="open = !open" class="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-blue-300 uppercase tracking-wider hover:text-white transition-colors group whitespace-nowrap text-left">
+                        <div class="flex items-center gap-3">
+                            <div class="flex-shrink-0 w-6 flex justify-center"><i data-lucide="clipboard-list" class="w-5 h-5 text-blue-300 group-hover:text-white"></i></div>
+                            <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'">
+                                <span>Laporan</span>
+                            </div>
+                        </div>
+                        <i data-lucide="chevron-down" class="w-4 h-4 transition-transform duration-200 flex-shrink-0" :class="[open ? 'rotate-180' : '', isCompact ? 'hidden' : 'block']"></i>
+                    </button>
+                    <div x-show="open && !isCompact" 
+                         x-transition:enter="transition ease-out duration-200"
+                         x-transition:enter-start="opacity-0 -translate-y-2"
+                         x-transition:enter-end="opacity-100 translate-y-0"
+                         class="space-y-1 mt-1">
+                        <a href="{{ route('admin.reports.transactions') }}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.reports.transactions') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
+                            <div class="flex-shrink-0 w-6 flex justify-center"><i data-lucide="receipt" class="w-4 h-4"></i></div>
+                            <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Penjualan</span></div>
+                        </a>
 
-                <a href="{{ route('admin.reports.sales') }}" class="flex items-center gap-3 px-4 py-3 rounded-lg {{ request()->routeIs('admin.reports.sales') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
-                    <i data-lucide="bar-chart-3" class="w-5 h-5"></i>
-                    <span>Analisa & Performa</span>
-                </a>
+                        <a href="{{ route('admin.reports.sales') }}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.reports.sales') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
+                            <div class="flex-shrink-0 w-6 flex justify-center"><i data-lucide="bar-chart-3" class="w-4 h-4"></i></div>
+                            <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Analisa & Performa</span></div>
+                        </a>
 
-                {{-- Merged into Analisa
-                <a href="{{ route('admin.reports.products') }}" class="flex items-center gap-3 px-4 py-3 rounded-lg {{ request()->routeIs('admin.reports.products') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
-                    <i data-lucide="package-search" class="w-5 h-5"></i>
-                    <span>Penjualan per Produk</span>
-                </a>
-                --}}
+                        <a href="{{ route('admin.reports.shifts') }}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.reports.shifts') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
+                            <div class="flex-shrink-0 w-6 flex justify-center"><i data-lucide="file-clock" class="w-4 h-4"></i></div>
+                            <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Laporan Shift</span></div>
+                        </a>
 
-                <a href="{{ route('admin.reports.shifts') }}" class="flex items-center gap-3 px-4 py-3 rounded-lg {{ request()->routeIs('admin.reports.shifts') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
-                    <i data-lucide="file-clock" class="w-5 h-5"></i>
-                    <span>Laporan Shift</span>
-                </a>
+                        <a href="{{ route('admin.returns') }}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.returns') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
+                            <div class="flex-shrink-0 w-6 flex justify-center"><i data-lucide="rotate-ccw" class="w-4 h-4"></i></div>
+                            <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Laporan Retur</span></div>
+                        </a>
+                    </div>
+                </div>
 
-                <a href="{{ route('admin.returns') }}" class="flex items-center gap-3 px-4 py-3 rounded-lg {{ request()->routeIs('admin.returns') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
-                    <i data-lucide="rotate-ccw" class="w-5 h-5"></i>
-                    <span>Laporan Retur</span>
-                </a>
+                <!-- Group: Pengaturan -->
+                @php
+                    $isSettingsActive = request()->routeIs('admin.users.*') || 
+                                        request()->routeIs('admin.roles.*') || 
+                                        request()->routeIs('admin.settings.*');
+                @endphp
+                <div x-data="{ open: {{ $isSettingsActive ? 'true' : 'false' }} }" class="mt-2">
+                    <button @click="open = !open" class="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-blue-300 uppercase tracking-wider hover:text-white transition-colors group whitespace-nowrap text-left">
+                         <div class="flex items-center gap-3">
+                            <div class="flex-shrink-0 w-6 flex justify-center"><i data-lucide="settings-2" class="w-5 h-5 text-blue-300 group-hover:text-white"></i></div>
+                            <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'">
+                                <span>Pengaturan</span>
+                            </div>
+                        </div>
+                        <i data-lucide="chevron-down" class="w-4 h-4 transition-transform duration-200 flex-shrink-0" :class="[open ? 'rotate-180' : '', isCompact ? 'hidden' : 'block']"></i>
+                    </button>
+                    <div x-show="open && !isCompact" 
+                         x-transition:enter="transition ease-out duration-200"
+                         x-transition:enter-start="opacity-0 -translate-y-2"
+                         x-transition:enter-end="opacity-100 translate-y-0"
+                         class="space-y-1 mt-1">
+                        <a href="{{ route('admin.users.index') }}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.users.*') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
+                            <div class="flex-shrink-0 w-6 flex justify-center"><i data-lucide="users" class="w-4 h-4"></i></div>
+                            <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Pengguna</span></div>
+                        </a>
 
-                <p class="px-4 pt-4 pb-2 text-xs font-semibold text-blue-300 uppercase tracking-wider">Pengaturan</p>
-                
-                <a href="{{ route('admin.users.index') }}" class="flex items-center gap-3 px-4 py-3 rounded-lg {{ request()->routeIs('admin.users.*') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
-                    <i data-lucide="users" class="w-5 h-5"></i>
-                    <span>Pengguna</span>
-                </a>
-
-                <a href="{{ route('admin.roles.index') }}" class="flex items-center gap-3 px-4 py-3 rounded-lg {{ request()->routeIs('admin.roles.*') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
-                    <i data-lucide="shield" class="w-5 h-5"></i>
-                    <span>Role & Permission</span>
-                </a>
-                
-                <a href="{{ route('admin.settings.index') }}" class="flex items-center gap-3 px-4 py-3 rounded-lg {{ request()->routeIs('admin.settings.*') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
-                    <i data-lucide="settings" class="w-5 h-5"></i>
-                    <span>Pengaturan</span>
-                </a>
+                        <a href="{{ route('admin.roles.index') }}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.roles.*') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
+                            <div class="flex-shrink-0 w-6 flex justify-center"><i data-lucide="shield" class="w-4 h-4"></i></div>
+                            <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Role & Permission</span></div>
+                        </a>
+                        
+                        <a href="{{ route('admin.settings.index') }}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.settings.*') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
+                            <div class="flex-shrink-0 w-6 flex justify-center"><i data-lucide="settings" class="w-4 h-4"></i></div>
+                            <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Pengaturan</span></div>
+                        </a>
+                    </div>
+                </div>
             </nav>
 
             <!-- Logout Button Trigger -->
             <div class="p-4 border-t border-sidebar-light">
-                <button @click="showLogoutModal = true" type="button" class="flex items-center gap-3 w-full px-4 py-3 rounded-lg bg-red-500/20 text-red-300 hover:bg-red-500/30 transition-colors">
-                    <i data-lucide="log-out" class="w-5 h-5"></i>
-                    <span>Logout</span>
+                <button @click="showLogoutModal = true" type="button" class="flex items-center gap-3 w-full px-3 py-3 rounded-lg bg-red-500/20 text-red-300 hover:bg-red-500/30 transition-colors whitespace-nowrap">
+                    <div class="flex-shrink-0 w-6 flex justify-center"><i data-lucide="log-out" class="w-5 h-5"></i></div>
+                    <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Logout</span></div>
                 </button>
             </div>
         </aside>
 
         <!-- Main Content -->
-        <main class="flex-1 flex flex-col overflow-hidden">
+        <main class="flex-1 flex flex-col overflow-hidden transition-all duration-300" :class="isSidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'">
             <!-- Header -->
             <header class="bg-white border-b px-6 py-4">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center gap-4">
-                        <!-- Hamburger Button -->
+                        <!-- Hamburger Button (Mobile) -->
                         <button @click="sidebarOpen = true" class="lg:hidden text-gray-500 hover:text-gray-700">
                             <i data-lucide="menu" class="w-6 h-6"></i>
                         </button>
                         
+                        <!-- Collapse Toggle (Desktop) -->
+                        <button @click="toggleSidebar()" class="hidden lg:block text-gray-500 hover:text-blue-600 transition-colors transform active:scale-95">
+                            <i data-lucide="align-justify" class="w-6 h-6"></i>
+                        </button>
+
                         <div>
                             <h2 class="text-xl font-bold text-gray-800">{{ $title ?? 'Dashboard' }}</h2>
                         </div>

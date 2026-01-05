@@ -33,9 +33,11 @@ class Users extends Component
 
     public string $search = '';
 
+    public bool $isEditingSuperAdmin = false;
+
     public function create(): void
     {
-        $this->reset(['editingId', 'username', 'name', 'email', 'password', 'selectedRoles']);
+        $this->reset(['editingId', 'username', 'name', 'email', 'password', 'selectedRoles', 'isEditingSuperAdmin']);
         $this->showModal = true;
     }
 
@@ -48,22 +50,47 @@ class Users extends Component
         $this->email = $user->email;
         $this->password = '';
         $this->selectedRoles = $user->roles->pluck('name')->toArray();
+        $this->isEditingSuperAdmin = $user->hasRole('Super Admin');
         $this->showModal = true;
     }
 
     public function save(): void
     {
+        // Logic khusus Super Admin
+        if ($this->isEditingSuperAdmin) {
+            $this->validate([
+                'password' => 'nullable|min:6',
+            ]);
+
+            $user = User::find($this->editingId);
+            
+            if ($this->password) {
+                $user->update(['password' => bcrypt($this->password)]);
+                $this->dispatch('notify', type: 'success', message: 'Password Super Admin berhasil diperbarui');
+            } else {
+                $this->dispatch('notify', type: 'info', message: 'Tidak ada perubahan data');
+            }
+            
+            $this->showModal = false;
+            return;
+        }
+
+        // Logic User Biasa
         $rules = [
             'username' => 'required|min:3|max:50|unique:users,username,' . $this->editingId,
             'name' => 'required|min:2|max:100',
             'email' => 'required|email|unique:users,email,' . $this->editingId,
+            'selectedRoles' => 'required|array|min:1',
         ];
         
         if (!$this->editingId) {
             $rules['password'] = 'required|min:6';
         }
         
-        $this->validate($rules);
+        $this->validate($rules, [
+            'selectedRoles.required' => 'Wajib memilih minimal satu role.',
+            'selectedRoles.min' => 'Wajib memilih minimal satu role.',
+        ]);
 
         $data = [
             'username' => $this->username,
@@ -95,7 +122,15 @@ class Users extends Component
             $this->dispatch('notify', type: 'error', message: 'Tidak dapat menghapus akun sendiri');
             return;
         }
-        User::findOrFail($id)->delete();
+
+        $user = User::with('roles')->findOrFail($id);
+        
+        if ($user->hasRole('Super Admin')) {
+            $this->dispatch('notify', type: 'error', message: 'Super Admin tidak dapat dihapus');
+            return;
+        }
+
+        $user->delete();
         $this->dispatch('notify', type: 'success', message: 'User berhasil dihapus');
     }
 
@@ -106,7 +141,7 @@ class Users extends Component
             ->latest()
             ->paginate(10);
 
-        $roles = Role::all();
+        $roles = Role::where('name', '!=', 'Super Admin')->get();
 
         return view('livewire.admin.users', compact('users', 'roles'))
             ->title('Pengguna');

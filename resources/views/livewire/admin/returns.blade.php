@@ -1,4 +1,4 @@
-<div>
+<div x-data="{ printFormat: 'A4' }">
     <style>
         @media print {
             aside, nav, .sidebar, .no-print, button, .lucide, .items-center.gap-4, .items-center.gap-2 {
@@ -120,26 +120,60 @@
             <div class="flex flex-wrap items-center gap-4 w-full md:w-auto">
                 <!-- Date Range Picker -->
                 @if($periodType === 'daily')
-                    <div class="flex items-center gap-3" id="datePickerContainer">
-                        <div class="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-white to-gray-50 border border-gray-200 rounded-xl hover:border-primary-400 hover:shadow-md transition-all cursor-pointer group w-full sm:w-auto" id="startDateContainer">
-                            <i data-lucide="calendar" class="w-4 h-4 text-primary-500 group-hover:text-primary-600"></i>
-                            <div class="flex flex-col">
-                                <span class="text-[10px] text-gray-400 uppercase tracking-wide">Dari</span>
-                                <input type="text" id="dateRangeStart" value="{{ $startDate }}" class="bg-transparent border-none outline-none text-sm font-semibold text-gray-700 cursor-pointer w-full sm:w-28" placeholder="Pilih" readonly>
+                     <!-- Custom Daily Layout (Compact) -->
+                     <div class="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full sm:w-auto">
+                        <!-- Date Range Picker -->
+                        <div class="flex items-center gap-3 w-full sm:w-auto" 
+                             x-data="{ init() { initDatePicker(@js($startDate), @js($endDate)) } }" 
+                             x-init="init()"
+                             wire:key="date-picker-daily">
+                            <div class="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-white to-gray-50 border border-gray-200 rounded-xl hover:border-primary-400 hover:shadow-md transition-all cursor-pointer group flex-1 sm:flex-none" id="startDateContainer">
+                                <div class="flex flex-col">
+                                    <span class="text-[9px] text-gray-400 uppercase tracking-wide leading-none mb-0.5">Dari</span>
+                                    <input type="text" id="dateRangeStart" class="bg-transparent border-none outline-none text-xs font-bold text-gray-700 cursor-pointer w-full sm:w-24 p-0" placeholder="Pilih" readonly>
+                                </div>
+                            </div>
+                            <div class="hidden sm:flex items-center justify-center">
+                                <i data-lucide="arrow-right" class="w-3 h-3 text-gray-300"></i>
+                            </div>
+                            <div class="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-white to-gray-50 border border-gray-200 rounded-xl hover:border-primary-400 hover:shadow-md transition-all cursor-pointer group flex-1 sm:flex-none" id="endDateContainer">
+                                <div class="flex flex-col">
+                                    <span class="text-[9px] text-gray-400 uppercase tracking-wide leading-none mb-0.5">Sampai</span>
+                                    <input type="text" id="dateRangeEnd" class="bg-transparent border-none outline-none text-xs font-bold text-gray-700 cursor-pointer w-full sm:w-24 p-0" placeholder="Pilih" readonly>
+                                </div>
                             </div>
                         </div>
-                        <div class="hidden sm:flex items-center justify-center w-8 h-8 bg-gray-100 rounded-full">
-                            <i data-lucide="arrow-right" class="w-4 h-4 text-gray-400"></i>
-                        </div>
-                        <div class="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-white to-gray-50 border border-gray-200 rounded-xl hover:border-primary-400 hover:shadow-md transition-all cursor-pointer group w-full sm:w-auto" id="endDateContainer">
-                            <i data-lucide="calendar" class="w-4 h-4 text-primary-500 group-hover:text-primary-600"></i>
-                            <div class="flex flex-col">
-                                <span class="text-[10px] text-gray-400 uppercase tracking-wide">Sampai</span>
-                                <input type="text" id="dateRangeEnd" value="{{ $endDate }}" class="bg-transparent border-none outline-none text-sm font-semibold text-gray-700 cursor-pointer w-full sm:w-28" placeholder="Pilih" readonly>
+
+                        <!-- Print Group (Compact) -->
+                         <div class="flex items-center gap-1 bg-gray-800 rounded-xl p-1 w-full sm:w-auto overflow-hidden shadow-lg shadow-gray-200/50">
+                            <div class="relative group flex-1 sm:flex-none">
+                                <select x-model="printFormat" class="w-full sm:w-auto bg-transparent text-white text-xs font-medium border-0 focus:ring-0 cursor-pointer pl-2 pr-6 py-1.5 appearance-none hover:bg-gray-700 rounded-lg transition-colors outline-none" title="Pilih Ukuran Kertas">
+                                    <option value="A4" class="text-gray-900 bg-white">Laporan (A4)</option>
+                                    <option value="A5" class="text-gray-900 bg-white">Laporan (A5)</option>
+                                    <option value="58mm" class="text-gray-900 bg-white">Struk (58mm)</option>
+                                    <option value="76mm" class="text-gray-900 bg-white">Struk (76mm)</option>
+                                </select>
+                                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-1 text-white/50 group-hover:text-white transition-colors">
+                                    <i data-lucide="chevron-down" class="w-3 h-3"></i>
+                                </div>
                             </div>
+                            <div class="w-px h-4 bg-gray-600"></div>
+                            <a :href="'{!! route('print.returns-report', ['start' => $startDate, 'end' => $endDate]) !!}' + ('{!! route('print.returns-report', ['start' => $startDate, 'end' => $endDate]) !!}'.includes('?') ? '&' : '?') + 'format=' + printFormat" target="_blank" class="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-1.5 text-white hover:bg-gray-700 rounded-lg transition-colors" title="Cetak Ringkasan">
+                                <i data-lucide="printer" class="w-3.5 h-3.5"></i>
+                                <span class="text-xs font-medium">Cetak</span>
+                            </a>
                         </div>
-                        <!-- Hidden true input for Flatpickr range mode hacking if needed, but we will try to bind to container -->
-                        <input type="hidden" id="dateRange">
+
+                        <!-- Vertical Stack: Reset & Excel -->
+                        <div class="flex flex-row sm:flex-col gap-1 ml-1 h-full justify-center">
+                            <button wire:click="resetFilters" wire:loading.attr="disabled" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors border border-transparent hover:border-red-100" title="Reset Filters">
+                                <i wire:loading.remove wire:target="resetFilters" data-lucide="rotate-ccw" class="w-4 h-4"></i>
+                                <i wire:loading wire:target="resetFilters" data-lucide="loader" class="w-4 h-4 animate-spin text-primary-600"></i>
+                            </button>
+                             <a href="{{ $this->getExportUrl() }}" class="w-8 h-8 flex items-center justify-center bg-green-50 hover:bg-green-100 text-green-600 hover:text-green-700 rounded-lg transition-colors border border-green-200" title="Export Excel">
+                                <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
+                            </a>
+                        </div>
                     </div>
                 @elseif($periodType === 'weekly')
                     <div class="flex items-center gap-2 w-full sm:w-auto">
@@ -164,23 +198,39 @@
                     </select>
                 @endif
                 
-                <button wire:click="resetFilters" wire:loading.attr="disabled" class="flex items-center justify-center gap-2 px-4 py-2.5 text-gray-500 hover:text-gray-800 hover:bg-gray-50 rounded-xl transition-colors w-full sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed">
-                    <i wire:loading.remove wire:target="resetFilters" data-lucide="rotate-ccw" class="w-4 h-4"></i>
-                    <i wire:loading wire:target="resetFilters" data-lucide="loader" class="w-4 h-4 animate-spin text-primary-600"></i>
-                    <span class="text-sm font-medium">Reset</span>
-                </button>
+                @if($periodType !== 'daily')
+                    <button wire:click="resetFilters" wire:loading.attr="disabled" class="flex items-center justify-center gap-2 px-4 py-2.5 text-gray-500 hover:text-gray-800 hover:bg-gray-50 rounded-xl transition-colors w-full sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed">
+                        <i wire:loading.remove wire:target="resetFilters" data-lucide="rotate-ccw" class="w-4 h-4"></i>
+                        <i wire:loading wire:target="resetFilters" data-lucide="loader" class="w-4 h-4 animate-spin text-primary-600"></i>
+                        <span class="text-sm font-medium">Reset</span>
+                    </button>
 
-                <div class="h-8 w-px bg-gray-200 hidden md:block"></div>
+                    <div class="h-8 w-px bg-gray-200 hidden md:block"></div>
 
-                <a href="{{ route('export.product-returns', ['start' => $startDate, 'end' => $endDate]) }}" class="flex items-center justify-center gap-2 px-4 py-2.5 bg-green-50 text-green-600 hover:bg-green-100 rounded-xl transition-colors w-full sm:w-auto" title="Export Excel">
-                    <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
-                    <span class="text-sm font-medium">Excel</span>
-                </a>
+                    <a href="{{ route('export.product-returns', ['start' => $startDate, 'end' => $endDate]) }}" class="flex items-center justify-center gap-2 px-4 py-2.5 bg-green-50 text-green-600 hover:bg-green-100 rounded-xl transition-colors w-full sm:w-auto" title="Export Excel">
+                        <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
+                        <span class="text-sm font-medium">Excel</span>
+                    </a>
 
-                <a href="{{ route('print.returns-report', ['start' => $startDate, 'end' => $endDate, 'search' => $search]) }}" target="_blank" class="flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-800 text-white hover:bg-gray-700 rounded-xl transition-colors w-full sm:w-auto" title="Cetak Laporan">
-                    <i data-lucide="printer" class="w-4 h-4"></i>
-                    <span class="text-sm font-medium">Cetak</span>
-                </a>
+                    <div class="flex items-center gap-1 bg-gray-800 rounded-xl p-1">
+                        <div class="relative group">
+                            <select x-model="printFormat" class="bg-transparent text-white text-sm font-medium border-0 focus:ring-0 cursor-pointer pl-3 pr-7 py-1.5 appearance-none hover:bg-gray-700 rounded-lg transition-colors outline-none" title="Pilih Ukuran Kertas">
+                                <option value="A4" class="text-gray-900 bg-white">Laporan (A4)</option>
+                                <option value="A5" class="text-gray-900 bg-white">Invoice (A5)</option>
+                                <option value="58mm" class="text-gray-900 bg-white">Struk (58mm)</option>
+                                <option value="76mm" class="text-gray-900 bg-white">Struk (76mm)</option>
+                            </select>
+                            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-white/50 group-hover:text-white transition-colors">
+                                <i data-lucide="chevron-down" class="w-3 h-3"></i>
+                            </div>
+                        </div>
+                        <div class="w-px h-5 bg-gray-600"></div>
+                        <a :href="'{{ route('print.returns-report', ['start' => $startDate, 'end' => $endDate, 'search' => $search]) }}' + ('{{ route('print.returns-report', ['start' => $startDate, 'end' => $endDate, 'search' => $search]) }}'.includes('?') ? '&' : '?') + 'format=' + printFormat" target="_blank" class="flex items-center justify-center gap-2 px-3 py-1.5 text-white hover:bg-gray-700 rounded-lg transition-colors" title="Cetak Sekarang">
+                            <i data-lucide="printer" class="w-4 h-4"></i>
+                            <span class="text-sm font-medium">Cetak</span>
+                        </a>
+                    </div>
+                @endif
             </div>
         </div>
     </div>
@@ -216,8 +266,11 @@
                             <td class="px-6 py-4 text-red-600 font-medium">Rp {{ number_format($return->total_refund, 0, ',', '.') }}</td>
                             <td class="px-6 py-4 text-gray-600">{{ Str::limit($return->reason, 20) }}</td>
                             <td class="px-6 py-4 text-gray-500">{{ $return->created_at->format('d/m/Y H:i') }}</td>
-                            <td class="px-6 py-4 text-right">
-                                <button wire:click="viewDetail({{ $return->id }})" class="p-2 text-gray-400 hover:text-primary-600 rounded-lg hover:bg-gray-100">
+                            <td class="px-6 py-4 text-right flex justify-end gap-1">
+                                <a :href="'{{ route('print.return-detail', $return->id) }}' + '?format=' + printFormat" target="_blank" class="p-2 text-gray-400 hover:text-primary-600 rounded-lg hover:bg-gray-100" title="Cetak Struk">
+                                    <i data-lucide="printer" class="w-4 h-4"></i>
+                                </a>
+                                <button wire:click="viewDetail({{ $return->id }})" class="p-2 text-gray-400 hover:text-primary-600 rounded-lg hover:bg-gray-100" title="Lihat Detail">
                                     <i data-lucide="eye" class="w-4 h-4"></i>
                                 </button>
                             </td>
@@ -248,7 +301,7 @@
                 <div class="p-6 border-b flex justify-between items-center bg-gray-50/50 rounded-t-2xl">
                     <h3 class="text-xl font-bold text-gray-800">Detail Retur</h3>
                     <div class="flex items-center gap-2">
-                        <a href="{{ route('returns.print', $selectedReturn->id) }}" target="_blank" class="p-2 text-gray-500 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors" title="Cetak Struk">
+                        <a :href="'{{ route('print.return-detail', $selectedReturn->id) }}' + '?format=' + printFormat" target="_blank" class="p-2 text-gray-500 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors" title="Cetak Struk">
                              <i data-lucide="printer" class="w-5 h-5"></i>
                         </a>
                         <button wire:click="$set('showDetailModal', false)" class="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">

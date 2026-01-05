@@ -253,10 +253,15 @@
                         </span>
                     </button>
                     
-                    <button wire:click="openReturnModal" class="flex items-center gap-2 px-3 py-2 bg-red-50 hover:bg-red-100 rounded-lg text-red-600 transition-colors border border-red-200">
-                        <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
-                        <span class="text-sm font-medium hidden md:inline">Retur</span>
-                    </button>
+                    <div class="flex items-center gap-1">
+                        <button wire:click="openReturnModal" class="flex items-center gap-2 px-3 py-2 bg-red-50 hover:bg-red-100 rounded-l-lg text-red-600 transition-colors border border-red-200 border-r-0">
+                            <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+                            <span class="text-sm font-medium hidden md:inline">Retur</span>
+                        </button>
+                        <button wire:click="openReturnHistoryModal" class="flex items-center gap-2 px-2 py-2 bg-red-50 hover:bg-red-100 rounded-r-lg text-red-600 transition-colors border border-red-200" title="Riwayat Retur">
+                            <i data-lucide="list" class="w-4 h-4"></i>
+                        </button>
+                    </div>
                 @endif
 
                 @if($this->todayShift && $this->todayShift->status === 'open')
@@ -1034,8 +1039,15 @@
                                             <p class="text-sm text-gray-500">Rp {{ number_format($item['unit_price'], 0, ',', '.') }}</p>
                                         </div>
                                         <div class="flex items-center gap-2">
-                                            <input type="number" wire:model.live="returnItems.{{ $detailId }}.quantity" min="1" max="{{ $item['max_quantity'] }}" class="w-16 px-2 py-1 border border-gray-200 rounded text-center">
-                                            <span class="text-sm text-gray-500">/ {{ $item['max_quantity'] }}</span>
+                                            <input 
+                                                type="number" 
+                                                wire:model.live="returnItems.{{ $detailId }}.quantity" 
+                                                min="1" 
+                                                max="{{ $item['max_quantity'] }}"
+                                                oninput="if(parseInt(this.value) > {{ $item['max_quantity'] }}) this.value = {{ $item['max_quantity'] }}; if(parseInt(this.value) < 1) this.value = 1;"
+                                                class="w-16 px-2 py-1 border border-gray-200 rounded text-center focus:ring-red-500 focus:border-red-500"
+                                            >
+                                            <span class="text-sm text-gray-500 font-medium">/ {{ $item['max_quantity'] }}</span>
                                         </div>
                                     </div>
                                 @endforeach
@@ -1072,6 +1084,62 @@
                             Proses Retur
                         </button>
                     @endif
+                </div>
+            </div>
+        </div>
+    @endif
+
+    <!-- Return History Modal -->
+    @if($showReturnHistoryModal)
+        <div class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center overflow-y-auto py-8">
+            <div class="bg-white rounded-2xl w-full max-w-2xl mx-4 shadow-2xl">
+                 <div class="p-5 border-b flex justify-between items-center sticky top-0 bg-white rounded-t-2xl z-10">
+                    <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+                        <i data-lucide="history" class="w-5 h-5 text-gray-500"></i>
+                        Riwayat Retur Hari Ini
+                    </h3>
+                    <button wire:click="closeReturnHistoryModal" class="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100">
+                        <i data-lucide="x" class="w-6 h-6"></i>
+                    </button>
+                </div>
+                <div class="p-0 overflow-y-auto max-h-[60vh]">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left">
+                            <thead class="bg-gray-50 text-gray-500 font-medium sticky top-0">
+                                <tr>
+                                    <th class="px-5 py-3 whitespace-nowrap">Waktu</th>
+                                    <th class="px-5 py-3 whitespace-nowrap">Retur #</th>
+                                    <th class="px-5 py-3 whitespace-nowrap">Invoice Asal</th>
+                                    <th class="px-5 py-3 whitespace-nowrap">Total Refund</th>
+                                    <th class="px-5 py-3 text-center whitespace-nowrap">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-100">
+                                @forelse($this->todayReturns as $retur)
+                                    <tr class="hover:bg-gray-50">
+                                        <td class="px-5 py-3 text-gray-500 font-mono whitespace-nowrap">{{ $retur->created_at->format('H:i') }}</td>
+                                        <td class="px-5 py-3 font-medium text-gray-800 whitespace-nowrap">{{ $retur->return_number }}</td>
+                                        <td class="px-5 py-3 text-gray-600 truncate">{{ $retur->transaction?->invoice_number }}</td>
+                                        <td class="px-5 py-3 font-bold text-red-600 whitespace-nowrap">Rp {{ number_format($retur->total_refund, 0, ',', '.') }}</td>
+                                        <td class="px-5 py-3 text-center">
+                                            <button wire:click="printReturnReceipt({{ $retur->id }})" class="p-2 text-gray-500 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors" title="Cetak Retur">
+                                                <i data-lucide="printer" class="w-4 h-4"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="5" class="px-5 py-8 text-center text-gray-500">Belum ada retur hari ini</td>
+                                    </tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                 <div class="p-4 border-t bg-gray-50 text-right">
+                    <button wire:click="closeReturnHistoryModal" class="px-6 py-2 bg-gray-800 hover:bg-gray-900 text-white font-medium rounded-lg">
+                        Tutup
+                    </button>
                 </div>
             </div>
         </div>
@@ -1133,11 +1201,19 @@
         }, 300);
     });
 
-    // Print shift receipt
+    // Print shift receipt (Legacy, kept just in case)
     $wire.on('print-shift-receipt', () => {
         setTimeout(() => {
             window.print();
         }, 300);
+    });
+
+    // Open new window (For Shift Detail & Returns)
+    $wire.on('open-new-window', (data) => {
+        const url = data.url;
+        if (url) {
+             window.open(url, '_blank');
+        }
     });
 </script>
 @endscript

@@ -79,6 +79,11 @@ Route::middleware(['auth'])->prefix('print')->name('print.')->group(function () 
     Route::get('/transactions/table', [App\Http\Controllers\PrintController::class, 'transactionsTable'])->name('transactions.table');
     Route::get('/transactions/detail', [App\Http\Controllers\PrintController::class, 'transactionsDetail'])->name('transactions.detail');
     Route::get('/returns-report', [App\Http\Controllers\PrintController::class, 'returnsReport'])->name('returns-report');
+    Route::get('/return-detail/{id}', [App\Http\Controllers\PrintController::class, 'returnDetail'])->name('return-detail');
+    Route::get('/sales-report', [App\Http\Controllers\PrintController::class, 'salesReport'])->name('sales-report');
+    Route::get('/transaction/{transaction}', [App\Http\Controllers\PrintController::class, 'transactionSingle'])->name('transaction.single');
+    Route::get('/shifts/table', [App\Http\Controllers\PrintController::class, 'shiftsTable'])->name('shifts.table');
+    Route::get('/shift/{shift}', [App\Http\Controllers\PrintController::class, 'shiftDetail'])->name('shift.detail');
 });
 
 // Export Routes (separate for streaming)
@@ -89,6 +94,7 @@ Route::middleware(['auth', 'throttle:5,1'])->name('export.')->prefix('export')->
     Route::get('/sales-by-category', [ExportController::class, 'salesByCategory'])->name('sales-by-category');
     Route::get('/sales-by-payment-method', [ExportController::class, 'salesByPaymentMethod'])->name('sales-by-payment-method');
     Route::get('/product-returns', [App\Http\Controllers\ExportController::class, 'productReturns'])->name('product-returns');
+    Route::get('/shifts', [ExportController::class, 'shifts'])->name('shifts');
 });
 
 Route::middleware(['auth'])->group(function () {

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Transaction;
 use App\Models\TransactionDetail;
+use App\Models\Shift;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -439,5 +440,54 @@ class ExportController extends Controller
     {
         $return->load(['items.product', 'transaction', 'user', 'shift']);
         return view('admin.exports.print-return', compact('return'));
+    }
+
+    public function shifts(Request $request)
+    {
+        set_time_limit(0); 
+        ini_set('memory_limit', '512M');
+
+        $start = Carbon::parse($request->query('start'))->startOfDay();
+        $end = Carbon::parse($request->query('end'))->endOfDay();
+        $cashierId = $request->query('cashier');
+        $filename = 'Laporan_Shift_' . $start->format('d_M_Y') . '_sd_' . $end->format('d_M_Y') . '.csv';
+
+        return response()->streamDownload(function () use ($start, $end, $cashierId) {
+            $handle = fopen('php://output', 'w');
+            fprintf($handle, chr(0xEF).chr(0xBB).chr(0xBF)); // BOM
+            
+            fputcsv($handle, [
+                'Kasir', 'Tanggal', 'Mulai', 'Selesai', 'Modal Awal', 'Penjualan', 'Pengeluaran', 'Selisih', 'Status', 'Catatan'
+            ], ';');
+
+            Shift::query()
+                ->with(['user', 'transactions', 'expenses'])
+                ->whereBetween('started_at', [$start, $end])
+                ->when($cashierId, fn($q) => $q->where('user_id', $cashierId))
+                ->latest('started_at')
+                ->cursor()
+                ->each(function ($shift) use ($handle) {
+                    $sales = $shift->transactions->where('status', 'completed')->sum('total');
+                    $expenses = $shift->expenses->sum('amount');
+                    
+                    fputcsv($handle, [
+                        $shift->user->name,
+                        $shift->started_at->format('d/m/Y'),
+                        $shift->started_at->format('H:i'),
+                        $shift->ended_at ? $shift->ended_at->format('H:i') : '-',
+                        $shift->opening_cash,
+                        $sales,
+                        $expenses,
+                        $shift->cash_difference,
+                        $shift->status,
+                        $shift->close_notes
+                    ], ';');
+
+                    if (ob_get_level() > 0) ob_flush();
+                    flush();
+                });
+
+            fclose($handle);
+        }, $filename);
     }
 }

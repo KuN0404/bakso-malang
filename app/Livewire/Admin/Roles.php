@@ -65,7 +65,10 @@ class Roles extends Component
 
     public function render()
     {
-        $roles = Role::with('permissions')->withCount('users')->get();
+        $roles = Role::where('name', '!=', 'Super Admin')
+            ->with('permissions')
+            ->withCount('users')
+            ->get();
         $permissions = Permission::orderBy('name')->get();
 
         // Group permissions using config groups (Indonesian labels)

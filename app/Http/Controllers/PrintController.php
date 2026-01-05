@@ -14,6 +14,7 @@ class PrintController extends Controller
         $end = Carbon::parse($request->query('end'))->endOfDay();
         $search = $request->query('search');
         $cashierId = $request->query('cashier');
+        $format = $request->query('format', 'A4');
 
         $transactions = Transaction::with(['user', 'paymentSource'])
             ->whereBetween('created_at', [$start, $end])
@@ -28,7 +29,7 @@ class PrintController extends Controller
             'total_revenue' => $transactions->sum('total'),
         ];
 
-        return view('print.transactions-table', compact('transactions', 'start', 'end', 'summary'));
+        return view('print.transactions-table', compact('transactions', 'start', 'end', 'summary', 'format'));
     }
 
     public function transactionsDetail(Request $request)
@@ -37,6 +38,7 @@ class PrintController extends Controller
         $end = Carbon::parse($request->query('end'))->endOfDay();
         $search = $request->query('search');
         $cashierId = $request->query('cashier');
+        $format = $request->query('format', 'A4');
 
         $transactions = Transaction::with(['user', 'paymentSource', 'details.product', 'details.modifiers'])
             ->whereBetween('created_at', [$start, $end])
@@ -51,7 +53,7 @@ class PrintController extends Controller
             'total_revenue' => $transactions->sum('total'),
         ];
 
-        return view('print.transactions-detail', compact('transactions', 'start', 'end', 'summary'));
+        return view('print.transactions-detail', compact('transactions', 'start', 'end', 'summary', 'format'));
     }
 
     public function returnsReport(Request $request)
@@ -76,6 +78,75 @@ class PrintController extends Controller
             $q->whereBetween('created_at', [$start, $end]);
         })->sum('quantity');
 
-        return view('print.returns-report', compact('returns', 'start', 'end', 'todayTotal', 'returnsCount', 'returnsQty'));
+        $format = $request->query('format', 'A4');
+        return view('print.returns-report', compact('returns', 'start', 'end', 'todayTotal', 'returnsCount', 'returnsQty', 'format'));
+    }
+    public function returnDetail(Request $request, $id)
+    {
+        $return = \App\Models\ProductReturn::with(['items.product', 'transaction', 'user'])->findOrFail($id);
+        $format = $request->query('format', '58mm');
+        return view('print.return-detail', compact('return', 'format'));
+    }
+
+    public function transactionSingle(Request $request, Transaction $transaction)
+    {
+        $format = $request->query('format', '58mm');
+        $transaction->increment('print_count');
+
+        // Load relationships
+        $transaction->load(['user', 'paymentSource', 'details.product', 'details.modifiers', 'details.product.category']);
+        
+        return view('print.transaction-single', compact('transaction', 'format'));
+    }
+
+    public function shiftsTable(Request $request)
+    {
+        $start = Carbon::parse($request->query('start'))->startOfDay();
+        $end = Carbon::parse($request->query('end'))->endOfDay();
+        $cashierId = $request->query('cashier');
+        $format = $request->query('format', 'A4');
+
+        $shifts = \App\Models\Shift::with(['user', 'transactions', 'expenses'])
+            ->whereBetween('started_at', [$start, $end])
+            ->when($cashierId, fn($q) => $q->where('user_id', $cashierId))
+            ->latest('started_at')
+            ->get();
+
+        $summary = [
+            'total_shifts' => $shifts->count(),
+            'total_sales' => $shifts->sum(fn($s) => $s->transactions->where('status', 'completed')->sum('total')),
+            'total_expenses' => $shifts->sum(fn($s) => $s->expenses->sum('amount')),
+            'total_difference' => $shifts->sum('cash_difference'),
+        ];
+
+        return view('print.shifts-table', compact('shifts', 'start', 'end', 'summary', 'format'));
+    }
+
+    public function shiftDetail(Request $request, \App\Models\Shift $shift)
+    {
+        $format = $request->query('format', '58mm');
+        $shift->load(['user', 'transactions.paymentSource', 'expenses']);
+        
+        return view('print.shift-detail', compact('shift', 'format'));
+    }
+
+    public function salesReport(Request $request)
+    {
+        $start = Carbon::parse($request->query('start', now()->format('Y-m-d')))->startOfDay();
+        $end = Carbon::parse($request->query('end', now()->format('Y-m-d')))->endOfDay();
+        $format = $request->query('format', 'A4');
+        
+        $reportService = new \App\Services\ReportService();
+        
+        // Fetch Data
+        $summary = $reportService->getRangeSummaryReport($start, $end);
+        $categories = $reportService->getSalesByCategoryReport($start, $end);
+        $payments = $reportService->getPaymentMethodReport($start, $end);
+        $topProducts = $reportService->getTopProductsReport($start, $end, 10); // Top 10
+        
+        return view('print.sales-report', compact(
+            'start', 'end', 'format',
+            'summary', 'categories', 'payments', 'topProducts'
+        ));
     }
 }

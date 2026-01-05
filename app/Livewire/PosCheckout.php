@@ -93,6 +93,7 @@ class PosCheckout extends Component
     
     // Return & Refund
     public bool $showReturnModal = false;
+    public bool $showReturnHistoryModal = false; // Added property
     public string $returnInvoiceSearch = '';
     public ?Transaction $returnTransaction = null;
     public array $returnItems = [];
@@ -125,6 +126,21 @@ class PosCheckout extends Component
     }
 
     // Return Logic
+    public function openReturnHistoryModal()
+    {
+        $this->showReturnHistoryModal = true;
+    }
+
+    public function closeReturnHistoryModal()
+    {
+        $this->showReturnHistoryModal = false;
+    }
+
+    public function printReturnReceipt(int $returnId)
+    {
+        $this->dispatch('open-new-window', url: route('print.return-detail', $returnId));
+    }
+
     public function openReturnModal()
     {
         $this->reset(['returnTransaction', 'returnInvoiceSearch', 'returnItems', 'returnReason', 'returnNotes']);
@@ -152,20 +168,30 @@ class PosCheckout extends Component
         $this->returnItems = [];
         
         foreach ($transaction->details as $detail) {
-            $this->returnItems[$detail->id] = [
-                'selected' => false,
-                'quantity' => $detail->quantity,
-                'max_quantity' => $detail->quantity,
-                'product_id' => $detail->product_id,
-                'product_name' => $detail->product_name,
-                'unit_price' => $detail->unit_price + $detail->modifier_total,
-                'modifiers' => $detail->modifiers->map(function($m) {
-                    return [
-                        'name' => $m->pivot->modifier_name,
-                        'price' => $m->pivot->price_adjustment
-                    ];
-                })->values()->toArray(),
-            ];
+            $alreadyReturned = \App\Models\ReturnItem::where('transaction_detail_id', $detail->id)->sum('quantity');
+            $remaining = max(0, $detail->quantity - $alreadyReturned);
+
+            if ($remaining > 0) {
+                $this->returnItems[$detail->id] = [
+                    'selected' => false,
+                    'quantity' => $remaining, // Default to max available
+                    'max_quantity' => $remaining,
+                    'product_id' => $detail->product_id,
+                    'product_name' => $detail->product_name,
+                    'unit_price' => $detail->unit_price + $detail->modifier_total,
+                    'modifiers' => $detail->modifiers->map(function($m) {
+                        return [
+                            'name' => $m->pivot->modifier_name,
+                            'price' => $m->pivot->price_adjustment
+                        ];
+                    })->values()->toArray(),
+                ];
+            }
+        }
+        
+        if (empty($this->returnItems)) {
+            $this->dispatch('notify', type: 'error', message: 'Semua item dalam invoice ini sudah diretur sepenuhnya');
+            $this->returnTransaction = null;
         }
     }
 
@@ -198,9 +224,32 @@ class PosCheckout extends Component
             return;
         }
 
+        // VALIDATION: Ensure return quantity logic is sound
+        foreach ($selectedItems as $detailId => $item) {
+            if ($item['quantity'] <= 0) {
+                $this->dispatch('notify', type: 'error', message: 'Jumlah retur harus lebih dari 0');
+                return;
+            }
+            
+            $detail = \App\Models\TransactionDetail::find($detailId);
+            if (!$detail) {
+                $this->dispatch('notify', type: 'error', message: 'Item transaksi data tidak valid (ID: ' . $detailId . ')');
+                return;
+            }
+
+            // Backend Check: Qty cannot exceed original purchase MINUS already returned
+            $alreadyReturned = \App\Models\ReturnItem::where('transaction_detail_id', $detailId)->sum('quantity');
+            $maxReturnable = $detail->quantity - $alreadyReturned;
+
+            if ($item['quantity'] > $maxReturnable) {
+                $this->dispatch('notify', type: 'error', message: "Retur '{$item['product_name']}' melebihi sisa (Max: {$maxReturnable})");
+                return;
+            }
+        }
+
         $totalRefund = $this->calculateReturnTotal();
 
-        DB::transaction(function () use ($selectedItems, $totalRefund) {
+        $return = DB::transaction(function () use ($selectedItems, $totalRefund) {
             $shift = $this->getOrCreateTodayShift();
 
             // Create return record
@@ -244,17 +293,21 @@ class PosCheckout extends Component
                     StockLog::create([
                         'product_id' => $detail->product_id,
                         'user_id' => auth()->id(),
-                        'type' => 'return',
+                        'type' => 'in', // Returned stock is 'in'
                         'amount' => $item['quantity'],
                         'final_stock' => $detail->product->stock, // Fresh stock after increment
-                        'note' => "Retur: {$return->return_number}",
+                        'reason' => "Retur Penjualan: {$return->return_number}",
+                        'reference_id' => $return->id,
                     ]);
                 }
             }
+            
+            return $return;
         });
 
         $this->showReturnModal = false;
         $this->dispatch('notify', type: 'success', message: 'Retur berhasil diproses');
+        $this->dispatch('open-new-window', url: route('print.return-detail', $return->id));
         $this->reset(['returnTransaction', 'returnInvoiceSearch', 'returnItems', 'returnReason', 'returnNotes']);
     }
 
@@ -326,6 +379,16 @@ class PosCheckout extends Component
         return Transaction::where('user_id', auth()->id())
             ->whereDate('created_at', today())
             ->where('status', 'completed')
+            ->get();
+    }
+
+    #[Computed]
+    public function todayReturns()
+    {
+        return ProductReturn::with(['user', 'transaction'])
+            ->where('user_id', auth()->id())
+            ->whereDate('created_at', today())
+            ->latest()
             ->get();
     }
 
@@ -689,7 +752,6 @@ class PosCheckout extends Component
             $shift->opening_cash = $this->openingCash;
 
             // Add expenses
-            $totalExpenses = 0;
             foreach ($this->expenses as $expense) {
                 if (!empty($expense['description']) && $expense['amount'] > 0) {
                     $shift->expenses()->create([
@@ -697,9 +759,12 @@ class PosCheckout extends Component
                         'amount' => $expense['amount'],
                         'category' => 'operational',
                     ]);
-                    $totalExpenses += $expense['amount'];
                 }
             }
+            
+            // Re-calculate TOTAL expenses (Manual Operational + Automated Refunds)
+            // We need to fetch from DB because refunds are already saved there
+            $totalExpenses = $shift->expenses()->sum('amount');
 
             // Calculate expected cash
             $cashSales = $shift->transactions()
@@ -722,7 +787,7 @@ class PosCheckout extends Component
 
         $this->showCloseShiftModal = false;
         $this->dispatch('notify', type: 'success', message: 'Shift berhasil ditutup');
-        $this->dispatch('print-shift-receipt');
+        $this->dispatch('open-new-window', url: route('print.shift.detail', $shift->id)); // Send URL directly
     }
 
     public function openClosePreviousShiftModal(): void
@@ -753,7 +818,6 @@ class PosCheckout extends Component
             $shift->opening_cash = $this->openingCash;
 
             // Add expenses
-            $totalExpenses = 0;
             foreach ($this->expenses as $expense) {
                 if (!empty($expense['description']) && $expense['amount'] > 0) {
                     $shift->expenses()->create([
@@ -761,9 +825,11 @@ class PosCheckout extends Component
                         'amount' => $expense['amount'],
                         'category' => 'operational',
                     ]);
-                    $totalExpenses += $expense['amount'];
                 }
             }
+            
+            // Re-calculate TOTAL expenses (to include Refunds)
+            $totalExpenses = $shift->expenses()->sum('amount');
 
             // Calculate expected cash
             $cashSales = $shift->transactions()
@@ -786,7 +852,9 @@ class PosCheckout extends Component
 
         $this->showUnclosedShiftModal = false;
         $this->unclosedShiftId = null;
+        $this->unclosedShiftId = null;
         $this->dispatch('notify', type: 'success', message: 'Shift sebelumnya berhasil ditutup. Anda bisa mulai transaksi.');
+        $this->dispatch('open-new-window', url: route('print.shift.detail', $shift->id));
     }
 
     protected function generateCartKey(int $productId, array $modifiers): string
