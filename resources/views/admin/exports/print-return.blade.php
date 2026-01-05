@@ -1,3 +1,6 @@
+@php
+    $settings = \App\Models\Setting::getGroup('general');
+@endphp
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -74,7 +77,7 @@
 </head>
 <body onload="window.print()">
     <div class="header">
-        <h2>BAKSO MALANG</h2>
+        <h2>{{ strtoupper($settings['store_name'] ?? 'BAKSO MALANG') }}</h2>
         <p>BUKTI RETUR BARANG</p>
     </div>
 

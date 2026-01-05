@@ -50,7 +50,7 @@
             <h3 class="font-bold mb-2 uppercase text-gray-400 text-[10px]">Metode Pembayaran</h3>
             @foreach($payments as $payment)
                 <div class="flex justify-between mb-1">
-                    <span class="capitalize">{{ $payment->payment_method }}</span>
+                    <span class="capitalize">{{ $payment->payment_name }}</span>
                     <span>Rp {{ number_format($payment->total_amount, 0, ',', '.') }}</span>
                 </div>
             @endforeach

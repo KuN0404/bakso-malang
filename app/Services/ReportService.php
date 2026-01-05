@@ -80,14 +80,18 @@ class ReportService
     public function getPaymentMethodReport(Carbon $startDate, Carbon $endDate): Collection
     {
         return Transaction::query()
-            ->where('status', 'completed')
-            ->whereBetween('created_at', [$startDate, $endDate])
-            ->groupBy('payment_method')
+            ->leftJoin('payment_sources', 'transactions.payment_source_id', '=', 'payment_sources.id')
+            ->where('transactions.status', 'completed')
+            ->whereBetween('transactions.created_at', [$startDate, $endDate])
+            ->groupBy('transactions.payment_method', 'payment_sources.name')
             ->selectRaw('
-                payment_method,
+                CASE 
+                    WHEN transactions.payment_method = "cash" THEN "Tunai"
+                    ELSE COALESCE(payment_sources.name, transactions.payment_method)
+                END as payment_name,
                 COUNT(*) as transaction_count,
-                SUM(total) as total_amount,
-                AVG(total) as average_amount
+                SUM(transactions.total) as total_amount,
+                AVG(transactions.total) as average_amount
             ')
             ->orderByDesc('total_amount')
             ->get();

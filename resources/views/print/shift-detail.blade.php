@@ -1,3 +1,6 @@
+@php
+    $settings = \App\Models\Setting::getGroup('general');
+@endphp
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -30,8 +33,12 @@
 </head>
 <body onload="window.print()">
     <div class="text-center mb-2">
-        <div class="font-bold" style="font-size: 14px; margin-bottom: 4px;">Bakso Malang</div>
-        <div>Laporan Tutup Shift</div>
+        <div class="font-bold" style="font-size: 14px; margin-bottom: 4px;">{{ $settings['store_name'] ?? 'Bakso Malang' }}</div>
+        <div style="font-size: 10px; color: #666;">{{ $settings['store_address'] ?? '' }}</div>
+        @if(!empty($settings['store_phone']))
+        <div style="font-size: 10px; color: #666;">Telp: {{ $settings['store_phone'] }}</div>
+        @endif
+        <div class="border-b" style="margin-top: 8px; padding-bottom: 8px;">Laporan Tutup Shift</div>
     </div>
 
     <div class="border-t border-b py-1 mb-2">

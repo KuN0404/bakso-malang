@@ -40,10 +40,6 @@
             <span class="font-bold">{{ $transaction->invoice_number }}</span>
         </div>
         <div class="flex justify-between">
-            <span>Antrian:</span>
-            <span class="font-bold text-lg">{{ $transaction->queue_display }}</span>
-        </div>
-        <div class="flex justify-between">
             <span>Tanggal:</span>
             <span>{{ $transaction->created_at->format('d/m/Y H:i') }}</span>
         </div>
@@ -52,15 +48,21 @@
             <span>{{ $transaction->user->name ?? '-' }}</span>
         </div>
         @if($transaction->customer_name)
-            <div class="flex justify-between">
-                <span>Customer:</span>
-                <span>{{ $transaction->customer_name }}</span>
-            </div>
+        <div class="flex justify-between">
+            <span>Customer:</span>
+            <span>{{ $transaction->customer_name }}</span>
+        </div>
         @endif
         <div class="flex justify-between">
             <span>Tipe:</span>
-            <span>{{ $transaction->order_type === 'dine_in' ? 'Makan di Tempat' : 'Bawa Pulang' }}</span>
+            <span>{{ $transaction->order_type === 'dine_in' ? 'Dine In' : 'Take Away' }}</span>
         </div>
+        @if($transaction->service_area_id)
+        <div class="flex justify-between">
+            <span>Area:</span>
+            <span class="font-bold text-md">{{ $transaction->serviceArea->name ?? '-' }}</span>
+        </div>
+        @endif
     </div>
 
     <!-- Items -->

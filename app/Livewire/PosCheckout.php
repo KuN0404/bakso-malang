@@ -7,13 +7,14 @@ use App\Models\DailyQueueNumber;
 use App\Models\PaymentSource;
 use App\Models\PrinterConfig;
 use App\Models\Product;
+use App\Models\ServiceArea;
 use App\Models\Setting;
 use App\Models\Shift;
 use App\Models\Transaction;
 use Illuminate\Support\Facades\DB;
 use App\Models\ProductReturn;
 use App\Models\ShiftExpense;
-use Illuminate\Support\Str;
+
 use App\Models\StockLog;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
@@ -72,6 +73,7 @@ class PosCheckout extends Component
     public float $paidAmount = 0;
     public string $customerName = '';
     public string $orderType = 'dine_in';
+    public ?int $selectedServiceAreaId = null;
     public string $notes = '';
     
     // UI state
@@ -103,6 +105,15 @@ class PosCheckout extends Component
     // Unclosed Shift Blocking
     public bool $showUnclosedShiftModal = false;
     public ?int $unclosedShiftId = null;
+
+    // Pagination
+    public int $perPage = 40;
+    public int $totalProductsCount = 0;
+
+    public function loadMore(): void
+    {
+        $this->perPage += 40;
+    }
     
     public function openHistoryModal()
     {
@@ -111,7 +122,7 @@ class PosCheckout extends Component
     
     public function reprintReceipt(int $transactionId)
     {
-        $this->lastTransaction = Transaction::with(['details.product.category', 'paymentSource', 'user'])->find($transactionId);
+        $this->lastTransaction = Transaction::with(['details.modifiers', 'paymentSource', 'user', 'serviceArea'])->find($transactionId);
         if ($this->lastTransaction) {
             $this->showReceiptModal = true;
             $this->dispatch('print-receipt');
@@ -339,14 +350,16 @@ class PosCheckout extends Component
                 $q->where('name', 'like', "%{$this->searchQuery}%")
                   ->orWhere('sku', 'like', "%{$this->searchQuery}%");
             });
-            // If searching, we might want more results or pagination, but for now standard get is fine.
-            // Or limit search results too if desired.
-        } else {
-            // Lazy Load Optimization: Limit initial load to prevent UI lag on large datasets
-            $query->take(40);
         }
+        
+        // Count total matching (cached for pagination check)
+        $this->totalProductsCount = $query->count();
 
-        return $query->orderByDesc('is_featured')->orderBy('name')->get();
+        // Apply limit
+        return $query->take($this->perPage)
+            ->orderByDesc('is_featured')
+            ->orderBy('name')
+            ->get();
     }
 
     #[Computed]
@@ -421,6 +434,12 @@ class PosCheckout extends Component
     public function printerConfig(): ?PrinterConfig
     {
         return PrinterConfig::where('is_default', true)->first();
+    }
+
+    #[Computed]
+    public function serviceAreas()
+    {
+        return ServiceArea::active()->orderBy('sort_order')->get();
     }
 
     public function selectCategory(?int $categoryId): void
@@ -519,6 +538,8 @@ class PosCheckout extends Component
         $this->paidAmount = 0;
         $this->customerName = '';
         $this->notes = '';
+        $this->orderType = 'dine_in';
+        $this->selectedServiceAreaId = null;
     }
 
     public function openPaymentModal(): void
@@ -588,6 +609,12 @@ class PosCheckout extends Component
             return;
         }
 
+        // Validate Service Area for Dine In
+        if ($this->orderType === 'dine_in' && !$this->selectedServiceAreaId) {
+            $this->dispatch('notify', type: 'error', message: 'Wajib pilih Meja / Ruangan untuk Dine In');
+            return;
+        }
+
         // For cash, validate paid amount
         if ($paymentSource->type === 'cash' && $this->paidAmount < $this->total) {
             $this->dispatch('notify', type: 'error', message: 'Jumlah pembayaran kurang');
@@ -619,6 +646,7 @@ class PosCheckout extends Component
                     'user_id' => auth()->id(),
                     'shift_id' => $shift->id,
                     'payment_source_id' => $paymentSource->id,
+                    'service_area_id' => $this->orderType === 'dine_in' ? $this->selectedServiceAreaId : null,
                     'invoice_number' => Transaction::generateInvoiceNumber(),
                     'queue_number' => $queueNumber,
                     'subtotal' => $this->subtotal,
@@ -677,6 +705,7 @@ class PosCheckout extends Component
                     'details.modifiers',
                     'user',
                     'paymentSource',
+                    'serviceArea',
                 ]);
             });
 

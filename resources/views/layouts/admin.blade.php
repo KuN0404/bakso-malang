@@ -169,7 +169,8 @@
                     $isMasterActive = request()->routeIs('admin.categories.*') || 
                                       request()->routeIs('admin.products.*') || 
                                       request()->routeIs('admin.modifiers.*') || 
-                                      request()->routeIs('admin.payment-sources.*');
+                                      request()->routeIs('admin.payment-sources.*') ||
+                                      request()->routeIs('admin.service-areas.*');
                 @endphp
                 <div x-data="{ open: {{ $isMasterActive ? 'true' : 'false' }} }" class="mt-4">
                     <button @click="open = !open" class="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-blue-300 uppercase tracking-wider hover:text-white transition-colors group whitespace-nowrap text-left">
@@ -205,6 +206,11 @@
                         <a href="{{ route('admin.payment-sources.index') }}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.payment-sources.*') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
                             <div class="flex-shrink-0 w-6 flex justify-center"><i data-lucide="wallet" class="w-4 h-4"></i></div>
                             <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Metode Bayar</span></div>
+                        </a>
+
+                        <a href="{{ route('admin.service-areas.index') }}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.service-areas.*') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
+                            <div class="flex-shrink-0 w-6 flex justify-center"><i data-lucide="map-pin" class="w-4 h-4"></i></div>
+                            <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Area Pelayanan</span></div>
                         </a>
                     </div>
                 </div>

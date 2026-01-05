@@ -28,14 +28,14 @@ class Settings extends Component
 
     public function mount(): void
     {
-        // Load general settings
-        $this->store_name = Setting::get('general.store_name', 'Bakso Malang');
-        $this->store_address = Setting::get('general.store_address', '');
-        $this->store_phone = Setting::get('general.store_phone', '');
-        $this->tax_percentage = (float) Setting::get('general.tax_percentage', 0);
-        $this->currency_symbol = Setting::get('general.currency_symbol', 'Rp');
-        $this->header_text = Setting::get('receipt.header_text', '');
-        $this->footer_text = Setting::get('receipt.footer_text', '');
+        // Load general settings (key without group prefix, group as separate param)
+        $this->store_name = Setting::get('store_name', 'Bakso Malang', 'general');
+        $this->store_address = Setting::get('store_address', '', 'general');
+        $this->store_phone = Setting::get('store_phone', '', 'general');
+        $this->tax_percentage = (float) Setting::get('tax_percentage', 0, 'general');
+        $this->currency_symbol = Setting::get('currency_symbol', 'Rp', 'general');
+        $this->header_text = Setting::get('header_text', '', 'receipt');
+        $this->footer_text = Setting::get('footer_text', '', 'receipt');
 
         // Load printer config
         $printer = PrinterConfig::getDefault();
@@ -50,13 +50,13 @@ class Settings extends Component
 
     public function saveGeneral(): void
     {
-        Setting::set('general.store_name', $this->store_name, 'general');
-        Setting::set('general.store_address', $this->store_address, 'general');
-        Setting::set('general.store_phone', $this->store_phone, 'general');
-        Setting::set('general.tax_percentage', $this->tax_percentage, 'general', 'float');
-        Setting::set('general.currency_symbol', $this->currency_symbol, 'general');
-        Setting::set('receipt.header_text', $this->header_text, 'receipt');
-        Setting::set('receipt.footer_text', $this->footer_text, 'receipt');
+        Setting::set('store_name', $this->store_name, 'general');
+        Setting::set('store_address', $this->store_address, 'general');
+        Setting::set('store_phone', $this->store_phone, 'general');
+        Setting::set('tax_percentage', $this->tax_percentage, 'general', 'float');
+        Setting::set('currency_symbol', $this->currency_symbol, 'general');
+        Setting::set('header_text', $this->header_text, 'receipt');
+        Setting::set('footer_text', $this->footer_text, 'receipt');
 
         $this->dispatch('notify', type: 'success', message: 'Pengaturan umum berhasil disimpan');
     }

@@ -8,6 +8,7 @@
         modifierProduct: null,
         selectedModifiers: {},
         modifierTotal: 0,
+        isThrottled: false,
         
         openModifierModal(product) {
             this.modifierProduct = product;
@@ -68,11 +69,15 @@
             return result;
         },
         addWithModifiers() {
+            if (this.isThrottled) return;
+
             if (this.modifierProduct) {
+                this.isThrottled = true;
                 $wire.addToCart(this.modifierProduct.id, this.getModifiersForCart());
                 this.showModifierModal = false;
                 this.modifierProduct = null;
                 this.selectedModifiers = {};
+                setTimeout(() => { this.isThrottled = false; }, 300);
             }
         }
     }"
@@ -352,7 +357,7 @@
                             @if($hasModifiers)
                                 @click="openModifierModal({{ json_encode($productData) }})"
                             @else
-                                wire:click="addToCart({{ $product->id }}, [])"
+                                wire:click.throttle.300ms="addToCart({{ $product->id }}, [])"
                             @endif
                         @endif
                         wire:key="product-{{ $product->id }}"
@@ -413,6 +418,25 @@
                     </div>
                 @endforelse
             </div>
+            
+            <!-- Load More -->
+            @if($this->totalProductsCount > count($this->products))
+                <div class="mt-6 text-center">
+                    <button 
+                        wire:click="loadMore"
+                        wire:loading.attr="disabled"
+                        class="px-6 py-2 bg-white border border-gray-200 text-primary-600 font-medium rounded-full shadow-sm hover:bg-gray-50 hover:border-primary-200 transition-all flex items-center gap-2 mx-auto disabled:opacity-50"
+                    >
+                        <i wire:loading.remove wire:target="loadMore" data-lucide="arrow-down-circle" class="w-4 h-4"></i>
+                        <svg wire:loading wire:target="loadMore" class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span>Muat Lebih Banyak</span>
+                        <span class="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full ml-1">{{ count($this->products) }} / {{ $this->totalProductsCount }}</span>
+                    </button>
+                </div>
+            @endif
         </div>
 
         <!-- Modifier Selection Modal -->
@@ -820,6 +844,61 @@
                             @endif
                         </div>
                     @endif
+
+
+                    <!-- Order Type & Service Area -->
+                    <div class="mb-6 space-y-4">
+                        <!-- Order Type Toggle -->
+                        <div class="bg-gray-100 p-1 rounded-xl flex">
+                            <button 
+                                wire:click="$set('orderType', 'dine_in')"
+                                class="flex-1 py-2 rounded-lg text-sm font-medium transition-all {{ $orderType === 'dine_in' ? 'bg-white text-primary-600 shadow-sm' : 'text-gray-500 hover:text-gray-700' }}"
+                            >
+                                Dine In
+                            </button>
+                            <button 
+                                wire:click="$set('orderType', 'take_away')"
+                                class="flex-1 py-2 rounded-lg text-sm font-medium transition-all {{ $orderType === 'take_away' ? 'bg-white text-primary-600 shadow-sm' : 'text-gray-500 hover:text-gray-700' }}"
+                            >
+                                Take Away
+                            </button>
+                        </div>
+
+                        <!-- Service Area Grid (Only for Dine In) -->
+                        @if($orderType === 'dine_in')
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Pilih Meja / Area</label>
+                                @if($this->serviceAreas->count() > 0)
+                                    <div class="grid grid-cols-4 gap-2 max-h-[200px] overflow-y-auto custom-scroll p-1">
+                                        @foreach($this->serviceAreas as $area)
+                                            <button 
+                                                wire:click="$set('selectedServiceAreaId', {{ $area->id }})"
+                                                class="p-2 rounded-lg border text-sm font-medium transition-all relative overflow-hidden group
+                                                    {{ $selectedServiceAreaId === $area->id 
+                                                        ? 'border-primary-500 bg-primary-50 text-primary-700 ring-1 ring-primary-500' 
+                                                        : 'border-gray-200 hover:border-primary-300 hover:bg-gray-50 text-gray-700' 
+                                                    }}"
+                                            >
+                                                <span class="block truncate">{{ $area->name }}</span>
+                                                <span class="text-xs text-gray-400">{{ $area->code }}</span>
+                                                
+                                                @if($selectedServiceAreaId === $area->id)
+                                                    <div class="absolute inset-0 border-2 border-primary-500 rounded-lg pointer-events-none"></div>
+                                                @endif
+                                            </button>
+                                        @endforeach
+                                    </div>
+                                    @if(!$selectedServiceAreaId)
+                                        <p class="text-xs text-red-500 mt-1">* Wajib pilih meja untuk Dine In</p>
+                                    @endif
+                                @else
+                                    <div class="text-center py-4 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+                                        <p class="text-sm text-gray-500">Belum ada data area</p>
+                                    </div>
+                                @endif
+                            </div>
+                        @endif
+                    </div>
 
                     <!-- Customer Name -->
                     <div>

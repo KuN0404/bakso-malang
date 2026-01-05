@@ -1,3 +1,6 @@
+@php
+    $settings = \App\Models\Setting::getGroup('general');
+@endphp
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -92,7 +95,7 @@
         <!-- A4 Layout (Existing) -->
         <div class="text-center mb-6">
             <h1 class="text-xl font-bold">Laporan Detail Transaksi</h1>
-            <p class="text-gray-600">Bakso Malang</p>
+            <p class="text-gray-600">{{ $settings['store_name'] ?? 'Bakso Malang' }}</p>
             <p class="text-sm text-gray-500">Periode: {{ $start->format('d M Y') }} - {{ $end->format('d M Y') }}</p>
         </div>
 

@@ -1,3 +1,6 @@
+@php
+    $settings = \App\Models\Setting::getGroup('general');
+@endphp
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -23,9 +26,11 @@
         <div class="font-mono text-xs" style="max-width: {{ $format }};">
             <!-- Header -->
             <div class="text-left border-b border-dashed border-gray-300 pb-3 mb-3">
-                <h1 class="text-base font-bold">BAKSO MALANG</h1>
-                <p class="text-xs text-gray-600">Jl. Soekarno Hatta No.123</p>
-                <p class="text-xs text-gray-600">Telp: 0812-3456-7890</p>
+                <h1 class="text-base font-bold">{{ strtoupper($settings['store_name'] ?? 'BAKSO MALANG') }}</h1>
+                <p class="text-xs text-gray-600">{{ $settings['store_address'] ?? '' }}</p>
+                @if(!empty($settings['store_phone']))
+                <p class="text-xs text-gray-600">Telp: {{ $settings['store_phone'] }}</p>
+                @endif
                 <h2 class="font-bold mt-2">BUKTI RETUR</h2>
             </div>
 
@@ -87,9 +92,11 @@
             <!-- A4 Invoice Layout -->
             <div class="flex justify-between items-start mb-8 border-b-2 border-gray-800 pb-4">
                 <div>
-                    <h1 class="text-2xl font-bold text-gray-900">BAKSO MALANG</h1>
-                    <p class="text-sm text-gray-600">Jl. Soekarno Hatta No.123</p>
-                    <p class="text-sm text-gray-600">Telp: 0812-3456-7890</p>
+                    <h1 class="text-2xl font-bold text-gray-900">{{ strtoupper($settings['store_name'] ?? 'BAKSO MALANG') }}</h1>
+                    <p class="text-sm text-gray-600">{{ $settings['store_address'] ?? '' }}</p>
+                    @if(!empty($settings['store_phone']))
+                    <p class="text-sm text-gray-600">Telp: {{ $settings['store_phone'] }}</p>
+                    @endif
                 </div>
                 <div class="text-right">
                     <h2 class="text-xl font-bold text-gray-800 uppercase tracking-widest">Nota Retur</h2>

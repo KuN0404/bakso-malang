@@ -298,7 +298,7 @@
                                 <div class="w-8 h-8 rounded-lg {{ $index === 0 ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-600' }} flex items-center justify-center font-bold text-sm">
                                     {{ $index + 1 }}
                                 </div>
-                                <span class="font-medium text-gray-800">{{ ucfirst($pay->payment_method) }}</span>
+                                <span class="font-medium text-gray-800">{{ ucfirst($pay->payment_name) }}</span>
                             </div>
                             <div class="text-right">
                                 <p class="font-medium text-gray-800">Rp {{ number_format($pay->total_sales, 0, ',', '.') }}</p>
@@ -430,7 +430,7 @@
                                     <i data-lucide="wallet" class="w-6 h-6 text-green-600"></i>
                                 </div>
                                 <div>
-                                    <h4 class="font-bold text-gray-800">{{ ucfirst($pay->payment_method) }}</h4>
+                                    <h4 class="font-bold text-gray-800">{{ ucfirst($pay->payment_name) }}</h4>
                                     <p class="text-sm text-gray-500">{{ $pay->transaction_count }} transaksi</p>
                                 </div>
                             </div>
@@ -469,7 +469,7 @@
                         @foreach($paymentReport as $index => $pay)
                             <tr>
                                 <td>{{ $loop->iteration }}</td>
-                                <td>{{ ucfirst($pay->payment_method) }}</td>
+                                <td>{{ ucfirst($pay->payment_name) }}</td>
                                 <td class="text-right">{{ $pay->transaction_count }}</td>
                                 <td class="text-right">Rp {{ number_format($pay->total_sales, 0, ',', '.') }}</td>
                             </tr>

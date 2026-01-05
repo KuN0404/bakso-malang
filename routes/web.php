@@ -57,6 +57,7 @@ Route::middleware(['auth', 'throttle:admin'])->prefix('admin')->name('admin.')->
     Route::get('/products/{product}', App\Livewire\Admin\ProductDetail::class)->name('products.show');
     Route::get('/modifiers', Modifiers::class)->name('modifiers.index');
     Route::get('/payment-sources', PaymentSources::class)->name('payment-sources.index');
+    Route::get('/service-areas', App\Livewire\Admin\ServiceAreas::class)->name('service-areas.index');
     
     // Transactions & Shifts
     Route::get('/shifts', Shifts::class)->name('shifts.index');

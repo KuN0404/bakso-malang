@@ -13,6 +13,7 @@ class Transaction extends Model
         'user_id',
         'shift_id',
         'payment_source_id',
+        'service_area_id',
         'invoice_number',
         'queue_number',
         'subtotal',
@@ -57,9 +58,15 @@ class Transaction extends Model
         return $this->belongsTo(Shift::class);
     }
 
+
     public function paymentSource(): BelongsTo
     {
         return $this->belongsTo(PaymentSource::class);
+    }
+
+    public function serviceArea(): BelongsTo
+    {
+        return $this->belongsTo(ServiceArea::class);
     }
 
     public function cancelledBy(): BelongsTo

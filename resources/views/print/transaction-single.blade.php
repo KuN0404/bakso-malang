@@ -1,3 +1,7 @@
+@php
+    $settings = \App\Models\Setting::getGroup('general');
+    $receiptSettings = \App\Models\Setting::getGroup('receipt');
+@endphp
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -24,9 +28,11 @@
         <div class="font-mono text-xs max-w-[{{ $format }}]">
             <!-- Header -->
             <div class="text-center border-b border-dashed border-gray-400 pb-3 mb-3">
-                <h1 class="text-base font-bold uppercase">Bakso Malang</h1>
-                <p class="text-[10px] text-gray-500">Jl. Contoh No. 123, Kota Malang</p>
-                <p class="text-[10px] text-gray-500">Telp: 0812-3456-7890</p>
+                <h1 class="text-base font-bold uppercase">{{ $settings['store_name'] ?? 'Bakso Malang' }}</h1>
+                <p class="text-[10px] text-gray-500">{{ $settings['store_address'] ?? '' }}</p>
+                @if(!empty($settings['store_phone']))
+                <p class="text-[10px] text-gray-500">Telp: {{ $settings['store_phone'] }}</p>
+                @endif
             </div>
 
             <!-- Transaction Info -->
@@ -34,9 +40,11 @@
                 <div class="flex justify-between">
                     <span>No:</span><span class="font-bold">{{ $transaction->invoice_number }}</span>
                 </div>
+                @if($transaction->service_area_id)
                 <div class="flex justify-between">
-                    <span>Antrian:</span><span class="font-bold text-lg">{{ $transaction->queue_display }}</span>
+                    <span>Area:</span><span class="font-bold text-lg">{{ $transaction->serviceArea->name ?? '-' }}</span>
                 </div>
+                @endif
                 <div class="flex justify-between">
                     <span>Tanggal:</span><span>{{ $transaction->created_at->format('d/m/y H:i') }}</span>
                 </div>
@@ -100,7 +108,10 @@
             </div>
 
              <div class="text-center text-[10px] text-gray-400 mt-4">
-                 Terima Kasih atas Kunjungan Anda!
+                 {{ $receiptSettings['header_text'] ?? 'Terima Kasih!' }}
+                 @if(!empty($receiptSettings['footer_text']))
+                 <p class="mt-1">{{ $receiptSettings['footer_text'] }}</p>
+                 @endif
              </div>
         </div>
     @else
@@ -112,9 +123,11 @@
                     <p class="text-gray-500 mt-1">#{{ $transaction->invoice_number }}</p>
                 </div>
                 <div class="text-right">
-                    <h2 class="font-bold text-xl">Bakso Malang</h2>
-                    <p class="text-gray-500 text-sm">Jl. Contoh No. 123, Kota Malang</p>
-                    <p class="text-gray-500 text-sm">Telp: 0812-3456-7890</p>
+                    <h2 class="font-bold text-xl">{{ $settings['store_name'] ?? 'Bakso Malang' }}</h2>
+                    <p class="text-gray-500 text-sm">{{ $settings['store_address'] ?? '' }}</p>
+                    @if(!empty($settings['store_phone']))
+                    <p class="text-gray-500 text-sm">Telp: {{ $settings['store_phone'] }}</p>
+                    @endif
                 </div>
             </div>
 
