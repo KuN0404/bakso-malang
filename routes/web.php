@@ -105,4 +105,5 @@ Route::middleware(['auth'])->group(function () {
 // POS Routes
 Route::middleware(['auth', 'throttle:pos'])->group(function () {
     Route::get('/pos', PosCheckout::class)->name('pos');
+    Route::get('/pos/display', App\Livewire\CustomerDisplay::class)->name('pos.display');
 });

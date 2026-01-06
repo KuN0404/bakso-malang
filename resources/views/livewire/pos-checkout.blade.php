@@ -250,6 +250,13 @@
 
             <div class="flex items-center gap-3">
                 @if($this->todayShift)
+                    <button onclick="window.open('{{ route('pos.display') }}', 'CustomerDisplay', 'width=1280,height=800,menubar=no,toolbar=no,location=no,status=no')" 
+                            class="flex items-center gap-2 px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg transition-colors border border-indigo-200 mr-2" 
+                            title="Buka Layar Pelanggan">
+                        <i data-lucide="monitor" class="w-4 h-4"></i>
+                        <span class="text-xs font-bold hidden xl:inline">LAYAR</span>
+                    </button>
+
                     <!-- History Buttons Group -->
                     <div class="flex items-center">
                         <button wire:click="openHistoryModal" class="flex items-center gap-2 px-3 py-2 bg-blue-50 hover:bg-blue-100 rounded-l-lg text-blue-700 transition-colors border border-blue-200 border-r-0" title="Riwayat Transaksi">
@@ -538,7 +545,7 @@
             <span><kbd class="px-2 py-1 bg-gray-700 rounded">F2</kbd> Proses</span>
             <span><kbd class="px-2 py-1 bg-gray-700 rounded">F3</kbd> Hapus</span>
             <span><kbd class="px-2 py-1 bg-gray-700 rounded">F4</kbd> Tutup Shift</span>
-            <span><kbd class="px-2 py-1 bg-gray-700 rounded">Esc</kbd> Tutup Modal</span>
+            <span><kbd class="px-2 py-1 bg-gray-700 rounded">Esc</kbd> Tutup Popup</span>
         </div>
         <!-- Mobile Sticky Bottom Bar -->
         <div class="lg:hidden bg-white border-t p-4 px-6 flex justify-between items-center sticky bottom-0 z-30 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
@@ -1273,6 +1280,16 @@
 <script>
     // Initialize Lucide icons
     lucide.createIcons();
+    
+    // Broadcast Channel for Customer Display (Instant Update)
+    const posChannel = new BroadcastChannel('pos_channel');
+
+    Livewire.hook('commit', ({ component, succeed }) => {
+        succeed(() => {
+            posChannel.postMessage('update');
+        });
+    });
+
     Livewire.hook('morph.updated', () => {
         setTimeout(() => lucide.createIcons(), 50);
     });

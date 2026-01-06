@@ -64,8 +64,16 @@ class PosCheckout extends Component
             }
             
             $this->recalculateCartItem($cartKey);
+        } else {
+            // Broadcast any other cart changes (e.g. quantity via other means if any)
+            $this->broadcastCartState();
         }
     }
+
+    public function updatedPaidAmount() { $this->broadcastCartState(); }
+    public function updatedCustomerName() { $this->broadcastCartState(); }
+    public function updatedPaymentMethod() { $this->broadcastCartState(); }
+    public function updatedPaymentSourceId() { $this->broadcastCartState(); }
     
     // Payment state
     public ?int $paymentSourceId = null;
@@ -491,6 +499,7 @@ class PosCheckout extends Component
         }
         
         $this->dispatch('notify', type: 'success', message: "{$product->name} ditambahkan");
+        $this->broadcastCartState();
     }
 
     public function updateQuantity(string $cartKey, int $quantity): void
@@ -530,6 +539,7 @@ class PosCheckout extends Component
     public function removeFromCart(string $cartKey): void
     {
         unset($this->cart[$cartKey]);
+        $this->broadcastCartState();
     }
 
     public function clearCart(): void
@@ -540,6 +550,7 @@ class PosCheckout extends Component
         $this->notes = '';
         $this->orderType = 'dine_in';
         $this->selectedServiceAreaId = null;
+        $this->broadcastCartState();
     }
 
     public function openPaymentModal(): void
@@ -907,6 +918,32 @@ class PosCheckout extends Component
         $item = $this->cart[$cartKey];
         $basePrice = $item['unit_price'] + $item['modifier_total'];
         $this->cart[$cartKey]['subtotal'] = $basePrice * $item['quantity'];
+        
+        $this->broadcastCartState();
+    }
+
+    /**
+     * Broadcast current state to cache for Customer Display
+     * Saved for 12 hours
+     */
+    public function broadcastCartState(): void
+    {
+        // Calculate totals dynamically if needed, or rely on computed properties
+        // For cache, we need concrete values.
+        
+        $data = [
+            'cart' => $this->cart,
+            'subtotal' => $this->subtotal, // Computed property access
+            'tax_amount' => $this->taxAmount,
+            'total' => $this->total,
+            'paid_amount' => $this->paidAmount,
+            'change_amount' => $this->changeAmount,
+            'customer_name' => $this->customerName,
+            'cashier_name' => auth()->user()->name,
+            'updated_at' => now()->timestamp,
+        ];
+
+        \Illuminate\Support\Facades\Cache::put('pos_active_cart_' . auth()->id(), $data, now()->addHours(12));
     }
 
     public function render()

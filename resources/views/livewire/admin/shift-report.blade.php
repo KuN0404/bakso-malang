@@ -284,10 +284,12 @@
     <!-- Detail Modal -->
     @if($showDetailModal && $selectedShift)
         <div class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center overflow-y-auto py-8" wire:click.self="$set('showDetailModal', false)">
-            <div class="bg-white rounded-2xl w-full max-w-2xl mx-4 shadow-2xl" x-init="setTimeout(() => lucide.createIcons(), 50)">
-                <div class="p-6 border-b flex justify-between items-center">
+            <div class="bg-white rounded-2xl w-full max-w-2xl mx-4 shadow-2xl overflow-hidden" x-init="setTimeout(() => lucide.createIcons(), 50)">
+                <div class="p-6 border-b flex justify-between items-center bg-gray-50/50">
                     <h3 class="text-xl font-bold text-gray-800">Detail Shift</h3>
-                    <button wire:click="$set('showDetailModal', false)" class="text-gray-400 hover:text-gray-600"><i data-lucide="x" class="w-6 h-6"></i></button>
+                    <button wire:click="$set('showDetailModal', false)" class="bg-gray-100 hover:bg-gray-200 text-gray-500 hover:text-gray-700 rounded-full p-2 transition-colors">
+                        <i data-lucide="x" class="w-5 h-5"></i>
+                    </button>
                 </div>
                 <div class="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
                     <div class="grid grid-cols-2 gap-4 bg-gray-50 rounded-lg p-4">
@@ -331,6 +333,11 @@
                             <p class="text-yellow-800">{{ $selectedShift->close_notes }}</p>
                         </div>
                     @endif
+                </div>
+                <div class="p-4 bg-gray-50 border-t flex justify-end">
+                    <button wire:click="$set('showDetailModal', false)" class="px-6 py-2 bg-white border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors shadow-sm">
+                        Tutup
+                    </button>
                 </div>
             </div>
         </div>
