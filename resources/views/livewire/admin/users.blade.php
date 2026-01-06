@@ -32,8 +32,8 @@
                     <tr class="hover:bg-gray-50">
                         <td class="px-6 py-4">
                             <div class="flex items-center gap-3">
-                                <div class="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center">
-                                    <i data-lucide="user" class="w-5 h-5 text-primary-600"></i>
+                                <div class="w-10 h-10 {{ $user->hasRole('Super Admin') ? 'bg-purple-100' : 'bg-primary-100' }} rounded-full flex items-center justify-center">
+                                    <i data-lucide="{{ $user->hasRole('Super Admin') ? 'shield-check' : 'user' }}" class="w-5 h-5 {{ $user->hasRole('Super Admin') ? 'text-purple-600' : 'text-primary-600' }}"></i>
                                 </div>
                                 <div>
                                     <p class="font-medium text-gray-800">{{ $user->name }}</p>

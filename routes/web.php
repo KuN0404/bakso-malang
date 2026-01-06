@@ -85,6 +85,7 @@ Route::middleware(['auth'])->prefix('print')->name('print.')->group(function () 
     Route::get('/transaction/{transaction}', [App\Http\Controllers\PrintController::class, 'transactionSingle'])->name('transaction.single');
     Route::get('/shifts/table', [App\Http\Controllers\PrintController::class, 'shiftsTable'])->name('shifts.table');
     Route::get('/shift/{shift}', [App\Http\Controllers\PrintController::class, 'shiftDetail'])->name('shift.detail');
+    Route::get('/shift/{shift}/custom', [App\Http\Controllers\PrintController::class, 'shiftCustom'])->name('shift.custom');
 });
 
 // Export Routes (separate for streaming)

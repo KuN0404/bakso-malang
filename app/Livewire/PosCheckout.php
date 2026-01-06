@@ -20,6 +20,9 @@ use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
+use Livewire\Attributes\Layout;
+
+#[Layout('layouts.pos')]
 class PosCheckout extends Component
 {
     // Cart state
@@ -379,8 +382,20 @@ class PosCheckout extends Component
     #[Computed]
     public function todayShift(): ?Shift
     {
+        // Prioritize OPEN shift first
+        $openShift = Shift::where('user_id', auth()->id())
+            ->whereDate('started_at', today())
+            ->where('status', 'open')
+            ->first();
+
+        if ($openShift) {
+            return $openShift;
+        }
+
+        // Fallback to latest closed shift (for history/display)
         return Shift::where('user_id', auth()->id())
             ->whereDate('started_at', today())
+            ->latest()
             ->first();
     }
 
@@ -581,8 +596,10 @@ class PosCheckout extends Component
 
     protected function getOrCreateTodayShift(): Shift
     {
+        // Find logic similar to todayShift but STRICTLY for assigning transaction
         $shift = Shift::where('user_id', auth()->id())
             ->whereDate('started_at', today())
+            ->where('status', 'open') // Only pick OPEN shift
             ->first();
 
         if (!$shift) {
@@ -789,7 +806,7 @@ class PosCheckout extends Component
 
         DB::transaction(function () use ($shift) {
             // Update opening cash
-            $shift->opening_cash = $this->openingCash;
+            $shift->opening_cash = (string) $this->openingCash;
 
             // Add expenses
             foreach ($this->expenses as $expense) {
@@ -855,7 +872,7 @@ class PosCheckout extends Component
 
         DB::transaction(function () use ($shift) {
             // Update opening cash
-            $shift->opening_cash = $this->openingCash;
+            $shift->opening_cash = (string) $this->openingCash;
 
             // Add expenses
             foreach ($this->expenses as $expense) {
@@ -948,7 +965,6 @@ class PosCheckout extends Component
 
     public function render()
     {
-        return view('livewire.pos-checkout')
-            ->layout('layouts.pos');
+        return view('livewire.pos-checkout');
     }
 }

@@ -9,7 +9,10 @@ use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
 
+use Livewire\Attributes\Title;
+
 #[Layout('layouts.admin')]
+#[Title('Laporan Shift')]
 class ShiftReport extends Component
 {
     use WithPagination;
@@ -121,7 +124,9 @@ class ShiftReport extends Component
 
             case 'daily':
             default:
-                // Keep startDate and endDate as is (set by date picker)
+                $now = now();
+                $this->startDate = $now->format('Y-m-d');
+                $this->endDate = $now->format('Y-m-d');
                 break;
         }
     }
@@ -217,7 +222,9 @@ class ShiftReport extends Component
         $start = Carbon::parse($this->startDate)->startOfDay();
         $end = Carbon::parse($this->endDate)->endOfDay();
 
-        $shifts = Shift::with(['user', 'transactions', 'expenses'])
+        $shifts = Shift::with('user')
+            ->withSum(['transactions' => fn($q) => $q->where('status', 'completed')], 'total')
+            ->withSum('expenses', 'amount')
             ->whereBetween('started_at', [$start, $end])
             ->when($this->filterUserId, fn($q) => $q->where('user_id', $this->filterUserId))
             ->latest('started_at')
@@ -247,7 +254,6 @@ class ShiftReport extends Component
             9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember'
         ];
 
-        return view('livewire.admin.shift-report', compact('shifts', 'users', 'totalSales', 'totalExpenses', 'totalDifference', 'months'))
-            ->title('Laporan Shift');
+        return view('livewire.admin.shift-report', compact('shifts', 'users', 'totalSales', 'totalExpenses', 'totalDifference', 'months'));
     }
 }

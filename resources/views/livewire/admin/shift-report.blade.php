@@ -1,4 +1,4 @@
-<div x-init="lucide.createIcons()">
+<div x-data="{ printFormat: '58mm' }" x-init="lucide.createIcons()">
     <div class="flex items-center justify-between mb-6">
         <div>
             <h1 class="text-2xl font-bold text-gray-800">Laporan Shift</h1>
@@ -92,38 +92,7 @@
                         </div>
                     </div>
 
-                    <!-- Print Group (Compact Dark) -->
-                    <div class="flex items-center gap-1 bg-gray-900 rounded-xl p-1 shadow-lg shadow-gray-200/50">
-                        <div class="relative group">
-                            <select x-model="printFormat" class="bg-transparent text-white text-xs font-medium border-0 focus:ring-0 cursor-pointer pl-3 pr-6 py-1.5 appearance-none hover:bg-gray-800 rounded-lg transition-colors outline-none" title="Pilih Ukuran Kertas">
-                                <option value="A4" class="text-gray-900 bg-white">Laporan (A4)</option>
-                                <option value="A5" class="text-gray-900 bg-white">Laporan (A5)</option>
-                                <option value="58mm" class="text-gray-900 bg-white">Struk (58mm)</option>
-                                <option value="76mm" class="text-gray-900 bg-white">Struk (76mm)</option>
-                            </select>
-                            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-1 text-white/50 group-hover:text-white transition-colors">
-                                <i data-lucide="chevron-down" class="w-3 h-3"></i>
-                            </div>
-                        </div>
-                        <div class="w-px h-4 bg-gray-700"></div>
-                        <a :href="'{!! $this->getPrintTableUrl() !!}' + ('{!! $this->getPrintTableUrl() !!}'.includes('?') ? '&' : '?') + 'format=' + printFormat" target="_blank" class="flex items-center justify-center gap-1.5 px-3 py-1.5 text-white hover:bg-gray-800 rounded-lg transition-colors" title="Cetak Tabel">
-                            <i data-lucide="printer" class="w-3.5 h-3.5"></i>
-                            <span class="text-xs font-medium">Cetak</span>
-                        </a>
-                    </div>
-                    
-                    <!-- Vertical Stack: Excel & Reset -->
-                    <div class="flex flex-col gap-1">
-                         <a href="{{ $this->getExportUrl() }}" class="w-8 h-8 flex items-center justify-center bg-green-50 hover:bg-green-100 text-green-600 hover:text-green-700 rounded-lg transition-colors border border-green-200" title="Excel Ringkasan">
-                            <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
-                        </a>
-                        <a href="{{ $this->getExportDetailUrl() }}" class="w-8 h-8 flex items-center justify-center bg-emerald-50 hover:bg-emerald-100 text-emerald-600 hover:text-emerald-700 rounded-lg transition-colors border border-emerald-200" title="Excel Detail">
-                            <i data-lucide="download" class="w-4 h-4"></i>
-                        </a>
-                        <button wire:click="resetFilters" class="w-8 h-8 flex items-center justify-center bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 rounded-lg transition-colors border border-red-200" title="Reset Filter">
-                            <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
-                        </button>
-                    </div>
+
 
                 @else
                     <!-- OTHER VIEWS (Weekly/Monthly/Yearly) -->
@@ -163,48 +132,49 @@
                         </div>
                     @endif
                     
-                    <div class="h-8 w-px bg-gray-200 hidden sm:block"></div>
-
-                    <!-- Print Group (Dark) -->
-                    <div class="flex items-center gap-1 bg-gray-900 rounded-xl p-1 shadow-lg shadow-gray-200/50">
-                        <div class="relative group">
-                            <select x-model="printFormat" class="bg-transparent text-white text-xs font-medium border-0 focus:ring-0 cursor-pointer pl-3 pr-6 py-1.5 appearance-none hover:bg-gray-800 rounded-lg transition-colors outline-none" title="Pilih Ukuran Kertas">
-                                <option value="A4" class="text-gray-900 bg-white">Laporan (A4)</option>
-                                <option value="A5" class="text-gray-900 bg-white">Laporan (A5)</option>
-                                <option value="58mm" class="text-gray-900 bg-white">Struk (58mm)</option>
-                                <option value="76mm" class="text-gray-900 bg-white">Struk (76mm)</option>
-                            </select>
-                            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-1 text-white/50 group-hover:text-white transition-colors">
-                                <i data-lucide="chevron-down" class="w-3 h-3"></i>
-                            </div>
-                        </div>
-                        <div class="w-px h-4 bg-gray-700"></div>
-                        <a :href="'{!! $this->getPrintTableUrl() !!}' + ('{!! $this->getPrintTableUrl() !!}'.includes('?') ? '&' : '?') + 'format=' + printFormat" target="_blank" class="flex items-center justify-center gap-1.5 px-3 py-1.5 text-white hover:bg-gray-800 rounded-lg transition-colors" title="Cetak Tabel">
-                            <i data-lucide="printer" class="w-3.5 h-3.5"></i>
-                            <span class="text-xs font-medium">Cetak</span>
-                        </a>
-                    </div>
-                    
-                    <!-- Vertical Stack: Excel & Reset -->
-                    <div class="flex flex-col gap-1">
-                         <a href="{{ $this->getExportUrl() }}" class="w-8 h-8 flex items-center justify-center bg-green-50 hover:bg-green-100 text-green-600 hover:text-green-700 rounded-lg transition-colors border border-green-200" title="Excel Ringkasan">
-                            <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
-                        </a>
-                        <a href="{{ $this->getExportDetailUrl() }}" class="w-8 h-8 flex items-center justify-center bg-emerald-50 hover:bg-emerald-100 text-emerald-600 hover:text-emerald-700 rounded-lg transition-colors border border-emerald-200" title="Excel Detail">
-                            <i data-lucide="download" class="w-4 h-4"></i>
-                        </a>
-                        <button wire:click="resetFilters" class="w-8 h-8 flex items-center justify-center bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 rounded-lg transition-colors border border-red-200" title="Reset Filter">
-                            <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
-                        </button>
-                    </div>
                 @endif
-            </div>
-            
-            <!-- Bottom: Search & Cashier -->
-            <div class="flex flex-wrap items-center gap-4 border-t border-gray-100 pt-4 mt-2">
-                <!-- Cashier Filter -->
-                <div class="flex-1">
-                    <select wire:model.live="filterUserId" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-100 focus:border-primary-500 outline-none transition-all">
+
+                <!-- Shared Actions & Filters -->
+                <div class="h-8 w-px bg-gray-200 hidden sm:block"></div>
+
+                <!-- Print Group (Compact Dark) -->
+                <div class="flex items-center gap-1 bg-gray-900 rounded-xl p-1 shadow-lg shadow-gray-200/50">
+                    <div class="relative group">
+                        <select x-model="printFormat" class="bg-transparent text-white text-xs font-medium border-0 focus:ring-0 cursor-pointer pl-3 pr-6 py-1.5 appearance-none hover:bg-gray-800 rounded-lg transition-colors outline-none" title="Pilih Ukuran Kertas">
+                            <option value="A4" class="text-gray-900 bg-white">Laporan (A4)</option>
+                            <option value="A5" class="text-gray-900 bg-white">Laporan (A5)</option>
+                            <option value="58mm" class="text-gray-900 bg-white">Struk (58mm)</option>
+                            <option value="76mm" class="text-gray-900 bg-white">Struk (76mm)</option>
+                        </select>
+                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-1 text-white/50 group-hover:text-white transition-colors">
+                            <i data-lucide="chevron-down" class="w-3 h-3"></i>
+                        </div>
+                    </div>
+                    <div class="w-px h-4 bg-gray-700"></div>
+                    <a :href="'{!! $this->getPrintTableUrl() !!}' + ('{!! $this->getPrintTableUrl() !!}'.includes('?') ? '&' : '?') + 'format=' + printFormat" target="_blank" class="flex items-center justify-center gap-1.5 px-3 py-1.5 text-white hover:bg-gray-800 rounded-lg transition-colors" title="Cetak Tabel">
+                        <i data-lucide="printer" class="w-3.5 h-3.5"></i>
+                        <span class="text-xs font-medium">Cetak</span>
+                    </a>
+                </div>
+                
+                <!-- Vertical Stack: Excel & Reset -->
+                <div class="flex items-center gap-1">
+                     <a href="{{ $this->getExportUrl() }}" class="w-8 h-8 flex items-center justify-center bg-green-50 hover:bg-green-100 text-green-600 hover:text-green-700 rounded-lg transition-colors border border-green-200" title="Excel Ringkasan">
+                        <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
+                    </a>
+                    <a href="{{ $this->getExportDetailUrl() }}" class="w-8 h-8 flex items-center justify-center bg-emerald-50 hover:bg-emerald-100 text-emerald-600 hover:text-emerald-700 rounded-lg transition-colors border border-emerald-200" title="Excel Detail">
+                        <i data-lucide="download" class="w-4 h-4"></i>
+                    </a>
+                    <button wire:click="resetFilters" class="w-8 h-8 flex items-center justify-center bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 rounded-lg transition-colors border border-red-200" title="Reset Filter">
+                        <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+                    </button>
+                </div>
+
+                <!-- Cashier Filter (Global) -->
+                <div class="h-8 w-px bg-gray-200 hidden sm:block"></div>
+                <div class="relative min-w-[200px]">
+                     <i data-lucide="user" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"></i>
+                    <select wire:model.live="filterUserId" class="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-100 focus:border-primary-500 outline-none transition-all text-sm appearance-none bg-white">
                         <option value="">Semua Kasir</option>
                         @foreach($users as $user)
                             <option value="{{ $user->id }}">{{ $user->name }}</option>
@@ -233,8 +203,8 @@
             <tbody class="divide-y divide-gray-100">
                 @forelse($shifts as $shift)
                     @php
-                        $shiftSales = $shift->transactions?->where('status', 'completed')->sum('total') ?? 0;
-                        $shiftExpenses = $shift->expenses?->sum('amount') ?? 0;
+                        $shiftSales = $shift->transactions_sum_total ?? 0;
+                        $shiftExpenses = $shift->expenses_sum_amount ?? 0;
                     @endphp
                     <tr class="hover:bg-gray-50">
                         <td class="px-6 py-4 font-medium text-gray-800">{{ $shift->user->name }}</td>
@@ -264,9 +234,22 @@
                             @endif
                         </td>
                         <td class="px-6 py-4 text-right">
-                            <button wire:click="viewDetail({{ $shift->id }})" class="p-2 text-gray-400 hover:text-primary-600 rounded-lg hover:bg-gray-100">
-                                <i data-lucide="eye" class="w-4 h-4"></i>
-                            </button>
+                            <div class="flex items-center justify-end gap-1">
+                                <!-- View Detail -->
+                                <button wire:click="viewDetail({{ $shift->id }})" class="p-2 text-gray-400 hover:text-primary-600 rounded-lg hover:bg-gray-100" title="Detail">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>
+                                </button>
+                                
+                                <!-- Print Brief -->
+                                <a :href="'{{ route('print.shift.custom', ['shift' => $shift->id, 'type' => 'brief']) }}' + '&format=' + printFormat" target="_blank" class="p-2 text-gray-400 hover:text-blue-600 rounded-lg hover:bg-blue-50" title="Cetak Ringkas">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect width="12" height="8" x="6" y="14"/></svg>
+                                </a>
+
+                                <!-- Print Detail -->
+                                <a :href="'{{ route('print.shift.custom', ['shift' => $shift->id, 'type' => 'detail']) }}' + '&format=' + printFormat" target="_blank" class="p-2 text-gray-400 hover:text-purple-600 rounded-lg hover:bg-purple-50" title="Cetak Lengkap">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M16 22h2a2 2 0 0 0 2-2V7.5L14.5 2H6a2 2 0 0 0-2 2v4"/><path d="M18 9l-5 5-2-2a2 2 0 0 0-2 0l-2 2-2-2"/></svg>
+                                </a>
+                            </div>
                         </td>
                     </tr>
                 @empty
@@ -311,6 +294,16 @@
                             <p class="text-sm text-red-600">Pengeluaran</p>
                             <p class="text-lg font-bold text-red-700">Rp {{ number_format($selectedShift->expenses->sum('amount'), 0, ',', '.') }}</p>
                         </div>
+                        <div class="bg-gray-50 p-4 rounded-lg text-center">
+                            <p class="text-sm text-gray-600">Uang Fisik</p>
+                            <p class="text-lg font-bold text-gray-700">Rp {{ number_format($selectedShift->actual_cash, 0, ',', '.') }}</p>
+                        </div>
+                        <div class="bg-{{ $selectedShift->cash_difference >= 0 ? 'green' : 'red' }}-50 p-4 rounded-lg text-center">
+                            <p class="text-sm text-{{ $selectedShift->cash_difference >= 0 ? 'green' : 'red' }}-600">Selisih</p>
+                            <p class="text-lg font-bold text-{{ $selectedShift->cash_difference >= 0 ? 'green' : 'red' }}-700">
+                                {{ $selectedShift->cash_difference >= 0 ? '+' : '' }}Rp {{ number_format($selectedShift->cash_difference, 0, ',', '.') }}
+                            </p>
+                        </div>
                     </div>
 
                     @if($selectedShift->expenses->isNotEmpty())
@@ -346,3 +339,95 @@
 @script
 <script>lucide.createIcons();Livewire.hook('morph.updated',()=>lucide.createIcons());</script>
 @endscript
+@script
+<script>
+    lucide.createIcons();
+    Livewire.hook('morph.updated', () => queueMicrotask(() => lucide.createIcons()));
+
+    // Format date helper
+    function formatDate(date) {
+        return date.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+    }
+
+    // Global function for Alpine to call
+    window.initDatePicker = function(startDateStr, endDateStr) {
+        setTimeout(() => {
+            const startInput = document.getElementById('dateRangeStart');
+            const endInput = document.getElementById('dateRangeEnd');
+            
+            if (!startInput || !endInput) return;
+            
+            // Set initial values
+            const initStart = new Date(startDateStr);
+            const initEnd = new Date(endDateStr);
+            // Check if valid dates
+            if (!isNaN(initStart.getTime())) startInput.value = formatDate(initStart);
+            if (!isNaN(initEnd.getTime())) endInput.value = formatDate(initEnd);
+            
+            // Remove any existing hidden picker
+            const existingPicker = document.getElementById('hiddenDatePicker');
+            if (existingPicker) {
+                existingPicker._flatpickr?.destroy();
+                existingPicker.remove();
+            }
+            
+            // Create a completely hidden element for Flatpickr
+            const hiddenPicker = document.createElement('input');
+            hiddenPicker.id = 'hiddenDatePicker';
+            hiddenPicker.style.cssText = 'position:absolute;visibility:hidden;width:0;height:0;overflow:hidden;';
+            document.body.appendChild(hiddenPicker);
+            
+            // Create Flatpickr on hidden element
+            const fp = flatpickr(hiddenPicker, {
+                mode: 'range',
+                locale: 'id',
+                dateFormat: 'Y-m-d',
+                defaultDate: [startDateStr, endDateStr],
+                showMonths: 2,
+                animate: true,
+                positionElement: startInput,
+                onChange: function(selectedDates, dateStr) {
+                    if (selectedDates.length === 2) {
+                        startInput.value = formatDate(selectedDates[0]);
+                        endInput.value = formatDate(selectedDates[1]);
+                        
+                        // Use local timezone adjustment to prevent off-by-one errors when converting to string
+                        const start = new Date(selectedDates[0].getTime() - (selectedDates[0].getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+                        const end = new Date(selectedDates[1].getTime() - (selectedDates[1].getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+                        
+                        console.log('Date picked:', start, end);
+                        
+                        $wire.set('startDate', start);
+                        $wire.set('endDate', end);
+                        $wire.applyDateRange();
+                    }
+                }
+            });
+            
+            // Make both inputs and containers open the picker
+            const openPicker = (e) => { e.stopPropagation(); fp.open(); };
+            startInput.addEventListener('click', openPicker);
+            endInput.addEventListener('click', openPicker);
+            document.getElementById('startDateContainer')?.addEventListener('click', openPicker);
+            document.getElementById('endDateContainer')?.addEventListener('click', openPicker);
+            
+            // Store reference for reset
+            window._datePicker = fp;
+        }, 50);
+    };
+
+    // Listen for reset event
+    $wire.on('reset-date-picker', (data) => {
+        if (window._datePicker) {
+            const newStart = new Date(data.start);
+            const newEnd = new Date(data.end);
+            const startInput = document.getElementById('dateRangeStart');
+            const endInput = document.getElementById('dateRangeEnd');
+            if (startInput) startInput.value = formatDate(newStart);
+            if (endInput) endInput.value = formatDate(newEnd);
+            window._datePicker.setDate([newStart, newEnd], false);
+        }
+    });
+</script>
+@endscript
+```

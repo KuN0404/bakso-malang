@@ -130,6 +130,27 @@ class PrintController extends Controller
         return view('print.shift-detail', compact('shift', 'format'));
     }
 
+    public function shiftCustom(Request $request, \App\Models\Shift $shift)
+    {
+        $type = $request->query('type', 'brief');
+        $format = $request->query('format', '58mm');
+
+        // Eager load for performance
+        $shift->load(['user', 'expenses', 'transactions' => function($q) {
+             $q->where('status', 'completed')->orderBy('created_at');
+        }]);
+
+        if ($type === 'detail') {
+            if (in_array($format, ['A4', 'A5'])) {
+                return view('print.shift-full-a4', compact('shift', 'format'));
+            }
+            return view('print.shift-full', compact('shift', 'format'));
+        }
+
+        // Brief (Standard)
+        return view('print.shift-detail', compact('shift', 'format'));
+    }
+
     public function salesReport(Request $request)
     {
         $start = Carbon::parse($request->query('start', now()->format('Y-m-d')))->startOfDay();

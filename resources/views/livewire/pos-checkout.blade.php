@@ -182,6 +182,10 @@
                             class="w-full px-4 py-3 border border-gray-200 rounded-lg text-lg focus:ring-2 focus:ring-primary-500" 
                             placeholder="0"
                         >
+                        <p class="text-xs text-yellow-600 mt-1 flex items-center gap-1">
+                            <i data-lucide="info" class="w-3 h-3"></i>
+                            Hitung hanya uang tunai. Jangan masukkan Transfer/QRIS.
+                        </p>
                     </div>
 
                     <!-- Expenses -->
@@ -195,7 +199,17 @@
                         @foreach($expenses as $index => $expense)
                             <div class="flex gap-2 mb-2" wire:key="prev-expense-{{ $index }}">
                                 <input type="text" wire:model="expenses.{{ $index }}.description" class="flex-1 px-3 py-2 border border-gray-200 rounded-lg" placeholder="Keterangan">
-                                <input type="number" wire:model="expenses.{{ $index }}.amount" class="w-28 px-3 py-2 border border-gray-200 rounded-lg" placeholder="Jumlah">
+                                <div x-data="moneyInput({{ $expense['amount'] ?? 0 }}, 'expenses.{{ $index }}.amount')" class="w-32">
+                                    <input 
+                                        type="text" 
+                                        inputmode="numeric" 
+                                        x-model="formatted" 
+                                        @input="onInput($event)" 
+                                        @blur="syncToWire()"
+                                        class="w-full px-3 py-2 border border-gray-200 rounded-lg text-right" 
+                                        placeholder="0"
+                                    >
+                                </div>
                                 <button wire:click="removeExpense({{ $index }})" class="p-2 text-red-500 hover:bg-red-50 rounded-lg">
                                     <i data-lucide="trash-2" class="w-4 h-4"></i>
                                 </button>
@@ -215,6 +229,10 @@
                             class="w-full px-4 py-3 border border-gray-200 rounded-lg text-lg focus:ring-2 focus:ring-primary-500" 
                             placeholder="0"
                         >
+                        <p class="text-xs text-yellow-600 mt-1 flex items-center gap-1">
+                            <i data-lucide="info" class="w-3 h-3"></i>
+                            Hitung hanya uang tunai. Jangan masukkan Transfer/QRIS.
+                        </p>
                     </div>
 
                     <!-- Notes -->
@@ -254,7 +272,7 @@
                             class="flex items-center gap-2 px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg transition-colors border border-indigo-200 mr-2" 
                             title="Buka Layar Pelanggan">
                         <i data-lucide="monitor" class="w-4 h-4"></i>
-                        <span class="text-xs font-bold hidden xl:inline">LAYAR</span>
+                        <!-- <span class="text-xs font-bold hidden xl:inline">LAYAR</span> -->
                     </button>
 
                     <!-- History Buttons Group -->
@@ -956,9 +974,9 @@
                 <div class="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
                     <!-- Summary -->
                     <div class="bg-blue-50 rounded-lg p-4">
-                        <p class="text-sm text-blue-600">Penjualan Hari Ini</p>
-                        <p class="text-2xl font-bold text-blue-700">Rp {{ number_format($this->todayTransactions->sum('total'), 0, ',', '.') }}</p>
-                        <p class="text-sm text-blue-600 mt-1">{{ $this->todayTransactions->count() }} transaksi</p>
+                        <p class="text-sm text-blue-600">Penjualan Shift Ini</p>
+                        <p class="text-2xl font-bold text-blue-700">Rp {{ number_format($this->todayShift?->transactions->sum('total') ?? 0, 0, ',', '.') }}</p>
+                        <p class="text-sm text-blue-600 mt-1">{{ $this->todayShift?->transactions->count() ?? 0 }} transaksi</p>
                     </div>
 
                     <!-- Opening Cash -->
@@ -973,6 +991,10 @@
                             class="w-full px-4 py-3 border border-gray-200 rounded-lg text-lg focus:ring-2 focus:ring-primary-500" 
                             placeholder="0"
                         >
+                        <p class="text-xs text-yellow-600 mt-1 flex items-center gap-1">
+                            <i data-lucide="info" class="w-3 h-3"></i>
+                            Hitung hanya uang tunai (Kertas & Koin). Jangan masukkan Transfer/QRIS.
+                        </p>
                     </div>
 
                     <!-- Expenses -->
@@ -986,7 +1008,17 @@
                         @foreach($expenses as $index => $expense)
                             <div class="flex gap-2 mb-2" wire:key="expense-{{ $index }}">
                                 <input type="text" wire:model="expenses.{{ $index }}.description" class="flex-1 px-3 py-2 border border-gray-200 rounded-lg" placeholder="Keterangan">
-                                <input type="number" wire:model="expenses.{{ $index }}.amount" class="w-28 px-3 py-2 border border-gray-200 rounded-lg" placeholder="Jumlah">
+                                <div x-data="moneyInput({{ $expense['amount'] ?? 0 }}, 'expenses.{{ $index }}.amount')" class="w-32">
+                                    <input 
+                                        type="text" 
+                                        inputmode="numeric" 
+                                        x-model="formatted" 
+                                        @input="onInput($event)" 
+                                        @blur="syncToWire()"
+                                        class="w-full px-3 py-2 border border-gray-200 rounded-lg text-right" 
+                                        placeholder="0"
+                                    >
+                                </div>
                                 <button wire:click="removeExpense({{ $index }})" class="p-2 text-red-500 hover:bg-red-50 rounded-lg">
                                     <i data-lucide="trash-2" class="w-4 h-4"></i>
                                 </button>
@@ -1006,6 +1038,10 @@
                             class="w-full px-4 py-3 border border-gray-200 rounded-lg text-lg focus:ring-2 focus:ring-primary-500" 
                             placeholder="0"
                         >
+                        <p class="text-xs text-yellow-600 mt-1 flex items-center gap-1">
+                            <i data-lucide="info" class="w-3 h-3"></i>
+                            Hitung hanya uang tunai (Kertas & Koin). Jangan masukkan Transfer/QRIS.
+                        </p>
                     </div>
 
                     <!-- Notes -->

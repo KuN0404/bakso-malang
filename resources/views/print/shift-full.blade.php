@@ -6,7 +6,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Struk Tutup Shift</title>
+    <title>Laporan Shift Detail</title>
     <style>
         body {
             font-family: 'Courier New', Courier, monospace;
@@ -25,6 +25,7 @@
         .mb-2 { margin-bottom: 8px; }
         .flex { display: flex; justify-content: space-between; }
         .w-full { width: 100%; }
+        table { width: 100%; border-collapse: collapse; }
         
         @media print {
             @page { margin: 0; size: auto; }
@@ -39,7 +40,7 @@
         @if(!empty($settings['store_phone']))
         <div style="font-size: 10px; color: #666;">Telp: {{ $settings['store_phone'] }}</div>
         @endif
-        <div class="border-b" style="margin-top: 8px; padding-bottom: 8px;">Laporan Tutup Shift</div>
+        <div class="border-b" style="margin-top: 8px; padding-bottom: 8px;">Laporan Detail Shift</div>
     </div>
 
     <div class="border-t border-b py-1 mb-2">
@@ -100,15 +101,12 @@
         <span>Pengeluaran (-)</span>
         <span class="text-right">{{ number_format($shift->expenses->sum('amount'), 0, ',', '.') }}</span>
     </div>
-    <!-- Expenses Detail -->
-    <div style="font-size: 10px; margin-left: 8px; color: #444;">
-        @foreach($shift->expenses as $exp)
-        <div class="flex">
+    @foreach($shift->expenses as $exp)
+        <div class="flex" style="padding-left: 10px; font-size: 11px; color: #444;">
             <span>- {{ $exp->description }}</span>
-            <span>{{ number_format($exp->amount, 0, ',', '.') }}</span>
+            <span class="text-right">{{ number_format($exp->amount, 0, ',', '.') }}</span>
         </div>
-        @endforeach
-    </div>
+    @endforeach
     @endif
 
     <div class="flex font-bold py-1 border-t mt-1">
@@ -121,21 +119,42 @@
     </div>
     <div class="flex font-bold">
         <span>Selisih</span>
-        <span class="text-right {{ $shift->cash_difference < 0 ? 'text-red-600' : '' }}">
-            {{ number_format($shift->cash_difference, 0, ',', '.') }}
-        </span>
+        <span class="text-right">{{ number_format($shift->cash_difference, 0, ',', '.') }}</span>
     </div>
 
-    @if($shift->close_notes)
-    <div class="border-t py-1 mt-2">
-        <div class="font-bold">Catatan:</div>
-        <div>{{ $shift->close_notes }}</div>
-    </div>
-    @endif
+    <!-- TRANSACTION LIST -->
+    <div class="font-bold mb-1 mt-4 border-t pt-2" style="border-top: 2px double #000;">DETAIL TRANSAKSI</div>
+    
+    <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
+        <thead>
+            <tr style="border-bottom: 1px dashed #000;">
+                <th class="text-left py-1">Inv</th>
+                <th class="text-left py-1">Jam</th>
+                <th class="text-left py-1">Tipe</th>
+                <th class="text-right py-1">Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach($shift->transactions as $trx)
+            <tr>
+                <td class="py-1">{{ $trx->invoice_number }}</td>
+                <td class="py-1">{{ $trx->created_at->format('H:i') }}</td>
+                <td class="py-1">{{ ucfirst($trx->payment_method) }}</td>
+                <td class="text-right py-1">{{ number_format($trx->total, 0, ',', '.') }}</td>
+            </tr>
+            @endforeach
+        </tbody>
+        <tfoot style="border-top: 1px dashed #000;">
+            <tr>
+                <td colspan="3" class="font-bold py-1 text-right">TOTAL</td>
+                <td class="text-right font-bold py-1">{{ number_format($shift->transactions->sum('total'), 0, ',', '.') }}</td>
+            </tr>
+        </tfoot>
+    </table>
 
-    <div class="text-center mt-4">
-        <div>Dicetak: {{ now()->format('d/m/Y H:i') }}</div>
-        <div>--- Akhir Laporan ---</div>
+    <div class="text-center mt-4 border-t pt-2" style="font-size: 10px; color: #888;">
+        Dicetak: {{ now()->format('d/m/Y H:i') }}
+        <br>--- Akhir Laporan ---
     </div>
 </body>
 </html>
