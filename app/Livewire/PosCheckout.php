@@ -117,6 +117,10 @@ class PosCheckout extends Component
     public bool $showUnclosedShiftModal = false;
     public ?int $unclosedShiftId = null;
 
+    // Kitchen Pending Warning
+    public int $pendingFoodCount = 0;
+    public int $pendingDrinkCount = 0;
+
     // Pagination
     public int $perPage = 40;
     public int $totalProductsCount = 0;
@@ -779,6 +783,18 @@ class PosCheckout extends Component
             return;
         }
 
+        // Check for pending kitchen orders detailed
+        $pendingItems = \App\Models\TransactionDetail::whereHas('transaction', function($q) use ($shift) {
+            $q->where('shift_id', $shift->id)
+              ->where('status', 'completed');
+        })
+        ->where('status', 'pending')
+        ->with('product.category')
+        ->get();
+
+        $this->pendingFoodCount = $pendingItems->filter(fn($item) => $item->product->category->slug !== 'minuman')->count();
+        $this->pendingDrinkCount = $pendingItems->filter(fn($item) => $item->product->category->slug === 'minuman')->count();
+
         $this->openingCash = 0;
         $this->actualCash = 0;
         $this->closeNotes = '';
@@ -801,6 +817,16 @@ class PosCheckout extends Component
     {
         $shift = $this->todayShift;
         if (!$shift) {
+            return;
+        }
+
+        // VALIDATION: Ensure inputs are valid
+        if (!is_numeric($this->openingCash) || $this->openingCash < 0) {
+            $this->dispatch('notify', type: 'error', message: 'Modal Awal harus diisi dengan valid (minimal 0)');
+            return;
+        }
+        if (!is_numeric($this->actualCash) || $this->actualCash < 0) {
+            $this->dispatch('notify', type: 'error', message: 'Uang Fisik (Total Dana) harus diisi dengan valid (minimal 0)');
             return;
         }
 
@@ -869,6 +895,16 @@ class PosCheckout extends Component
         $shift = Shift::find($this->unclosedShiftId);
         if (!$shift || $shift->user_id !== auth()->id()) {
             $this->dispatch('notify', type: 'error', message: 'Shift tidak ditemukan');
+            return;
+        }
+
+        // VALIDATION: Ensure inputs are valid
+        if (!is_numeric($this->openingCash) || $this->openingCash < 0) {
+            $this->dispatch('notify', type: 'error', message: 'Modal Awal harus diisi dengan valid (minimal 0)');
+            return;
+        }
+        if (!is_numeric($this->actualCash) || $this->actualCash < 0) {
+            $this->dispatch('notify', type: 'error', message: 'Uang Fisik (Total Dana) harus diisi dengan valid (minimal 0)');
             return;
         }
 

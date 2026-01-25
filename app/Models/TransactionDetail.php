@@ -17,6 +17,8 @@ class TransactionDetail extends Model
         'modifier_total',
         'subtotal',
         'notes',
+        'status', // pending, done
+        'fulfilled_at',
     ];
 
     protected $casts = [
@@ -24,6 +26,7 @@ class TransactionDetail extends Model
         'modifier_total' => 'decimal:2',
         'subtotal' => 'decimal:2',
         'quantity' => 'integer',
+        'fulfilled_at' => 'datetime',
     ];
 
     public function transaction(): BelongsTo
@@ -63,5 +66,23 @@ class TransactionDetail extends Model
     public function getModifierNamesAttribute(): string
     {
         return $this->modifiers->pluck('pivot.modifier_name')->implode(', ');
+    }
+
+    public function isPending(): bool
+    {
+        return $this->status === 'pending';
+    }
+
+    public function isDone(): bool
+    {
+        return $this->status === 'done';
+    }
+
+    public function markAsDone(): bool
+    {
+        return $this->update([
+            'status' => 'done',
+            'fulfilled_at' => now(),
+        ]);
     }
 }

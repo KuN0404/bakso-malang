@@ -67,6 +67,10 @@ class RolesAndPermissionsSeeder extends Seeder
             'edit_users',
             'delete_users',
             'manage_roles',
+            
+            // Kitchen / Service Display
+            'view_kitchen_display',
+            'update_order_status',
         ];
 
         // Create all permissions
@@ -90,7 +94,9 @@ class RolesAndPermissionsSeeder extends Seeder
             'access_pos', 'view_transactions', 'cancel_transactions',
             'open_shift', 'close_shift', 'view_own_shifts', 'view_all_shifts', 'add_shift_expense',
             'view_sales_reports', 'view_financial_reports', 'view_peak_hours_reports', 'view_cancellation_reports', 'export_reports',
+            'view_sales_reports', 'view_financial_reports', 'view_peak_hours_reports', 'view_cancellation_reports', 'export_reports',
             'manage_payment_sources',
+            'view_kitchen_display', 'update_order_status',
         ]);
 
         // Kasir - can use POS, manage own shifts
@@ -105,6 +111,8 @@ class RolesAndPermissionsSeeder extends Seeder
         $kitchen = Role::firstOrCreate(['name' => 'Kitchen']);
         $kitchen->syncPermissions([
             'view_transactions',
+            'view_kitchen_display', 
+            'update_order_status',
         ]);
 
         // Create default Super Admin user

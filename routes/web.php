@@ -93,3 +93,8 @@ Route::middleware(['auth', 'throttle:pos'])->group(function () {
     Route::get('/pos', PosCheckout::class)->name('pos');
     Route::get('/pos/display', App\Livewire\CustomerDisplay::class)->name('pos.display');
 });
+
+// Kitchen Display Route
+Route::middleware(['auth', 'can:view_kitchen_display'])->group(function () {
+    Route::get('/kitchen', App\Livewire\KitchenDisplay::class)->name('kitchen.display');
+});

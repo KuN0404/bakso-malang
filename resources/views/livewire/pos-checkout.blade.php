@@ -7,8 +7,10 @@
         showModifierModal: false,
         modifierProduct: null,
         selectedModifiers: {},
+        selectedModifiers: {},
         modifierTotal: 0,
         isThrottled: false,
+        showConfirmCloseShift: false,
         
         openModifierModal(product) {
             this.modifierProduct = product;
@@ -182,10 +184,10 @@
                             class="w-full px-4 py-3 border border-gray-200 rounded-lg text-lg focus:ring-2 focus:ring-primary-500" 
                             placeholder="0"
                         >
-                        <p class="text-xs text-yellow-600 mt-1 flex items-center gap-1">
+                        <!-- <p class="text-xs text-yellow-600 mt-1 flex items-center gap-1">
                             <i data-lucide="info" class="w-3 h-3"></i>
                             Hitung hanya uang tunai. Jangan masukkan Transfer/QRIS.
-                        </p>
+                        </p> -->
                     </div>
 
                     <!-- Expenses -->
@@ -229,11 +231,11 @@
                             class="w-full px-4 py-3 border border-gray-200 rounded-lg text-lg focus:ring-2 focus:ring-primary-500" 
                             placeholder="0"
                         >
-                        <p class="text-xs text-yellow-600 mt-1 flex items-center gap-1">
+                        <!-- <p class="text-xs text-yellow-600 mt-1 flex items-center gap-1">
                             <i data-lucide="info" class="w-3 h-3"></i>
                             Hitung TOTAL UANG (Fisik di Laci + Total Non-Tunai/QRIS). 
                             <strong>GABUNGKAN SEMUANYA.</strong>
-                        </p>
+                        </p> -->
                     </div>
 
                     <!-- Notes -->
@@ -984,6 +986,7 @@
                     <div x-data="moneyInput({{ $openingCash }}, 'openingCash')">
                         <label class="block text-sm font-medium text-gray-700 mb-1">Modal Awal (Cash)</label>
                         <input 
+                            id="openingCashInput"
                             type="text" 
                             inputmode="numeric"
                             x-model="formatted"
@@ -1031,6 +1034,7 @@
                     <div x-data="moneyInput({{ $actualCash }}, 'actualCash')">
                         <label class="block text-sm font-medium text-gray-700 mb-1">Uang Fisik di Laci</label>
                         <input 
+                            id="actualCashInput"
                             type="text" 
                             inputmode="numeric"
                             x-model="formatted"
@@ -1054,8 +1058,19 @@
                 </div>
                 <div class="p-6 border-t bg-gray-50 flex gap-3">
                     <button wire:click="$set('showCloseShiftModal', false)" class="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl">Batal</button>
-                    <button wire:click="closeShift" class="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white font-medium rounded-xl flex items-center justify-center gap-2">
-                        <i data-lucide="check" class="w-5 h-5"></i>
+                    <button 
+                        @click="
+                            let op = document.getElementById('openingCashInput').value;
+                            let ac = document.getElementById('actualCashInput').value;
+                            if(op.trim() === '' || ac.trim() === '') {
+                                $dispatch('notify', { type: 'error', message: 'Harap isi Modal Awal dan Uang Fisik (isi 0 jika kosong)' });
+                            } else {
+                                showConfirmCloseShift = true;
+                            }
+                        "
+                        class="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white font-medium rounded-xl flex items-center justify-center gap-2"
+                    >
+                        <i data-lucide="printer" class="w-5 h-5"></i>
                         Tutup & Cetak
                     </button>
                 </div>
@@ -1308,10 +1323,72 @@
                     >
                         Tutup
                     </button>
-                </div>
+
+</div>
             </div>
         </div>
     @endif
+
+
+    <!-- Custom Close Shift Confirmation Modal (Logout Style) -->
+    <div 
+        x-show="showConfirmCloseShift" 
+        style="display: none;"
+        class="fixed inset-0 z-[110] flex items-center justify-center bg-black/40 backdrop-blur-sm"
+    >
+        <div 
+            x-show="showConfirmCloseShift"
+            x-transition:enter="transition ease-out duration-300"
+            x-transition:enter-start="opacity-0 scale-90"
+            x-transition:enter-end="opacity-100 scale-100"
+            x-transition:leave="transition ease-in duration-200"
+            x-transition:leave-start="opacity-100 scale-100"
+            x-transition:leave-end="opacity-0 scale-90"
+            @click.away="showConfirmCloseShift = false"
+            class="bg-white/90 backdrop-blur-md rounded-2xl shadow-2xl p-8 max-w-sm w-full mx-4 border border-white/50 text-center"
+        >
+            <div class="w-16 h-16 mx-auto rounded-full flex items-center justify-center mb-4 {{ ($pendingFoodCount > 0 || $pendingDrinkCount > 0) ? 'bg-red-100' : 'bg-red-100' }}">
+                <i data-lucide="{{ ($pendingFoodCount > 0 || $pendingDrinkCount > 0) ? 'alert-triangle' : 'power' }}" class="w-8 h-8 text-red-600"></i>
+            </div>
+            
+            <h3 class="text-xl font-bold text-gray-800 mb-2">Konfirmasi Tutup Shift</h3>
+            
+            <div class="text-gray-600 mb-6 text-sm">
+                @if($pendingFoodCount > 0 || $pendingDrinkCount > 0)
+                     <div class="bg-red-50 p-3 rounded-lg border border-red-200 mb-3 text-left">
+                        <p class="font-bold text-red-800 mb-1 flex items-center gap-1">
+                            ⚠️ Order Belum Selesai!
+                        </p>
+                        <ul class="list-disc list-inside text-xs text-red-700">
+                            @if($pendingFoodCount > 0) <li>{{ $pendingFoodCount }} Makanan pending</li> @endif
+                            @if($pendingDrinkCount > 0) <li>{{ $pendingDrinkCount }} Minuman pending</li> @endif
+                        </ul>
+                    </div>
+                    <p class="font-medium text-red-600">Yakin ingin memaksa tutup?</p>
+                @else
+                    <p>Apakah Anda yakin ingin menutup shift ini dan mencetak laporan?</p>
+                @endif
+            </div>
+            
+            <div class="flex gap-3">
+                <button 
+                    @click="showConfirmCloseShift = false" 
+                    class="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl transition-colors"
+                >
+                    Batal
+                </button>
+                
+                <button 
+                    wire:click="closeShift"
+                    @click="showConfirmCloseShift = false"
+                    class="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white font-medium rounded-xl shadow-lg shadow-red-600/30 transition-colors flex items-center justify-center gap-2"
+                >
+                    <i data-lucide="printer" class="w-4 h-4"></i>
+                    Ya, Tutup
+                </button>
+            </div>
+        </div>
+    </div>
 </div>
 
 @script

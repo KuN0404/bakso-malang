@@ -231,7 +231,7 @@
                 @php
                     $isTransActive = request()->routeIs('pos') || request()->routeIs('admin.shifts.*');
                 @endphp
-                @canany(['access_pos', 'view_all_shifts'])
+                @canany(['access_pos', 'view_all_shifts', 'view_kitchen_display'])
                 <div x-data="{ open: {{ $isTransActive ? 'true' : 'false' }} }" class="mt-2">
                     <button @click="open = !open" class="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-blue-300 uppercase tracking-wider hover:text-white transition-colors group whitespace-nowrap text-left">
                         <div class="flex items-center gap-3">
@@ -258,6 +258,13 @@
                         <a href="{{ route('admin.shifts.index') }}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.shifts.*') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
                             <div class="flex-shrink-0 w-6 flex justify-center"><i data-lucide="clock" class="w-4 h-4"></i></div>
                             <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Shift</span></div>
+                        </a>
+                        @endcan
+
+                        @can('view_kitchen_display')
+                        <a href="{{ route('kitchen.display') }}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('kitchen.display') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
+                            <div class="flex-shrink-0 w-6 flex justify-center"><i data-lucide="chef-hat" class="w-4 h-4"></i></div>
+                            <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Dapur / Service</span></div>
                         </a>
                         @endcan
                     </div>
@@ -635,7 +642,7 @@
                 wireModel: wireModel,
                 
                 init() {
-                    this.formatted = this.rawValue > 0 ? this.formatNumber(this.rawValue) : '';
+                    this.formatted = this.formatNumber(this.rawValue);
                 },
                 
                 formatNumber(num) {
@@ -649,18 +656,64 @@
                 onInput(e) {
                     const input = e.target;
                     const cursorPos = input.selectionStart;
-                    const oldLen = this.formatted.length;
+                    const value = input.value;
+                    const oldLen = value.length; // Use current value length as reference or approximation? No, we need old length of FORMATTED before edit? 
+                    // Actually, cursor logic depends on old formatted length.
+                    // But accessing this.formatted is safe for "old length" (previous state).
+                    // accessing input.value is safe for "new characters".
                     
-                    // Get raw digits only
-                    const digits = this.formatted.replace(/\D/g, '');
-                    this.rawValue = parseInt(digits) || 0;
-                    this.formatted = this.rawValue > 0 ? this.formatNumber(this.rawValue) : '';
+                    const oldFormattedLen = this.formatted.length;
                     
-                    // Adjust cursor position after formatting
+                    // Get raw digits only from CURRENT INPUT
+                    const digits = value.replace(/\D/g, '');
+                    if (digits === '') {
+                        this.rawValue = 0;
+                        this.formatted = '';
+                    } else {
+                        this.rawValue = parseInt(digits) || 0;
+                        this.formatted = this.formatNumber(this.rawValue);
+                    }
+                    
+                    // Adjust cursor position
+                    // We need to compare old formatted length vs new formatted length
+                    // And adjust cursor based on that?
+                    // The standard cursor logic:
+                    // newPos = oldPos + (newLen - oldLen)
+                    // But here oldPos is cursorPos (post-edit position).
+                    // This logic is tricky. 
+                    // Let's stick to the existing logic but FIX the source of 'digits'.
+                    
+                    // Re-calculate cursor position
                     const newLen = this.formatted.length;
-                    const diff = newLen - oldLen;
+                    
                     this.$nextTick(() => {
-                        const newPos = Math.max(0, cursorPos + diff);
+                        const diff = newLen - oldFormattedLen; 
+                        // If new length is bigger, cursor usually moves forward effectively by diff? 
+                        // Or if we just added a digit.
+                        // Simple heuristic: 
+                        // If appending digit, move forward. 
+                        // If deleting digit, move back (diff is negative).
+                        // Be careful about formatting chars (dots) appearing/disappearing.
+                        
+                        // Heuristic: Maintain relative distance from end? No.
+                        // Maintain relative distance from start.
+                        let newPos = cursorPos;
+                        
+                        // If formatting changed length (e.g. 1000 -> 1.000), diff is 1. 
+                        // If cursor was at 2 (after 0), newPos should be 3 (after 0).
+                        // So newPos = cursorPos + diff?
+                        // If diff is due to formatting occurring BEFORE cursor?
+                        // For money input, thousands separator usually appears to the left.
+                        // So usually we just add diff.
+                        
+                        // But what if we deleted? diff is negative. 
+                        // Cursor moves back.
+                        
+                        newPos = Math.max(0, cursorPos + diff);
+                        
+                        // Special case: if value is empty/0, ensure we are inside.
+                        if (newLen === 0) newPos = 0;
+                        
                         input.setSelectionRange(newPos, newPos);
                     });
                 },
