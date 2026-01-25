@@ -208,6 +208,7 @@ class SalesReport extends Component
         // Data for Analysis Tab
         $categoryReport = [];
         $paymentReport = [];
+        $serviceAreaReport = [];
         $topProducts = [];
         $peakHours = [];
         // Note: dailySummary logic might need adjustment if service only supports single day
@@ -261,6 +262,22 @@ class SalesReport extends Component
                 ->paginate(10);
         }
 
+        if ($this->activeTab === 'service_areas') {
+            $serviceAreaReport = \App\Models\Transaction::query()
+                ->join('service_areas', 'transactions.service_area_id', '=', 'service_areas.id')
+                ->where('transactions.status', 'completed')
+                ->whereBetween('transactions.created_at', [$start, $end])
+                ->groupBy('service_areas.id', 'service_areas.name')
+                ->selectRaw('
+                    service_areas.name as area_name,
+                    COUNT(transactions.id) as transaction_count,
+                    SUM(transactions.total) as total_sales,
+                    AVG(transactions.total) as average_amount
+                ')
+                ->orderByDesc('transaction_count')
+                ->paginate(10);
+        }
+
         // Data for Products Tab
         $productSales = null;
         $categories = [];
@@ -311,6 +328,7 @@ class SalesReport extends Component
         return view('livewire.admin.sales-report', compact(
             'categoryReport', 
             'paymentReport', 
+            'serviceAreaReport',
             'topProducts', 
             'dailySummary', 
             'peakHours',

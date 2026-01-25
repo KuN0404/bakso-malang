@@ -48,7 +48,6 @@
                     <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Nama</th>
                     <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Tipe</th>
                     <th class="px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Kapasitas</th>
-                    <th class="px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Transaksi</th>
                     <th class="px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Status</th>
                     <th class="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Aksi</th>
                 </tr>
@@ -84,7 +83,6 @@
                                 {{ $area->capacity }}
                             </span>
                         </td>
-                        <td class="px-6 py-4 text-center text-gray-600">{{ $area->transactions_count }}</td>
                         <td class="px-6 py-4 text-center">
                             @if($area->is_active)
                                 <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">

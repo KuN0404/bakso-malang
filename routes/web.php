@@ -21,24 +21,9 @@ Route::get('/', function () {
     return redirect()->route('login');
 });
 
-// Login with username
-Route::get('/login', function () {
-    return view('auth.login');
-})->name('login')->middleware('guest');
-
-Route::post('/login', function () {
-    $credentials = [
-        'username' => request('username'),
-        'password' => request('password'),
-    ];
-    
-    if (auth()->attempt($credentials)) {
-        request()->session()->regenerate();
-        return redirect()->intended('/admin');
-    }
-    
-    return back()->withErrors(['username' => 'Username atau password salah'])->withInput();
-})->name('login.post');
+// Login
+Route::get('/login', [App\Http\Controllers\LoginController::class, 'showLoginForm'])->name('login')->middleware('guest');
+Route::post('/login', [App\Http\Controllers\LoginController::class, 'login'])->name('login.post');
 
 Route::post('/logout', function () {
     auth()->logout();

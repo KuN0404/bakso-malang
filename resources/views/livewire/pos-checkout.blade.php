@@ -231,7 +231,8 @@
                         >
                         <p class="text-xs text-yellow-600 mt-1 flex items-center gap-1">
                             <i data-lucide="info" class="w-3 h-3"></i>
-                            Hitung hanya uang tunai. Jangan masukkan Transfer/QRIS.
+                            Hitung TOTAL UANG (Fisik di Laci + Total Non-Tunai/QRIS). 
+                            <strong>GABUNGKAN SEMUANYA.</strong>
                         </p>
                     </div>
 
@@ -1040,7 +1041,8 @@
                         >
                         <p class="text-xs text-yellow-600 mt-1 flex items-center gap-1">
                             <i data-lucide="info" class="w-3 h-3"></i>
-                            Hitung hanya uang tunai (Kertas & Koin). Jangan masukkan Transfer/QRIS.
+                            Hitung TOTAL UANG (Fisik di Laci + Total Non-Tunai/QRIS). 
+                            <strong>GABUNGKAN SEMUANYA.</strong>
                         </p>
                     </div>
 

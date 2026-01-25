@@ -60,8 +60,7 @@
         @endif
     </div>
 
-    <!-- SALES SUMMARY -->
-    <div class="font-bold mb-1">REKAP PENJUALAN</div>
+    <!-- LAPORAN SALDO -->
     @php
         $cashDetails = $shift->transactions->where('status', 'completed')->where('payment_method', 'cash');
         $cashCount = $cashDetails->count();
@@ -70,56 +69,53 @@
         $nonCashDetails = $shift->transactions->where('status', 'completed')->where('payment_method', '!=', 'cash');
         $nonCashCount = $nonCashDetails->count();
         $nonCashTotal = $nonCashDetails->sum('total');
+        
+        $totalOmset = $cashTotal + $nonCashTotal;
+        $totalTrx = $cashCount + $nonCashCount;
+        $expenseTotal = $shift->expenses->sum('amount');
+        
+        // Saldo = Modal Awal + Total Omset - Pengeluaran
+        $expectedSaldo = $shift->opening_cash + $totalOmset - $expenseTotal;
     @endphp
 
-    <div class="flex">
-        <span>Tunai ({{ $cashCount }})</span>
-        <span class="text-right">{{ number_format($cashTotal, 0, ',', '.') }}</span>
-    </div>
-    <div class="flex">
-        <span>Non-Tunai ({{ $nonCashCount }})</span>
-        <span class="text-right">{{ number_format($nonCashTotal, 0, ',', '.') }}</span>
-    </div>
-    <div class="flex font-bold py-1 border-t mt-1">
-        <span>TOTAL OMSET</span>
-        <span class="text-right">{{ number_format($cashTotal + $nonCashTotal, 0, ',', '.') }}</span>
-    </div>
-
-    <!-- CASH REPORT -->
-    <div class="font-bold mb-1 mt-2">LAPORAN KAS</div>
+    <div class="font-bold mb-1">LAPORAN SALDO</div>
     <div class="flex">
         <span>Modal Awal</span>
         <span class="text-right">{{ number_format($shift->opening_cash, 0, ',', '.') }}</span>
     </div>
     <div class="flex">
-        <span>Penjualan Tunai</span>
-        <span class="text-right">{{ number_format($cashTotal, 0, ',', '.') }}</span>
+        <span>Penjualan ({{ $totalTrx }} trx)</span>
+        <span class="text-right">{{ number_format($totalOmset, 0, ',', '.') }}</span>
+    </div>
+    <div class="flex" style="padding-left: 10px; font-size: 10px; color: #666;">
+        <span>Tunai: {{ number_format($cashTotal, 0, ',', '.') }} | Non-Tunai: {{ number_format($nonCashTotal, 0, ',', '.') }}</span>
     </div>
     
-    @if($shift->expenses->sum('amount') > 0)
+    @if($expenseTotal > 0)
     <div class="flex">
         <span>Pengeluaran (-)</span>
-        <span class="text-right">{{ number_format($shift->expenses->sum('amount'), 0, ',', '.') }}</span>
+        <span class="text-right">{{ number_format($expenseTotal, 0, ',', '.') }}</span>
     </div>
     @foreach($shift->expenses as $exp)
-        <div class="flex" style="padding-left: 10px; font-size: 11px; color: #444;">
+        <div class="flex" style="padding-left: 10px; font-size: 10px; color: #666;">
             <span>- {{ $exp->description }}</span>
             <span class="text-right">{{ number_format($exp->amount, 0, ',', '.') }}</span>
         </div>
     @endforeach
     @endif
 
-    <div class="flex font-bold py-1 border-t mt-1">
-        <span>SALDO SEHARUSNYA</span>
-        <span class="text-right">{{ number_format($shift->expected_cash, 0, ',', '.') }}</span>
+    <div class="flex font-bold py-1 border-t border-b mt-1" style="background: #f5f5f5;">
+        <span>SALDO</span>
+        <span class="text-right">{{ number_format($expectedSaldo, 0, ',', '.') }}</span>
     </div>
-    <div class="flex">
+    
+    <div class="flex mt-2">
         <span>Uang Fisik</span>
         <span class="text-right">{{ number_format($shift->actual_cash, 0, ',', '.') }}</span>
     </div>
-    <div class="flex font-bold">
+    <div class="flex font-bold" style="color: {{ ($shift->actual_cash - $expectedSaldo) < 0 ? 'red' : 'inherit' }};">
         <span>Selisih</span>
-        <span class="text-right">{{ number_format($shift->cash_difference, 0, ',', '.') }}</span>
+        <span class="text-right">{{ number_format($shift->actual_cash - $expectedSaldo, 0, ',', '.') }}</span>
     </div>
 
     <!-- TRANSACTION LIST -->

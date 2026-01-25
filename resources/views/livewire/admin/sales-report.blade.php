@@ -67,7 +67,7 @@
             <p class="text-gray-500">Analisis penjualan dan performa produk</p>
         </div>
         <div class="flex items-center gap-3">
-            @if(in_array($activeTab, ['products', 'categories', 'payments']))
+            @if(in_array($activeTab, ['products', 'categories', 'payments', 'service_areas']))
                 <a href="{{ $this->getExportUrl() }}" class="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors shadow-sm">
                     <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
                     <span class="text-sm font-medium">Excel</span>
@@ -114,6 +114,10 @@
                 <button wire:click="setTab('payments')" 
                     class="px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap {{ $activeTab === 'payments' ? 'bg-primary-50 text-primary-600 shadow-sm' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50' }}">
                     Metode Bayar
+                </button>
+                <button wire:click="setTab('service_areas')" 
+                    class="px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap {{ $activeTab === 'service_areas' ? 'bg-primary-50 text-primary-600 shadow-sm' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50' }}">
+                    Area Pelayanan
                 </button>
             </div>
         </div>
@@ -472,6 +476,79 @@
                                 <td>{{ ucfirst($pay->payment_name) }}</td>
                                 <td class="text-right">{{ $pay->transaction_count }}</td>
                                 <td class="text-right">Rp {{ number_format($pay->total_sales, 0, ',', '.') }}</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+            </div>
+        </div>
+
+    @elseif($activeTab === 'service_areas')
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100">
+             <div class="p-5 border-b flex justify-between items-center">
+                <h3 class="font-semibold text-gray-800">Detail Area Pelayanan</h3>
+                <div wire:loading wire:target="setTab, setPeriod, startDate, endDate" class="text-sm text-gray-500 flex items-center gap-2">
+                    <i data-lucide="loader" class="w-4 h-4 animate-spin"></i>
+                    Memuat data...
+                </div>
+            </div>
+            <div class="p-6">
+            <!-- Screen View (Cards) -->
+            <div class="print:hidden">
+                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+                    @forelse($serviceAreaReport as $index => $area)
+                        <div class="bg-white p-6 rounded-xl border border-gray-200 hover:shadow-md transition-shadow relative overflow-hidden">
+                            <div class="absolute top-0 right-0 p-3 opacity-10 font-bold text-6xl text-gray-900 pointer-events-none">
+                                {{ $serviceAreaReport->firstItem() + $index }}
+                            </div>
+                            <div class="flex items-center gap-4 mb-4 relative z-10">
+                                <div class="w-12 h-12 bg-purple-50 rounded-xl flex items-center justify-center">
+                                    <i data-lucide="map-pin" class="w-6 h-6 text-purple-600"></i>
+                                </div>
+                                <div>
+                                    <h4 class="font-bold text-gray-800">{{ $area->area_name }}</h4>
+                                    <p class="text-sm text-gray-500">{{ $area->transaction_count }} transaksi</p>
+                                </div>
+                            </div>
+                            <div class="pt-4 border-t border-gray-100 relative z-10">
+                                <p class="text-sm text-gray-500 mb-1">Total Pendapatan</p>
+                                <p class="text-2xl font-bold text-gray-800">Rp {{ number_format($area->total_sales, 0, ',', '.') }}</p>
+                            </div>
+                        </div>
+                    @empty
+                        <div class="col-span-full text-center py-12">
+                            <i data-lucide="map-pin" class="w-12 h-12 text-gray-300 mx-auto mb-3"></i>
+                            <p class="text-gray-500">Tidak ada data area pelayanan</p>
+                        </div>
+                    @endforelse
+                 </div>
+
+                 @if($serviceAreaReport->hasPages())
+                    <div class="pt-4 border-t border-gray-100">
+                        {{ $serviceAreaReport->links(data: ['scrollTo' => false]) }}
+                    </div>
+                @endif
+            </div>
+
+            <!-- Print View (Table) -->
+            <div class="hidden print:block">
+                <table class="w-full">
+                    <thead>
+                        <tr>
+                            <th class="text-left">No</th>
+                            <th class="text-left">Area Pelayanan</th>
+                            <th class="text-right">Jumlah Transaksi</th>
+                            <th class="text-right">Total Pendapatan</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($serviceAreaReport as $index => $area)
+                            <tr>
+                                <td>{{ $loop->iteration }}</td>
+                                <td>{{ $area->area_name }}</td>
+                                <td class="text-right">{{ $area->transaction_count }}</td>
+                                <td class="text-right">Rp {{ number_format($area->total_sales, 0, ',', '.') }}</td>
                             </tr>
                         @endforeach
                     </tbody>

@@ -824,12 +824,14 @@ class PosCheckout extends Component
             $totalExpenses = $shift->expenses()->sum('amount');
 
             // Calculate expected cash
-            $cashSales = $shift->transactions()
+            // Calculate expected cash (NOW INCLUDES NON-CASH as handled by user input)
+            // As per new requirement: User inputs TOTAL FUNDS (Cash + Non-Cash)
+            // So Expected = Opening + ALL SALES - Expenses
+            $totalSales = $shift->transactions()
                 ->where('status', 'completed')
-                ->where('payment_method', 'cash')
                 ->sum('total');
 
-            $expectedCash = $this->openingCash + $cashSales - $totalExpenses;
+            $expectedCash = $this->openingCash + $totalSales - $totalExpenses;
 
             // Close shift
             $shift->update([
@@ -888,13 +890,14 @@ class PosCheckout extends Component
             // Re-calculate TOTAL expenses (to include Refunds)
             $totalExpenses = $shift->expenses()->sum('amount');
 
-            // Calculate expected cash
-            $cashSales = $shift->transactions()
+            // Calculate expected cash (NOW INCLUDES NON-CASH as handled by user input)
+            // As per new requirement: User inputs TOTAL FUNDS (Cash + Non-Cash)
+            // So Expected = Opening + ALL SALES - Expenses
+            $totalSales = $shift->transactions()
                 ->where('status', 'completed')
-                ->where('payment_method', 'cash')
                 ->sum('total');
 
-            $expectedCash = $this->openingCash + $cashSales - $totalExpenses;
+            $expectedCash = $this->openingCash + $totalSales - $totalExpenses;
 
             // Close shift with late closure flag
             $shift->update([

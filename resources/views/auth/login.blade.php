@@ -23,6 +23,7 @@
         }
     </script>
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    <script src="https://www.google.com/recaptcha/api.js" async defer></script>
 </head>
 <body class="min-h-screen bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center p-4" onload="lucide.createIcons()">
     <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8">
@@ -67,6 +68,13 @@
                 >
             </div>
 
+            <!-- reCAPTCHA -->
+            @if(config('services.recaptcha.site_key'))
+            <div class="flex justify-center">
+                <div class="g-recaptcha" data-sitekey="{{ config('services.recaptcha.site_key') }}"></div>
+            </div>
+            @endif
+
             <button 
                 type="submit"
                 class="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-colors"
@@ -75,9 +83,7 @@
             </button>
         </form>
 
-        <p class="text-center text-gray-400 text-sm mt-6">
-            Default: admin / password
-        </p>
+
     </div>
 </body>
 </html>

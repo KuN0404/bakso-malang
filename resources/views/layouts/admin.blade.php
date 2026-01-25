@@ -172,6 +172,7 @@
                                       request()->routeIs('admin.payment-sources.*') ||
                                       request()->routeIs('admin.service-areas.*');
                 @endphp
+                @canany(['view_categories', 'view_products', 'view_modifiers', 'manage_payment_sources', 'manage_settings'])
                 <div x-data="{ open: {{ $isMasterActive ? 'true' : 'false' }} }" class="mt-4">
                     <button @click="open = !open" class="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-blue-300 uppercase tracking-wider hover:text-white transition-colors group whitespace-nowrap text-left">
                         <div class="flex items-center gap-3">
@@ -188,37 +189,49 @@
                          x-transition:enter-start="opacity-0 -translate-y-2"
                          x-transition:enter-end="opacity-100 translate-y-0"
                          class="space-y-1 mt-1">
+                        @can('view_categories')
                         <a href="{{ route('admin.categories.index') }}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.categories.*') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
                             <div class="flex-shrink-0 w-6 flex justify-center"><i data-lucide="folder" class="w-4 h-4"></i></div>
                             <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Kategori</span></div>
                         </a>
+                        @endcan
                         
+                        @can('view_products')
                         <a href="{{ route('admin.products.index') }}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.products.*') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
                             <div class="flex-shrink-0 w-6 flex justify-center"><i data-lucide="package" class="w-4 h-4"></i></div>
                             <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Produk</span></div>
                         </a>
+                        @endcan
 
+                        @can('view_modifiers')
                         <a href="{{ route('admin.modifiers.index') }}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.modifiers.*') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
                             <div class="flex-shrink-0 w-6 flex justify-center"><i data-lucide="sliders" class="w-4 h-4"></i></div>
                             <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Modifier</span></div>
                         </a>
+                        @endcan
 
+                        @can('manage_payment_sources')
                         <a href="{{ route('admin.payment-sources.index') }}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.payment-sources.*') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
                             <div class="flex-shrink-0 w-6 flex justify-center"><i data-lucide="wallet" class="w-4 h-4"></i></div>
                             <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Metode Bayar</span></div>
                         </a>
+                        @endcan
 
+                        @can('manage_settings')
                         <a href="{{ route('admin.service-areas.index') }}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.service-areas.*') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
                             <div class="flex-shrink-0 w-6 flex justify-center"><i data-lucide="map-pin" class="w-4 h-4"></i></div>
                             <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Area Pelayanan</span></div>
                         </a>
+                        @endcan
                     </div>
                 </div>
+                @endcanany
 
                 <!-- Group: Transaksi -->
                 @php
                     $isTransActive = request()->routeIs('pos') || request()->routeIs('admin.shifts.*');
                 @endphp
+                @canany(['access_pos', 'view_all_shifts'])
                 <div x-data="{ open: {{ $isTransActive ? 'true' : 'false' }} }" class="mt-2">
                     <button @click="open = !open" class="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-blue-300 uppercase tracking-wider hover:text-white transition-colors group whitespace-nowrap text-left">
                         <div class="flex items-center gap-3">
@@ -234,22 +247,28 @@
                          x-transition:enter-start="opacity-0 -translate-y-2"
                          x-transition:enter-end="opacity-100 translate-y-0"
                          class="space-y-1 mt-1">
+                        @can('access_pos')
                         <a href="{{ route('pos') }}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-blue-200 hover:bg-sidebar-light hover:text-white transition-colors">
                              <div class="flex-shrink-0 w-6 flex justify-center"><i data-lucide="monitor" class="w-4 h-4"></i></div>
                             <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>POS Kasir</span></div>
                         </a>
+                        @endcan
                         
+                        @can('view_all_shifts')
                         <a href="{{ route('admin.shifts.index') }}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.shifts.*') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
                             <div class="flex-shrink-0 w-6 flex justify-center"><i data-lucide="clock" class="w-4 h-4"></i></div>
                             <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Shift</span></div>
                         </a>
+                        @endcan
                     </div>
                 </div>
+                @endcanany
 
                 <!-- Group: Laporan -->
                 @php
                     $isReportActive = request()->routeIs('admin.reports.*') || request()->routeIs('admin.returns');
                 @endphp
+                @canany(['view_transactions', 'view_sales_reports', 'view_all_shifts', 'view_cancellation_reports'])
                 <div x-data="{ open: {{ $isReportActive ? 'true' : 'false' }} }" class="mt-2">
                     <button @click="open = !open" class="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-blue-300 uppercase tracking-wider hover:text-white transition-colors group whitespace-nowrap text-left">
                         <div class="flex items-center gap-3">
@@ -265,27 +284,36 @@
                          x-transition:enter-start="opacity-0 -translate-y-2"
                          x-transition:enter-end="opacity-100 translate-y-0"
                          class="space-y-1 mt-1">
+                        @can('view_transactions')
                         <a href="{{ route('admin.reports.transactions') }}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.reports.transactions') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
                             <div class="flex-shrink-0 w-6 flex justify-center"><i data-lucide="receipt" class="w-4 h-4"></i></div>
                             <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Penjualan</span></div>
                         </a>
+                        @endcan
 
+                        @can('view_sales_reports')
                         <a href="{{ route('admin.reports.sales') }}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.reports.sales') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
                             <div class="flex-shrink-0 w-6 flex justify-center"><i data-lucide="bar-chart-3" class="w-4 h-4"></i></div>
                             <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Analisa & Performa</span></div>
                         </a>
+                        @endcan
 
+                        @can('view_all_shifts')
                         <a href="{{ route('admin.reports.shifts') }}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.reports.shifts') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
                             <div class="flex-shrink-0 w-6 flex justify-center"><i data-lucide="file-clock" class="w-4 h-4"></i></div>
                             <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Laporan Shift</span></div>
                         </a>
+                        @endcan
 
+                        @can('view_cancellation_reports')
                         <a href="{{ route('admin.returns') }}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.returns') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
                             <div class="flex-shrink-0 w-6 flex justify-center"><i data-lucide="rotate-ccw" class="w-4 h-4"></i></div>
                             <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Laporan Retur</span></div>
                         </a>
+                        @endcan
                     </div>
                 </div>
+                @endcanany
 
                 <!-- Group: Pengaturan -->
                 @php
@@ -293,6 +321,7 @@
                                         request()->routeIs('admin.roles.*') || 
                                         request()->routeIs('admin.settings.*');
                 @endphp
+                @canany(['view_users', 'manage_roles', 'manage_settings'])
                 <div x-data="{ open: {{ $isSettingsActive ? 'true' : 'false' }} }" class="mt-2">
                     <button @click="open = !open" class="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-blue-300 uppercase tracking-wider hover:text-white transition-colors group whitespace-nowrap text-left">
                          <div class="flex items-center gap-3">
@@ -308,22 +337,29 @@
                          x-transition:enter-start="opacity-0 -translate-y-2"
                          x-transition:enter-end="opacity-100 translate-y-0"
                          class="space-y-1 mt-1">
+                        @can('view_users')
                         <a href="{{ route('admin.users.index') }}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.users.*') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
                             <div class="flex-shrink-0 w-6 flex justify-center"><i data-lucide="users" class="w-4 h-4"></i></div>
                             <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Pengguna</span></div>
                         </a>
+                        @endcan
 
+                        @can('manage_roles')
                         <a href="{{ route('admin.roles.index') }}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.roles.*') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
                             <div class="flex-shrink-0 w-6 flex justify-center"><i data-lucide="shield" class="w-4 h-4"></i></div>
                             <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Role & Permission</span></div>
                         </a>
+                        @endcan
                         
+                        @can('manage_settings')
                         <a href="{{ route('admin.settings.index') }}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.settings.*') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
                             <div class="flex-shrink-0 w-6 flex justify-center"><i data-lucide="settings" class="w-4 h-4"></i></div>
                             <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Pengaturan</span></div>
                         </a>
+                        @endcan
                     </div>
                 </div>
+                @endcanany
             </nav>
 
             <!-- Logout Button Trigger -->
@@ -336,7 +372,7 @@
         </aside>
 
         <!-- Main Content -->
-        <main class="flex-1 flex flex-col overflow-hidden transition-all duration-300" :class="isSidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'">
+        <main class="flex-1 flex flex-col overflow-hidden transition-all duration-300 lg:transition-none" :class="isSidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'">
             <!-- Header -->
             <header class="bg-white border-b px-6 py-4">
                 <div class="flex items-center justify-between">
