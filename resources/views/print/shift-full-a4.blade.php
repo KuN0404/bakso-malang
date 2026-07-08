@@ -188,33 +188,54 @@
 
             <!-- Cash Reconciliation Block -->
             <div style="padding: 5px 0;">
-                <div style="font-weight: bold; text-decoration: underline; margin-bottom: 5px;">HITUNGAN LACI (KASIR)</div>
+                <div style="font-weight: bold; text-decoration: underline; margin-bottom: 5px;">💵 REKONSILIASI TUNAI (LACI)</div>
                 <div class="info-row">
                     <span class="info-label">Modal Awal</span><span class="info-sep">:</span>
                     <span class="info-val">{{ number_format($shift->opening_cash, 0, ',', '.') }}</span>
                 </div>
                 <div class="info-row">
-                    <span class="info-label">(+) Tunai</span><span class="info-sep">:</span>
+                    <span class="info-label">(+) Penjualan Tunai</span><span class="info-sep">:</span>
                     <span class="info-val">{{ number_format($shift->cash_sales, 0, ',', '.') }}</span>
                 </div>
                 <div class="info-row">
                     <span class="info-label">(-) Pengeluaran</span><span class="info-sep">:</span>
                     <span class="info-val">{{ number_format($shift->expenses->sum('amount'), 0, ',', '.') }}</span>
                 </div>
-                
-                 <div class="info-row" style="background-color: #f9f9f9; font-weight: bold; border-top: 1px solid #ddd; margin-top: 5px; padding-top: 5px;">
-                    <span class="info-label">Target Fisik</span><span class="info-sep">:</span>
+                <div class="info-row" style="background-color: #f9f9f9; font-weight: bold; border-top: 1px solid #ddd; margin-top: 5px; padding-top: 5px;">
+                    <span class="info-label">Ekspektasi Tunai</span><span class="info-sep">:</span>
                     <span class="info-val">{{ number_format($shift->expected_cash, 0, ',', '.') }}</span>
                 </div>
                 <div class="info-row">
-                    <span class="info-label">Uang Fisik</span><span class="info-sep">:</span>
+                    <span class="info-label">Fisik di Laci</span><span class="info-sep">:</span>
                     <span class="info-val">{{ number_format($shift->actual_cash, 0, ',', '.') }}</span>
                 </div>
                 <div class="info-row" style="color: {{ $shift->cash_difference < 0 ? 'red' : 'black' }}; font-weight: bold;">
-                    <span class="info-label">Selisih</span><span class="info-sep">:</span>
-                    <span class="info-val">{{ number_format($shift->cash_difference, 0, ',', '.') }}</span>
+                    <span class="info-label">Selisih Tunai</span><span class="info-sep">:</span>
+                    <span class="info-val">{{ ($shift->cash_difference >= 0 ? '+' : '') . number_format($shift->cash_difference, 0, ',', '.') }}</span>
                 </div>
             </div>
+
+            <!-- Non-Cash Reconciliation Block -->
+            @if($shift->non_cash_sales > 0 || $shift->actual_non_cash !== null)
+            <div style="padding: 5px 0; margin-top: 10px; border-top: 1px dashed #ccc;">
+                <div style="font-weight: bold; text-decoration: underline; margin-bottom: 5px;">📱 REKONSILIASI NON-TUNAI (QRIS/TRANSFER/EDC)</div>
+                <div class="info-row">
+                    <span class="info-label">Sistem (Catatan)</span><span class="info-sep">:</span>
+                    <span class="info-val">{{ number_format($shift->expected_non_cash ?? $shift->non_cash_sales, 0, ',', '.') }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Terverifikasi Kasir</span><span class="info-sep">:</span>
+                    <span class="info-val">{{ number_format($shift->actual_non_cash ?? 0, 0, ',', '.') }}</span>
+                </div>
+                @if($shift->non_cash_difference !== null)
+                <div class="info-row" style="color: {{ $shift->non_cash_difference < 0 ? 'red' : 'black' }}; font-weight: bold;">
+                    <span class="info-label">Selisih Non-Tunai</span><span class="info-sep">:</span>
+                    <span class="info-val">{{ ($shift->non_cash_difference >= 0 ? '+' : '') . number_format($shift->non_cash_difference, 0, ',', '.') }}</span>
+                </div>
+                @endif
+            </div>
+            @endif
+
         </div>
     </div>
 

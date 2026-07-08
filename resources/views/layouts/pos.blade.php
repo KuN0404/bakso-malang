@@ -130,7 +130,8 @@
                 wireModel: wireModel,
                 
                 init() {
-                    this.formatted = this.rawValue > 0 ? this.formatNumber(this.rawValue) : '';
+                    // Show '0' when initial value is 0, not empty
+                    this.formatted = this.rawValue > 0 ? this.formatNumber(this.rawValue) : '0';
                 },
                 
                 formatNumber(num) {
@@ -149,7 +150,8 @@
                     // Get raw digits only
                     const digits = this.formatted.replace(/\D/g, '');
                     this.rawValue = parseInt(digits) || 0;
-                    this.formatted = this.rawValue > 0 ? this.formatNumber(this.rawValue) : '';
+                    // Keep '0' visible instead of blanking the field
+                    this.formatted = this.rawValue > 0 ? this.formatNumber(this.rawValue) : (digits.length > 0 ? '0' : '');
                     
                     // Adjust cursor position after formatting
                     const newLen = this.formatted.length;

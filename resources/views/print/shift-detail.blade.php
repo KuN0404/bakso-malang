@@ -73,8 +73,10 @@
         $totalTrx = $cashCount + $nonCashCount;
         $expenseTotal = $shift->expenses->sum('amount');
         
-        // Saldo = Modal Awal + Total Omset - Pengeluaran
-        $expectedSaldo = $shift->opening_cash + $totalOmset - $expenseTotal;
+        // Expected cash in drawer = Modal Awal + Cash Sales - Expenses
+        $expectedSaldo = $shift->opening_cash + $cashTotal - $expenseTotal;
+        $cashDiff      = $shift->actual_cash !== null ? ($shift->actual_cash - $expectedSaldo) : null;
+        $nonCashDiff   = $shift->non_cash_difference;
     @endphp
 
     <div class="font-bold mb-1">LAPORAN SALDO</div>
@@ -103,19 +105,55 @@
     @endforeach
     @endif
 
-    <div class="flex font-bold py-1 border-t border-b mt-1" style="background: #f5f5f5;">
-        <span>SALDO</span>
+    {{-- ========= REKONSILIASI TUNAI ========= --}}
+    <div class="font-bold mt-2 mb-1 border-t pt-1" style="font-size: 10px;">REKONSILIASI TUNAI</div>
+    <div class="flex">
+        <span>Modal Awal</span>
+        <span class="text-right">{{ number_format($shift->opening_cash, 0, ',', '.') }}</span>
+    </div>
+    <div class="flex">
+        <span>Penjualan Tunai ({{ $cashCount }} trx)</span>
+        <span class="text-right">{{ number_format($cashTotal, 0, ',', '.') }}</span>
+    </div>
+    @if($expenseTotal > 0)
+    <div class="flex">
+        <span>Pengeluaran (-)</span>
+        <span class="text-right">{{ number_format($expenseTotal, 0, ',', '.') }}</span>
+    </div>
+    @endif
+    <div class="flex font-bold py-1 border-t border-b" style="background: #f5f5f5;">
+        <span>Ekspektasi Tunai</span>
         <span class="text-right">{{ number_format($expectedSaldo, 0, ',', '.') }}</span>
     </div>
-    
-    <div class="flex mt-2">
-        <span>Uang Fisik</span>
+    <div class="flex mt-1">
+        <span>Fisik di Laci</span>
         <span class="text-right">{{ number_format($shift->actual_cash, 0, ',', '.') }}</span>
     </div>
-    <div class="flex font-bold" style="color: {{ ($shift->actual_cash - $expectedSaldo) < 0 ? 'red' : 'inherit' }};">
-        <span>Selisih</span>
-        <span class="text-right">{{ number_format($shift->actual_cash - $expectedSaldo, 0, ',', '.') }}</span>
+    @if($cashDiff !== null)
+    <div class="flex font-bold" style="color: {{ $cashDiff < 0 ? 'red' : 'inherit' }};">
+        <span>Selisih Tunai</span>
+        <span class="text-right">{{ ($cashDiff >= 0 ? '+' : '') . number_format($cashDiff, 0, ',', '.') }}</span>
     </div>
+    @endif
+
+    {{-- ========= REKONSILIASI NON-TUNAI ========= --}}
+    @if($nonCashTotal > 0 || ($shift->actual_non_cash !== null))
+    <div class="font-bold mt-2 mb-1 border-t pt-1" style="font-size: 10px;">REKONSILIASI NON-TUNAI (QRIS/TRANSFER/EDC)</div>
+    <div class="flex">
+        <span>Sistem ({{ $nonCashCount }} trx)</span>
+        <span class="text-right">{{ number_format($shift->expected_non_cash ?? $nonCashTotal, 0, ',', '.') }}</span>
+    </div>
+    <div class="flex">
+        <span>Terverifikasi Kasir</span>
+        <span class="text-right">{{ number_format($shift->actual_non_cash ?? 0, 0, ',', '.') }}</span>
+    </div>
+    @if($nonCashDiff !== null)
+    <div class="flex font-bold" style="color: {{ $nonCashDiff < 0 ? 'red' : 'inherit' }};">
+        <span>Selisih Non-Tunai</span>
+        <span class="text-right">{{ ($nonCashDiff >= 0 ? '+' : '') . number_format($nonCashDiff, 0, ',', '.') }}</span>
+    </div>
+    @endif
+    @endif
 
     @if($shift->close_notes)
     <div class="border-t py-1 mt-2">

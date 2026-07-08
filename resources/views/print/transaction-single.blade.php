@@ -25,7 +25,7 @@
 <body class="bg-white {{ ($format == '58mm' || $format == '76mm') ? 'p-1' : 'p-8 a4-font' }}" onload="window.print()">
     @if($format == '58mm' || $format == '76mm')
         <!-- Struk Layout (Adapted from partials.receipt) -->
-        <div class="font-mono text-xs max-w-[{{ $format }}]">
+        <div class="font-mono text-xs" style="max-width: {{ $format }};">
             <!-- Header -->
             <div class="text-center border-b border-dashed border-gray-400 pb-3 mb-3">
                 <h1 class="text-base font-bold uppercase">{{ $settings['store_name'] ?? 'Bakso Malang' }}</h1>

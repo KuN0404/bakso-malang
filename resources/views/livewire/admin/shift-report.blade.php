@@ -218,12 +218,23 @@
                         <td class="px-6 py-4 text-green-600 font-medium">Rp {{ number_format($shiftSales, 0, ',', '.') }}</td>
                         <td class="px-6 py-4 text-red-600">Rp {{ number_format($shiftExpenses, 0, ',', '.') }}</td>
                         <td class="px-6 py-4">
-                            @if($shift->cash_difference !== null)
-                                <span class="{{ $shift->cash_difference >= 0 ? 'text-green-600' : 'text-red-600' }} font-medium">
-                                    {{ $shift->cash_difference >= 0 ? '+' : '' }}Rp {{ number_format($shift->cash_difference, 0, ',', '.') }}
-                                </span>
+                            @if($shift->status === 'closed')
+                                @php
+                                    $cashDiff = $shift->cash_difference;
+                                    $nonCashDiff = $shift->non_cash_difference;
+                                @endphp
+                                <div class="flex flex-col gap-0.5 text-xs">
+                                    <span class="{{ $cashDiff >= 0 ? 'text-green-600' : 'text-red-600' }} font-medium">
+                                        Tunai: {{ $cashDiff >= 0 ? '+' : '' }}Rp {{ number_format($cashDiff, 0, ',', '.') }}
+                                    </span>
+                                    @if($nonCashDiff !== null)
+                                    <span class="{{ $nonCashDiff >= 0 ? 'text-purple-600' : 'text-orange-600' }} font-medium">
+                                        Non-Tunai: {{ $nonCashDiff >= 0 ? '+' : '' }}Rp {{ number_format($nonCashDiff, 0, ',', '.') }}
+                                    </span>
+                                    @endif
+                                </div>
                             @else
-                                -
+                                <span class="text-gray-400 text-xs">Shift aktif</span>
                             @endif
                         </td>
                         <td class="px-6 py-4">
@@ -281,29 +292,66 @@
                         <div><p class="text-sm text-gray-500">Mulai</p><p class="font-medium">{{ $selectedShift->started_at->format('H:i') }}</p></div>
                         <div><p class="text-sm text-gray-500">Selesai</p><p class="font-medium">{{ $selectedShift->ended_at?->format('H:i') ?? '-' }}</p></div>
                     </div>
-                    <div class="grid grid-cols-3 gap-4">
-                        <div class="bg-blue-50 p-4 rounded-lg text-center">
-                            <p class="text-sm text-blue-600">Modal Awal</p>
-                            <p class="text-lg font-bold text-blue-700">Rp {{ number_format($selectedShift->opening_cash, 0, ',', '.') }}</p>
+                    <!-- Cash Verification Row -->
+                    <div class="border rounded-xl overflow-hidden">
+                        <div class="bg-green-50 px-4 py-2 border-b">
+                            <p class="text-xs font-semibold text-green-700 uppercase tracking-wide">💵 Rekonsiliasi Tunai (Cash)</p>
                         </div>
-                        <div class="bg-green-50 p-4 rounded-lg text-center">
-                            <p class="text-sm text-green-600">Penjualan</p>
-                            <p class="text-lg font-bold text-green-700">Rp {{ number_format($selectedShift->transactions->where('status', 'completed')->sum('total'), 0, ',', '.') }}</p>
+                        <div class="grid grid-cols-3 divide-x">
+                            <div class="p-3 text-center">
+                                <p class="text-xs text-gray-500">Modal Awal</p>
+                                <p class="font-bold text-gray-800">Rp {{ number_format($selectedShift->opening_cash, 0, ',', '.') }}</p>
+                            </div>
+                            <div class="p-3 text-center">
+                                <p class="text-xs text-gray-500">Penjualan Tunai</p>
+                                <p class="font-bold text-green-700">Rp {{ number_format($selectedShift->transactions->where('status','completed')->where('payment_method','cash')->sum('total'), 0, ',', '.') }}</p>
+                            </div>
+                            <div class="p-3 text-center">
+                                <p class="text-xs text-gray-500">Pengeluaran</p>
+                                <p class="font-bold text-red-700">-Rp {{ number_format($selectedShift->expenses->sum('amount'), 0, ',', '.') }}</p>
+                            </div>
                         </div>
-                        <div class="bg-red-50 p-4 rounded-lg text-center">
-                            <p class="text-sm text-red-600">Pengeluaran</p>
-                            <p class="text-lg font-bold text-red-700">Rp {{ number_format($selectedShift->expenses->sum('amount'), 0, ',', '.') }}</p>
+                        <div class="grid grid-cols-2 divide-x border-t bg-gray-50">
+                            <div class="p-3 text-center">
+                                <p class="text-xs text-gray-500">Ekspektasi Sistem</p>
+                                <p class="font-bold text-gray-800">Rp {{ number_format($selectedShift->expected_cash, 0, ',', '.') }}</p>
+                            </div>
+                            <div class="p-3 text-center">
+                                <p class="text-xs text-gray-500">Fisik di Laci</p>
+                                <p class="font-bold text-gray-800">Rp {{ number_format($selectedShift->actual_cash, 0, ',', '.') }}</p>
+                            </div>
                         </div>
-                        <div class="bg-gray-50 p-4 rounded-lg text-center">
-                            <p class="text-sm text-gray-600">Uang Fisik</p>
-                            <p class="text-lg font-bold text-gray-700">Rp {{ number_format($selectedShift->actual_cash, 0, ',', '.') }}</p>
+                        @if($selectedShift->cash_difference !== null)
+                        <div class="px-4 py-2 border-t bg-{{ $selectedShift->cash_difference >= 0 ? 'green' : 'red' }}-50 text-center">
+                            <span class="text-sm font-bold text-{{ $selectedShift->cash_difference >= 0 ? 'green' : 'red' }}-700">
+                                Selisih Tunai: {{ $selectedShift->cash_difference >= 0 ? '+' : '' }}Rp {{ number_format($selectedShift->cash_difference, 0, ',', '.') }}
+                            </span>
                         </div>
-                        <div class="bg-{{ $selectedShift->cash_difference >= 0 ? 'green' : 'red' }}-50 p-4 rounded-lg text-center">
-                            <p class="text-sm text-{{ $selectedShift->cash_difference >= 0 ? 'green' : 'red' }}-600">Selisih</p>
-                            <p class="text-lg font-bold text-{{ $selectedShift->cash_difference >= 0 ? 'green' : 'red' }}-700">
-                                {{ $selectedShift->cash_difference >= 0 ? '+' : '' }}Rp {{ number_format($selectedShift->cash_difference, 0, ',', '.') }}
-                            </p>
+                        @endif
+                    </div>
+
+                    <!-- Non-Cash Verification Row -->
+                    <div class="border rounded-xl overflow-hidden">
+                        <div class="bg-purple-50 px-4 py-2 border-b">
+                            <p class="text-xs font-semibold text-purple-700 uppercase tracking-wide">📱 Rekonsiliasi Non-Tunai (QRIS / Transfer / EDC)</p>
                         </div>
+                        <div class="grid grid-cols-2 divide-x">
+                            <div class="p-3 text-center">
+                                <p class="text-xs text-gray-500">Penjualan Non-Tunai (Sistem)</p>
+                                <p class="font-bold text-purple-700">Rp {{ number_format($selectedShift->expected_non_cash ?? $selectedShift->transactions->where('status','completed')->where('payment_method','!=','cash')->sum('total'), 0, ',', '.') }}</p>
+                            </div>
+                            <div class="p-3 text-center">
+                                <p class="text-xs text-gray-500">Non-Tunai Terverifikasi</p>
+                                <p class="font-bold text-gray-800">Rp {{ number_format($selectedShift->actual_non_cash ?? 0, 0, ',', '.') }}</p>
+                            </div>
+                        </div>
+                        @if($selectedShift->non_cash_difference !== null)
+                        <div class="px-4 py-2 border-t bg-{{ $selectedShift->non_cash_difference >= 0 ? 'purple' : 'orange' }}-50 text-center">
+                            <span class="text-sm font-bold text-{{ $selectedShift->non_cash_difference >= 0 ? 'purple' : 'orange' }}-700">
+                                Selisih Non-Tunai: {{ $selectedShift->non_cash_difference >= 0 ? '+' : '' }}Rp {{ number_format($selectedShift->non_cash_difference, 0, ',', '.') }}
+                            </span>
+                        </div>
+                        @endif
                     </div>
 
                     @if($selectedShift->expenses->isNotEmpty())

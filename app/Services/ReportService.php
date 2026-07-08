@@ -32,22 +32,28 @@ class ReportService
         $refunds = $shift->expenses->where('category', 'refund')->sum('amount');
         $operational = $shift->expenses->where('category', '!=', 'refund')->sum('amount');
 
+        // Cash: Opening + Cash Sales - ALL Expenses (cash-side only)
         $expectedCash = $shift->opening_cash + $totalCash - $expenses;
 
         return [
-            'shift' => $shift,
-            'opening_cash' => $shift->opening_cash,
-            'total_cash_sales' => $totalCash,
-            'total_non_cash_sales' => $totalNonCash,
-            'total_sales' => $totalCash + $totalNonCash,
-            'transaction_count' => $transactions->count(),
-            'refunds' => $refunds,
-            'operational_expenses' => $operational,
-            'total_expenses' => $expenses,
-            'expected_cash' => $expectedCash,
-            'actual_cash' => $shift->actual_cash,
-            'difference' => $shift->cash_difference,
-            'status' => $shift->status,
+            'shift'                  => $shift,
+            'opening_cash'           => $shift->opening_cash,
+            'total_cash_sales'       => $totalCash,
+            'total_non_cash_sales'   => $totalNonCash,
+            'total_sales'            => $totalCash + $totalNonCash,
+            'transaction_count'      => $transactions->count(),
+            'refunds'                => $refunds,
+            'operational_expenses'   => $operational,
+            'total_expenses'         => $expenses,
+            // Cash reconciliation
+            'expected_cash'          => $expectedCash,
+            'actual_cash'            => $shift->actual_cash,
+            'difference'             => $shift->cash_difference,
+            // Non-cash reconciliation
+            'expected_non_cash'      => $shift->expected_non_cash ?? $totalNonCash,
+            'actual_non_cash'        => $shift->actual_non_cash,
+            'non_cash_difference'    => $shift->non_cash_difference,
+            'status'                 => $shift->status,
         ];
     }
 

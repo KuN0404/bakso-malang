@@ -1,4 +1,7 @@
 <div class="fixed inset-0 w-full flex bg-gray-100 overflow-hidden" style="height: 100dvh;"
+    @print-receipt.window="console.log('Alpine print-receipt triggered'); setTimeout(() => window.print(), 600)"
+    @print-shift-receipt.window="console.log('Alpine print-shift-receipt triggered'); setTimeout(() => window.print(), 600)"
+    @cart-updated.window="new BroadcastChannel('pos_channel_' + {{ auth()->id() }}).postMessage($event.detail.data)"
     x-data="{
         showProductModal: false, 
         selectedProduct: null, 
@@ -96,7 +99,7 @@
                 <div class="p-6 border-b bg-red-50 rounded-t-2xl">
                     <div class="flex items-center gap-3 text-red-600">
                         <div class="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
-                            <i data-lucide="alert-triangle" class="w-6 h-6"></i>
+                            <x-lucide name="alert-triangle" class="w-6 h-6" />
                         </div>
                         <div>
                             <h3 class="text-xl font-bold">Shift Belum Ditutup</h3>
@@ -129,7 +132,7 @@
                     
                     <div class="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
                         <p class="text-yellow-800 text-sm flex items-start gap-2">
-                            <i data-lucide="info" class="w-5 h-5 flex-shrink-0 mt-0.5"></i>
+                            <x-lucide name="info" class="w-5 h-5 flex-shrink-0 mt-0.5" />
                             <span>POS akan diblokir sampai shift ini ditutup. Silakan tutup shift atau hubungi Super Admin.</span>
                         </p>
                     </div>
@@ -140,7 +143,7 @@
                         wire:click="openClosePreviousShiftModal"
                         class="w-full py-4 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
                     >
-                        <i data-lucide="clock" class="w-5 h-5"></i>
+                        <x-lucide name="clock" class="w-5 h-5" />
                         Tutup Shift Sekarang
                     </button>
                 </div>
@@ -155,7 +158,7 @@
                 <div class="p-6 border-b flex-none">
                     <div class="flex justify-between items-center">
                         <h3 class="text-xl font-bold text-gray-800 flex items-center gap-2">
-                            <i data-lucide="clock" class="w-6 h-6 text-red-600"></i>
+                            <x-lucide name="clock" class="w-6 h-6 text-red-600" />
                             Tutup Shift {{ \App\Models\Shift::find($unclosedShiftId)?->started_at?->format('d/m/Y') }}
                         </h3>
                     </div>
@@ -185,7 +188,7 @@
                             placeholder="0"
                         >
                         <!-- <p class="text-xs text-yellow-600 mt-1 flex items-center gap-1">
-                            <i data-lucide="info" class="w-3 h-3"></i>
+                            <x-lucide name="info" class="w-3 h-3" />
                             Hitung hanya uang tunai. Jangan masukkan Transfer/QRIS.
                         </p> -->
                     </div>
@@ -195,7 +198,7 @@
                         <div class="flex items-center justify-between mb-2">
                             <label class="block text-sm font-medium text-gray-700">Pengeluaran</label>
                             <button type="button" wire:click="addExpense" class="text-primary-600 text-sm font-medium flex items-center gap-1">
-                                <i data-lucide="plus" class="w-4 h-4"></i> Tambah
+                                <x-lucide name="plus" class="w-4 h-4" /> Tambah
                             </button>
                         </div>
                         @foreach($expenses as $index => $expense)
@@ -213,7 +216,7 @@
                                     >
                                 </div>
                                 <button wire:click="removeExpense({{ $index }})" class="p-2 text-red-500 hover:bg-red-50 rounded-lg">
-                                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                    <x-lucide name="trash-2" class="w-4 h-4" />
                                 </button>
                             </div>
                         @endforeach
@@ -232,7 +235,7 @@
                             placeholder="0"
                         >
                         <!-- <p class="text-xs text-yellow-600 mt-1 flex items-center gap-1">
-                            <i data-lucide="info" class="w-3 h-3"></i>
+                            <x-lucide name="info" class="w-3 h-3" />
                             Hitung TOTAL UANG (Fisik di Laci + Total Non-Tunai/QRIS). 
                             <strong>GABUNGKAN SEMUANYA.</strong>
                         </p> -->
@@ -244,10 +247,10 @@
                         <textarea wire:model="closeNotes" rows="2" class="w-full px-4 py-2 border border-gray-200 rounded-lg" placeholder="Catatan opsional"></textarea>
                     </div>
                 </div>
-                <div class="p-6 border-t bg-gray-50 flex gap-3 flex-none">
+                <div class="p-6 border-t bg-gray-50 flex gap-3 flex-none rounded-b-2xl">
                     <button wire:click="$set('showUnclosedShiftModal', false)" class="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl">Kembali</button>
                     <button wire:click="closePreviousShift" class="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white font-medium rounded-xl flex items-center justify-center gap-2">
-                        <i data-lucide="check" class="w-5 h-5"></i>
+                        <x-lucide name="check" class="w-5 h-5" />
                         Tutup Shift
                     </button>
                 </div>
@@ -261,7 +264,7 @@
         <header class="bg-white px-6 py-3 border-b flex justify-between items-center sticky top-0 z-20">
             <div class="flex items-center gap-3">
                 <div class="w-10 h-10 bg-primary-600 rounded-lg flex items-center justify-center shadow-lg shadow-primary-500/30">
-                    <i data-lucide="soup" class="w-6 h-6 text-white"></i>
+                    <x-lucide name="soup" class="w-6 h-6 text-white" />
                 </div>
                 <div>
                     <h1 class="font-bold text-gray-800 leading-tight">Bakso Malang</h1>
@@ -274,20 +277,20 @@
                     <button onclick="window.open('{{ route('pos.display') }}', 'CustomerDisplay', 'width=1280,height=800,menubar=no,toolbar=no,location=no,status=no')" 
                             class="flex items-center gap-2 px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg transition-colors border border-indigo-200 mr-2" 
                             title="Buka Layar Pelanggan">
-                        <i data-lucide="monitor" class="w-4 h-4"></i>
+                        <x-lucide name="monitor" class="w-4 h-4" />
                         <!-- <span class="text-xs font-bold hidden xl:inline">LAYAR</span> -->
                     </button>
 
                     <!-- History Buttons Group -->
                     <div class="flex items-center">
                         <button wire:click="openHistoryModal" class="flex items-center gap-2 px-3 py-2 bg-blue-50 hover:bg-blue-100 rounded-l-lg text-blue-700 transition-colors border border-blue-200 border-r-0" title="Riwayat Transaksi">
-                            <i data-lucide="history" class="w-4 h-4 text-blue-600"></i>
+                            <x-lucide name="history" class="w-4 h-4 text-blue-600" />
                             <span class="bg-blue-200 text-blue-800 text-xs py-0.5 px-2 rounded-full font-bold">
                                 {{ $this->todayTransactions->count() }}
                             </span>
                         </button>
                         <button wire:click="openReturnHistoryModal" class="flex items-center gap-2 px-3 py-2 bg-orange-50 hover:bg-orange-100 rounded-r-lg text-orange-700 transition-colors border border-orange-200" title="Riwayat Retur">
-                            <i data-lucide="list" class="w-4 h-4 text-orange-600"></i>
+                            <x-lucide name="list" class="w-4 h-4 text-orange-600" />
                             <span class="bg-orange-200 text-orange-800 text-xs py-0.5 px-2 rounded-full font-bold">
                                 {{ $this->todayReturns->count() }}
                             </span>
@@ -296,14 +299,14 @@
                     
                     <!-- Return Action Button -->
                     <button wire:click="openReturnModal" class="flex items-center gap-2 px-4 py-2 bg-red-50 hover:bg-red-100 rounded-lg text-red-600 transition-colors border border-red-200 shadow-sm">
-                        <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+                        <x-lucide name="rotate-ccw" class="w-4 h-4" />
                         <span class="text-sm font-bold uppercase tracking-wide">Retur</span>
                     </button>
                 @endif
 
                 @if($this->todayShift && $this->todayShift->status === 'open')
                     <button wire:click="openCloseShiftModal" class="flex items-center gap-2 px-3 py-2 bg-red-50 hover:bg-red-50 text-red-600 rounded-lg transition-colors border border-red-100">
-                        <i data-lucide="power" class="w-4 h-4"></i>
+                        <x-lucide name="power" class="w-4 h-4" />
                         <span class="text-sm font-medium hidden md:inline">Tutup Shift (F4)</span>
                     </button>
                 @endif
@@ -311,11 +314,11 @@
                 <div class="h-6 w-px bg-gray-200 mx-1"></div>
 
                 <a href="{{ route('admin.dashboard') }}" class="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors" title="Dashboard">
-                    <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
+                    <x-lucide name="layout-dashboard" class="w-5 h-5" />
                 </a>
 
                 <div class="flex items-center gap-2 text-sm text-gray-600 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100">
-                    <i data-lucide="user" class="w-4 h-4 text-gray-400"></i>
+                    <x-lucide name="user" class="w-4 h-4 text-gray-400" />
                     <span class="font-medium truncate max-w-[100px]">{{ auth()->user()->name }}</span>
                 </div>
             </div>
@@ -331,7 +334,7 @@
                     placeholder="Cari produk... (ketik untuk mencari)"
                     class="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 >
-                <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400"></i>
+                <x-lucide name="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
             </div>
 
             <!-- Categories -->
@@ -340,7 +343,7 @@
                     wire:click="selectCategory(null)"
                     class="px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-all flex items-center gap-2 {{ !$selectedCategoryId ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' }}"
                 >
-                    <i data-lucide="grid-3x3" class="w-4 h-4"></i>
+                    <x-lucide name="grid-3x3" class="w-4 h-4" />
                     Semua
                 </button>
                 @foreach($this->categories as $category)
@@ -348,7 +351,7 @@
                         wire:click="selectCategory({{ $category->id }})"
                         class="px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-all flex items-center gap-2 {{ $selectedCategoryId === $category->id ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' }}"
                     >
-                        <i data-lucide="tag" class="w-4 h-4"></i>
+                        <x-lucide name="tag" class="w-4 h-4" />
                         {{ $category->name }}
                     </button>
                 @endforeach
@@ -412,7 +415,7 @@
                             <img src="{{ asset('storage/' . $product->image) }}" alt="{{ $product->name }}" class="w-full h-24 object-cover rounded-lg mb-3">
                         @else
                             <div class="w-full h-24 bg-gradient-to-br from-primary-100 to-primary-200 rounded-lg mb-3 flex items-center justify-center">
-                                <i data-lucide="package" class="w-8 h-8 text-primary-500"></i>
+                                <x-lucide name="package" class="w-8 h-8 text-primary-500" />
                             </div>
                         @endif
                         
@@ -433,14 +436,14 @@
                         </p>
                         @if($product->track_stock)
                             <p class="text-xs mt-1 flex items-center gap-1 {{ $product->stock <= 0 ? 'text-red-600 font-bold' : 'text-gray-500' }}">
-                                <i data-lucide="box" class="w-3 h-3"></i>
+                                <x-lucide name="box" class="w-3 h-3" />
                                 Stok: {{ $product->stock }}
                             </p>
                         @endif
                     </div>
                 @empty
                     <div class="col-span-full text-center py-12 text-gray-500">
-                        <i data-lucide="inbox" class="w-16 h-16 mx-auto mb-4 text-gray-300"></i>
+                        <x-lucide name="inbox" class="w-16 h-16 mx-auto mb-4 text-gray-300" />
                         <p>Tidak ada produk ditemukan</p>
                         <p class="text-sm mt-2">Pastikan ada produk aktif di database</p>
                     </div>
@@ -455,7 +458,7 @@
                         wire:loading.attr="disabled"
                         class="px-6 py-2 bg-white border border-gray-200 text-primary-600 font-medium rounded-full shadow-sm hover:bg-gray-50 hover:border-primary-200 transition-all flex items-center gap-2 mx-auto disabled:opacity-50"
                     >
-                        <i wire:loading.remove wire:target="loadMore" data-lucide="arrow-down-circle" class="w-4 h-4"></i>
+                        <x-lucide name="arrow-down-circle" wire:loading.remove wire:target="loadMore" class="w-4 h-4" />
                         <svg wire:loading wire:target="loadMore" class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -579,7 +582,7 @@
                 class="flex items-center gap-2 px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-xl shadow-lg shadow-primary-500/30 transition-all active:scale-95"
             >
                 <div class="relative">
-                    <i data-lucide="shopping-cart" class="w-5 h-5"></i>
+                    <x-lucide name="shopping-cart" class="w-5 h-5" />
                     @if(count($cart) > 0)
                         <span class="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold border border-white">
                             {{ count($cart) }}
@@ -609,14 +612,14 @@
             <div class="flex items-center justify-between">
                 <h2 class="text-lg font-bold text-gray-800 flex items-center gap-2">
                     <button @click="showCartMobile = false" class="lg:hidden text-gray-500 hover:text-gray-700 mr-2">
-                        <i data-lucide="arrow-left" class="w-6 h-6"></i>
+                        <x-lucide name="arrow-left" class="w-6 h-6" />
                     </button>
-                    <i data-lucide="shopping-cart" class="w-5 h-5"></i>
+                    <x-lucide name="shopping-cart" class="w-5 h-5" />
                     Keranjang
                 </h2>
                 @if(count($cart) > 0)
                     <button wire:click="clearCart" class="text-red-500 hover:text-red-700 text-sm font-medium flex items-center gap-1">
-                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                        <x-lucide name="trash-2" class="w-4 h-4" />
                         Hapus Semua
                     </button>
                 @endif
@@ -645,7 +648,7 @@
                             wire:click="removeFromCart('{{ $cartKey }}')"
                             class="text-gray-400 hover:text-red-500 p-1"
                         >
-                            <i data-lucide="x" class="w-5 h-5"></i>
+                            <x-lucide name="x" class="w-5 h-5" />
                         </button>
                     </div>
                     
@@ -681,7 +684,7 @@
                                 class="w-8 h-8 rounded-lg bg-gray-200 hover:bg-gray-300 flex items-center justify-center active:scale-95 transition-transform"
                                 type="button"
                             >
-                                <i data-lucide="minus" class="w-4 h-4"></i>
+                                <x-lucide name="minus" class="w-4 h-4" />
                             </button>
                             <input 
                                 type="number" 
@@ -705,7 +708,7 @@
                                 class="w-8 h-8 rounded-lg bg-primary-100 hover:bg-primary-200 text-primary-600 flex items-center justify-center active:scale-95 transition-transform"
                                 type="button"
                             >
-                                <i data-lucide="plus" class="w-4 h-4"></i>
+                                <x-lucide name="plus" class="w-4 h-4" />
                             </button>
                         </div>
                         <span class="font-bold text-gray-800">
@@ -715,7 +718,7 @@
                 </div>
             @empty
                 <div class="text-center py-12 text-gray-400">
-                    <i data-lucide="shopping-bag" class="w-16 h-16 mx-auto mb-4"></i>
+                    <x-lucide name="shopping-bag" class="w-16 h-16 mx-auto mb-4" />
                     <p>Keranjang kosong</p>
                     <p class="text-sm">Klik produk untuk memulai</p>
                 </div>
@@ -744,7 +747,7 @@
                 @if(count($cart) === 0) disabled @endif
                 class="w-full py-4 bg-primary-600 hover:bg-primary-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
             >
-                <i data-lucide="credit-card" class="w-5 h-5"></i>
+                <x-lucide name="credit-card" class="w-5 h-5" />
                 Bayar (F1)
             </button>
         </div>
@@ -757,11 +760,11 @@
                 <div class="p-6 border-b flex-none">
                     <div class="flex justify-between items-center">
                         <h3 class="text-xl font-bold text-gray-800 flex items-center gap-2">
-                            <i data-lucide="wallet" class="w-6 h-6"></i>
+                            <x-lucide name="wallet" class="w-6 h-6" />
                             Pembayaran
                         </h3>
                         <button wire:click="closePaymentModal" class="text-gray-400 hover:text-gray-600 p-1">
-                            <i data-lucide="x" class="w-6 h-6"></i>
+                            <x-lucide name="x" class="w-6 h-6" />
                         </button>
                     </div>
                 </div>
@@ -856,7 +859,7 @@
                             @if($paidAmount > 0 && $paidAmount < $this->total)
                                 <div class="mt-4 bg-red-50 border border-red-200 rounded-xl p-4 text-center">
                                     <p class="text-red-600 font-medium flex items-center justify-center gap-2">
-                                        <i data-lucide="alert-circle" class="w-5 h-5"></i>
+                                        <x-lucide name="alert-circle" class="w-5 h-5" />
                                         Uang kurang Rp {{ number_format($this->total - $paidAmount, 0, ',', '.') }}
                                     </p>
                                 </div>
@@ -947,7 +950,7 @@
                         class="w-full py-4 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
                     >
                         <span wire:loading.remove wire:target="processPayment">
-                            <i data-lucide="check-circle" class="w-5 h-5 inline mr-2"></i>
+                            <x-lucide name="check-circle" class="w-5 h-5 inline mr-2" />
                             Proses Pembayaran (F2)
                         </span>
                         <span wire:loading wire:target="processPayment">
@@ -966,20 +969,29 @@
                 <div class="p-6 border-b">
                     <div class="flex justify-between items-center">
                         <h3 class="text-xl font-bold text-gray-800 flex items-center gap-2">
-                            <i data-lucide="clock" class="w-6 h-6"></i>
+                            <x-lucide name="clock" class="w-6 h-6" />
                             Tutup Shift
                         </h3>
                         <button wire:click="$set('showCloseShiftModal', false)" class="text-gray-400 hover:text-gray-600">
-                            <i data-lucide="x" class="w-6 h-6"></i>
+                            <x-lucide name="x" class="w-6 h-6" />
                         </button>
                     </div>
                 </div>
                 <div class="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
-                    <!-- Summary -->
-                    <div class="bg-blue-50 rounded-lg p-4">
-                        <p class="text-sm text-blue-600">Penjualan Shift Ini</p>
-                        <p class="text-2xl font-bold text-blue-700">Rp {{ number_format($this->todayShift?->transactions->sum('total') ?? 0, 0, ',', '.') }}</p>
-                        <p class="text-sm text-blue-600 mt-1">{{ $this->todayShift?->transactions->count() ?? 0 }} transaksi</p>
+                    <!-- Breakdown: Cash vs Non-Cash Sales -->
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="bg-green-50 rounded-lg p-3">
+                            <p class="text-xs text-green-600 font-medium">Penjualan Tunai</p>
+                            <p class="text-lg font-bold text-green-700">
+                                Rp {{ number_format($this->todayShift?->completedTransactions()->where('payment_method','cash')->sum('total') ?? 0, 0, ',', '.') }}
+                            </p>
+                        </div>
+                        <div class="bg-purple-50 rounded-lg p-3">
+                            <p class="text-xs text-purple-600 font-medium">Non-Tunai (QRIS/EDC)</p>
+                            <p class="text-lg font-bold text-purple-700">
+                                Rp {{ number_format($this->todayShift?->completedTransactions()->where('payment_method','!=','cash')->sum('total') ?? 0, 0, ',', '.') }}
+                            </p>
+                        </div>
                     </div>
 
                     <!-- Opening Cash -->
@@ -991,12 +1003,13 @@
                             inputmode="numeric"
                             x-model="formatted"
                             @input="onInput($event)"
+                            @focus="$event.target.select()"
                             @blur="syncToWire()"
                             class="w-full px-4 py-3 border border-gray-200 rounded-lg text-lg focus:ring-2 focus:ring-primary-500" 
                             placeholder="0"
                         >
                         <p class="text-xs text-yellow-600 mt-1 flex items-center gap-1">
-                            <i data-lucide="info" class="w-3 h-3"></i>
+                            <x-lucide name="info" class="w-3 h-3" />
                             Hitung hanya uang tunai (Kertas & Koin). Jangan masukkan Transfer/QRIS.
                         </p>
                     </div>
@@ -1006,7 +1019,7 @@
                         <div class="flex items-center justify-between mb-2">
                             <label class="block text-sm font-medium text-gray-700">Pengeluaran</label>
                             <button type="button" wire:click="addExpense" class="text-primary-600 text-sm font-medium flex items-center gap-1">
-                                <i data-lucide="plus" class="w-4 h-4"></i> Tambah
+                                <x-lucide name="plus" class="w-4 h-4" /> Tambah
                             </button>
                         </div>
                         @foreach($expenses as $index => $expense)
@@ -1018,35 +1031,69 @@
                                         inputmode="numeric" 
                                         x-model="formatted" 
                                         @input="onInput($event)" 
+                                        @focus="$event.target.select()"
                                         @blur="syncToWire()"
                                         class="w-full px-3 py-2 border border-gray-200 rounded-lg text-right" 
                                         placeholder="0"
                                     >
                                 </div>
                                 <button wire:click="removeExpense({{ $index }})" class="p-2 text-red-500 hover:bg-red-50 rounded-lg">
-                                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                    <x-lucide name="trash-2" class="w-4 h-4" />
                                 </button>
                             </div>
                         @endforeach
                     </div>
 
-                    <!-- Actual Cash -->
+                    <!-- Actual Cash (Physical in drawer) -->
                     <div x-data="moneyInput({{ $actualCash }}, 'actualCash')">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Uang Fisik di Laci</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                            Uang Fisik Tunai di Laci
+                        </label>
                         <input 
                             id="actualCashInput"
                             type="text" 
                             inputmode="numeric"
                             x-model="formatted"
                             @input="onInput($event)"
+                            @focus="$event.target.select()"
                             @blur="syncToWire()"
                             class="w-full px-4 py-3 border border-gray-200 rounded-lg text-lg focus:ring-2 focus:ring-primary-500" 
                             placeholder="0"
                         >
-                        <p class="text-xs text-yellow-600 mt-1 flex items-center gap-1">
-                            <i data-lucide="info" class="w-3 h-3"></i>
-                            Hitung TOTAL UANG (Fisik di Laci + Total Non-Tunai/QRIS). 
-                            <strong>GABUNGKAN SEMUANYA.</strong>
+                        <p class="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                            <x-lucide name="info" class="w-3 h-3 shrink-0" />
+                            Hitung HANYA uang kertas & koin di laci cash drawer.
+                        </p>
+                    </div>
+
+                    <!-- Actual Non-Cash (QRIS/Transfer verified from bank) -->
+                    <div x-data="moneyInput({{ $actualNonCash }}, 'actualNonCash')">
+                        <div class="flex items-center justify-between mb-1">
+                            <label class="block text-sm font-medium text-gray-700">
+                                Uang Non-Tunai (QRIS / Transfer / EDC)
+                            </label>
+                            @if($expectedNonCash > 0)
+                                <span class="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium">
+                                    Sistem: Rp {{ number_format($expectedNonCash, 0, ',', '.') }}
+                                </span>
+                            @else
+                                <span class="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">Tidak ada transaksi non-tunai</span>
+                            @endif
+                        </div>
+                        <input 
+                            id="actualNonCashInput"
+                            type="text" 
+                            inputmode="numeric"
+                            x-model="formatted"
+                            @input="onInput($event)"
+                            @focus="$event.target.select()"
+                            @blur="syncToWire()"
+                            class="w-full px-4 py-3 border border-gray-200 rounded-lg text-lg focus:ring-2 focus:ring-purple-500" 
+                            placeholder="0"
+                        >
+                        <p class="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                            <x-lucide name="info" class="w-3 h-3 shrink-0" />
+                            Cocokkan dengan mutasi rekening / dashboard QRIS. Nilai default diisi otomatis dari catatan sistem.
                         </p>
                     </div>
 
@@ -1056,21 +1103,22 @@
                         <textarea wire:model="closeNotes" rows="2" class="w-full px-4 py-2 border border-gray-200 rounded-lg" placeholder="Catatan opsional"></textarea>
                     </div>
                 </div>
-                <div class="p-6 border-t bg-gray-50 flex gap-3">
+                <div class="p-6 border-t bg-gray-50 flex gap-3 rounded-b-2xl">
                     <button wire:click="$set('showCloseShiftModal', false)" class="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl">Batal</button>
                     <button 
                         @click="
                             let op = document.getElementById('openingCashInput').value;
                             let ac = document.getElementById('actualCashInput').value;
-                            if(op.trim() === '' || ac.trim() === '') {
-                                $dispatch('notify', { type: 'error', message: 'Harap isi Modal Awal dan Uang Fisik (isi 0 jika kosong)' });
+                            let anc = document.getElementById('actualNonCashInput').value;
+                            if(op.trim() === '' || ac.trim() === '' || anc.trim() === '') {
+                                $dispatch('notify', { type: 'error', message: 'Harap isi semua kolom wajib (isi 0 jika tidak ada)' });
                             } else {
                                 showConfirmCloseShift = true;
                             }
                         "
                         class="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white font-medium rounded-xl flex items-center justify-center gap-2"
                     >
-                        <i data-lucide="printer" class="w-5 h-5"></i>
+                        <x-lucide name="printer" class="w-5 h-5" />
                         Tutup & Cetak
                     </button>
                 </div>
@@ -1084,11 +1132,11 @@
             <div class="bg-white rounded-2xl w-full max-w-2xl mx-4 shadow-2xl">
                 <div class="p-5 border-b flex justify-between items-center sticky top-0 bg-white rounded-t-2xl z-10">
                     <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
-                        <i data-lucide="history" class="w-5 h-5 text-gray-500"></i>
+                        <x-lucide name="history" class="w-5 h-5 text-gray-500" />
                         Riwayat Transaksi Hari Ini
                     </h3>
                     <button wire:click="closeHistoryModal" class="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100">
-                        <i data-lucide="x" class="w-6 h-6"></i>
+                        <x-lucide name="x" class="w-6 h-6" />
                     </button>
                 </div>
                 <div class="p-0 overflow-y-auto max-h-[60vh]">
@@ -1112,7 +1160,7 @@
                                         <td class="px-5 py-3 font-bold text-gray-800 whitespace-nowrap">Rp {{ number_format($trx->total, 0, ',', '.') }}</td>
                                         <td class="px-5 py-3 text-center">
                                             <button wire:click="reprintReceipt({{ $trx->id }})" class="p-2 text-gray-500 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors" title="Cetak Ulang">
-                                                <i data-lucide="printer" class="w-4 h-4"></i>
+                                                <x-lucide name="printer" class="w-4 h-4" />
                                             </button>
                                         </td>
                                     </tr>
@@ -1125,7 +1173,7 @@
                         </table>
                     </div>
                 </div>
-                <div class="p-4 border-t bg-gray-50 text-right">
+                <div class="p-4 border-t bg-gray-50 text-right rounded-b-2xl">
                     <button wire:click="closeHistoryModal" class="px-6 py-2 bg-gray-800 hover:bg-gray-900 text-white font-medium rounded-lg">
                         Tutup
                     </button>
@@ -1140,11 +1188,11 @@
             <div class="bg-white rounded-2xl w-full max-w-2xl mx-4 shadow-2xl">
                 <div class="p-6 border-b flex justify-between items-center sticky top-0 bg-white z-10 rounded-t-2xl">
                     <h3 class="text-xl font-bold text-gray-800 flex items-center gap-2">
-                        <i data-lucide="rotate-ccw" class="w-6 h-6 text-red-600"></i>
+                        <x-lucide name="rotate-ccw" class="w-6 h-6 text-red-600" />
                         Buat Retur
                     </h3>
                     <button wire:click="$set('showReturnModal', false)" class="text-gray-400 hover:text-gray-600">
-                        <i data-lucide="x" class="w-6 h-6"></i>
+                        <x-lucide name="x" class="w-6 h-6" />
                     </button>
                 </div>
                 <div class="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
@@ -1219,11 +1267,11 @@
                         </div>
                     @endif
                 </div>
-                <div class="p-6 border-t bg-gray-50 flex gap-3">
+                <div class="p-6 border-t bg-gray-50 flex gap-3 rounded-b-2xl">
                     <button wire:click="$set('showReturnModal', false)" class="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl">Batal</button>
                     @if($returnTransaction)
                         <button wire:click="processReturn" class="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white font-medium rounded-xl flex items-center justify-center gap-2">
-                            <i data-lucide="rotate-ccw" class="w-5 h-5"></i>
+                            <x-lucide name="rotate-ccw" class="w-5 h-5" />
                             Proses Retur
                         </button>
                     @endif
@@ -1238,11 +1286,11 @@
             <div class="bg-white rounded-2xl w-full max-w-2xl mx-4 shadow-2xl">
                  <div class="p-5 border-b flex justify-between items-center sticky top-0 bg-white rounded-t-2xl z-10">
                     <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
-                        <i data-lucide="history" class="w-5 h-5 text-gray-500"></i>
+                        <x-lucide name="history" class="w-5 h-5 text-gray-500" />
                         Riwayat Retur Hari Ini
                     </h3>
                     <button wire:click="closeReturnHistoryModal" class="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100">
-                        <i data-lucide="x" class="w-6 h-6"></i>
+                        <x-lucide name="x" class="w-6 h-6" />
                     </button>
                 </div>
                 <div class="p-0 overflow-y-auto max-h-[60vh]">
@@ -1266,7 +1314,7 @@
                                         <td class="px-5 py-3 font-bold text-red-600 whitespace-nowrap">Rp {{ number_format($retur->total_refund, 0, ',', '.') }}</td>
                                         <td class="px-5 py-3 text-center">
                                             <button wire:click="printReturnReceipt({{ $retur->id }})" class="p-2 text-gray-500 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors" title="Cetak Retur">
-                                                <i data-lucide="printer" class="w-4 h-4"></i>
+                                                <x-lucide name="printer" class="w-4 h-4" />
                                             </button>
                                         </td>
                                     </tr>
@@ -1279,7 +1327,7 @@
                         </table>
                     </div>
                 </div>
-                 <div class="p-4 border-t bg-gray-50 text-right">
+                 <div class="p-4 border-t bg-gray-50 text-right rounded-b-2xl">
                     <button wire:click="closeReturnHistoryModal" class="px-6 py-2 bg-gray-800 hover:bg-gray-900 text-white font-medium rounded-lg">
                         Tutup
                     </button>
@@ -1294,11 +1342,11 @@
             <div class="bg-white rounded-2xl w-full max-w-md shadow-2xl max-h-[90vh] flex flex-col">
                 <div class="p-4 border-b flex justify-between items-center flex-none">
                     <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
-                        <i data-lucide="receipt" class="w-5 h-5"></i>
+                        <x-lucide name="receipt" class="w-5 h-5" />
                         Struk Transaksi
                     </h3>
                     <button wire:click="closeReceiptModal" class="text-gray-400 hover:text-gray-600 p-1" type="button">
-                        <i data-lucide="x" class="w-6 h-6"></i>
+                        <x-lucide name="x" class="w-6 h-6" />
                     </button>
                 </div>
 
@@ -1310,10 +1358,11 @@
                 <div class="p-4 border-t flex gap-3 flex-none">
                     <button 
                         wire:click="printReceipt"
+                        @click="console.log('Direct click print trigger'); window.print();"
                         class="flex-1 py-3 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-xl flex items-center justify-center gap-2"
                         type="button"
                     >
-                        <i data-lucide="printer" class="w-5 h-5"></i>
+                        <x-lucide name="printer" class="w-5 h-5" />
                         Cetak Ulang
                     </button>
                     <button 
@@ -1323,8 +1372,7 @@
                     >
                         Tutup
                     </button>
-
-</div>
+            </div>
             </div>
         </div>
     @endif
@@ -1348,7 +1396,11 @@
             class="bg-white/90 backdrop-blur-md rounded-2xl shadow-2xl p-8 max-w-sm w-full mx-4 border border-white/50 text-center"
         >
             <div class="w-16 h-16 mx-auto rounded-full flex items-center justify-center mb-4 {{ ($pendingFoodCount > 0 || $pendingDrinkCount > 0) ? 'bg-red-100' : 'bg-red-100' }}">
-                <i data-lucide="{{ ($pendingFoodCount > 0 || $pendingDrinkCount > 0) ? 'alert-triangle' : 'power' }}" class="w-8 h-8 text-red-600"></i>
+                @if($pendingFoodCount > 0 || $pendingDrinkCount > 0)
+                    <x-lucide name="alert-triangle" class="w-8 h-8 text-red-600" />
+                @else
+                    <x-lucide name="power" class="w-8 h-8 text-red-600" />
+                @endif
             </div>
             
             <h3 class="text-xl font-bold text-gray-800 mb-2">Konfirmasi Tutup Shift</h3>
@@ -1383,7 +1435,7 @@
                     @click="showConfirmCloseShift = false"
                     class="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white font-medium rounded-xl shadow-lg shadow-red-600/30 transition-colors flex items-center justify-center gap-2"
                 >
-                    <i data-lucide="printer" class="w-4 h-4"></i>
+                    <x-lucide name="printer" class="w-4 h-4" />
                     Ya, Tutup
                 </button>
             </div>
@@ -1393,11 +1445,13 @@
 
 @script
 <script>
-    // Initialize Lucide icons
-    lucide.createIcons();
-    
-    // Broadcast Channel for Customer Display (Instant Update)
-    const posChannel = new BroadcastChannel('pos_channel');
+    // Broadcast Channel for Customer Display (Instant Update, isolated by cashier user ID)
+    const posChannel = new BroadcastChannel('pos_channel_' + {{ auth()->id() }});
+
+    // Send heartbeat every 3 seconds to indicate cashier presence
+    setInterval(() => {
+        posChannel.postMessage({ type: 'heartbeat', timestamp: Date.now() });
+    }, 3000);
 
     Livewire.hook('commit', ({ component, succeed }) => {
         succeed(() => {
@@ -1405,23 +1459,7 @@
         });
     });
 
-    Livewire.hook('morph.updated', () => {
-        setTimeout(() => lucide.createIcons(), 50);
-    });
 
-    // Print receipt event
-    $wire.on('print-receipt', () => {
-        setTimeout(() => {
-            window.print();
-        }, 300);
-    });
-
-    // Print shift receipt (Legacy, kept just in case)
-    $wire.on('print-shift-receipt', () => {
-        setTimeout(() => {
-            window.print();
-        }, 300);
-    });
 
     // Open new window (For Shift Detail & Returns)
     $wire.on('open-new-window', (data) => {

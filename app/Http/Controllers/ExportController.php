@@ -457,7 +457,26 @@ class ExportController extends Controller
             fprintf($handle, chr(0xEF).chr(0xBB).chr(0xBF)); // BOM
             
             fputcsv($handle, [
-                'Kasir', 'Tanggal', 'Mulai', 'Selesai', 'Modal Awal', 'Penjualan', 'Pengeluaran', 'Selisih', 'Status', 'Catatan'
+                'Kasir',
+                'Tanggal',
+                'Mulai',
+                'Selesai',
+                'Modal Awal',
+                'Total Penjualan',
+                'Penjualan Tunai',
+                'Penjualan Non-Tunai',
+                'Pengeluaran',
+                // Cash reconciliation
+                'Ekspektasi Tunai (Sistem)',
+                'Fisik di Laci (Kasir)',
+                'Selisih Tunai',
+                // Non-cash reconciliation
+                'Non-Tunai Sistem',
+                'Non-Tunai Terverifikasi (Kasir)',
+                'Selisih Non-Tunai',
+                // General
+                'Status',
+                'Catatan',
             ], ';');
 
             Shift::query()
@@ -467,8 +486,11 @@ class ExportController extends Controller
                 ->latest('started_at')
                 ->cursor()
                 ->each(function ($shift) use ($handle) {
-                    $sales = $shift->transactions->where('status', 'completed')->sum('total');
-                    $expenses = $shift->expenses->sum('amount');
+                    $completedTrx   = $shift->transactions->where('status', 'completed');
+                    $totalSales     = $completedTrx->sum('total');
+                    $cashSales      = $completedTrx->where('payment_method', 'cash')->sum('total');
+                    $nonCashSales   = $completedTrx->where('payment_method', '!=', 'cash')->sum('total');
+                    $expenses       = $shift->expenses->sum('amount');
                     
                     fputcsv($handle, [
                         $shift->user->name,
@@ -476,11 +498,21 @@ class ExportController extends Controller
                         $shift->started_at->format('H:i'),
                         $shift->ended_at ? $shift->ended_at->format('H:i') : '-',
                         $shift->opening_cash,
-                        $sales,
+                        $totalSales,
+                        $cashSales,
+                        $nonCashSales,
                         $expenses,
+                        // Cash
+                        $shift->expected_cash,
+                        $shift->actual_cash,
                         $shift->cash_difference,
-                        $shift->status,
-                        $shift->close_notes
+                        // Non-Cash
+                        $shift->expected_non_cash ?? $nonCashSales,
+                        $shift->actual_non_cash,
+                        $shift->non_cash_difference,
+                        // General
+                        $shift->status === 'closed' ? 'Ditutup' : 'Aktif',
+                        $shift->close_notes,
                     ], ';');
 
                     if (ob_get_level() > 0) ob_flush();
@@ -491,3 +523,4 @@ class ExportController extends Controller
         }, $filename);
     }
 }
+

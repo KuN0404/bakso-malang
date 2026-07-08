@@ -97,6 +97,10 @@ class PosCheckout extends Component
     // Close shift form
     public float $openingCash = 0;
     public float $actualCash = 0;
+    /** Non-cash verified by cashier from bank/QRIS statement */
+    public float $actualNonCash = 0;
+    /** Non-cash expected, auto-populated from system records */
+    public float $expectedNonCash = 0;
     public string $closeNotes = '';
     public array $expenses = [];
     
@@ -340,6 +344,17 @@ class PosCheckout extends Component
     public function mount(): void
     {
         $this->paymentSourceId = PaymentSource::active()->where('type', 'cash')->first()?->id;
+
+        // Load cart from cache if it exists
+        $cachedCart = \Illuminate\Support\Facades\Cache::get('pos_active_cart_' . auth()->id());
+        if ($cachedCart) {
+            $this->cart = $cachedCart['cart'] ?? [];
+            $this->paidAmount = $cachedCart['paid_amount'] ?? 0;
+            $this->customerName = $cachedCart['customer_name'] ?? '';
+            $this->notes = $cachedCart['notes'] ?? '';
+            $this->orderType = $cachedCart['order_type'] ?? 'dine_in';
+            $this->selectedServiceAreaId = $cachedCart['selected_service_area_id'] ?? null;
+        }
     }
 
     #[Computed]
@@ -353,7 +368,7 @@ class PosCheckout extends Component
     #[Computed]
     public function products()
     {
-        $query = Product::with(['category', 'modifierGroups.modifiers'])
+        $query = Product::with(['category', 'modifierGroups.activeModifiers'])
             ->where('is_active', true);
 
         if ($this->selectedCategoryId) {
@@ -476,7 +491,7 @@ class PosCheckout extends Component
 
     public function addToCart(int $productId, array $modifiers = []): void
     {
-        $product = Product::with('modifierGroups.modifiers')->find($productId);
+        $product = Product::with('modifierGroups.activeModifiers')->find($productId);
         
         if (!$product) {
             $this->dispatch('notify', type: 'error', message: 'Produk tidak ditemukan');
@@ -741,18 +756,12 @@ class PosCheckout extends Component
                 ]);
             });
 
-            // Clear cart and close payment modal
             $this->clearCart();
             $this->showPaymentModal = false;
             $this->showReceiptModal = true;
-
-            // Dispatch event for auto-print
-            $printerConfig = $this->printerConfig;
-            if ($printerConfig?->auto_print) {
-                $this->dispatch('print-receipt');
-                // Increment print count for auto-print
-                $this->lastTransaction?->increment('print_count');
-            }
+            // Dispatch event for print
+            $this->dispatch('print-receipt');
+            $this->lastTransaction?->increment('print_count');
 
             $this->dispatch('notify', type: 'success', message: 'Transaksi berhasil!');
 
@@ -797,6 +806,9 @@ class PosCheckout extends Component
 
         $this->openingCash = 0;
         $this->actualCash = 0;
+        // Auto-populate non-cash from system records (cashier just verifies / adjusts)
+        $this->expectedNonCash = (float) $shift->calculateExpectedNonCash();
+        $this->actualNonCash   = $this->expectedNonCash;
         $this->closeNotes = '';
         $this->expenses = [];
         $this->showCloseShiftModal = true;
@@ -826,53 +838,41 @@ class PosCheckout extends Component
             return;
         }
         if (!is_numeric($this->actualCash) || $this->actualCash < 0) {
-            $this->dispatch('notify', type: 'error', message: 'Uang Fisik (Total Dana) harus diisi dengan valid (minimal 0)');
+            $this->dispatch('notify', type: 'error', message: 'Uang Fisik Tunai harus diisi dengan valid (minimal 0)');
+            return;
+        }
+        if (!is_numeric($this->actualNonCash) || $this->actualNonCash < 0) {
+            $this->dispatch('notify', type: 'error', message: 'Uang Non-Tunai harus diisi dengan valid (minimal 0)');
             return;
         }
 
         DB::transaction(function () use ($shift) {
             // Update opening cash
-            $shift->opening_cash = (string) $this->openingCash;
+            $shift->opening_cash = (float) $this->openingCash;
+            $shift->save();
 
-            // Add expenses
+            // Add expenses (operational — always deducted from cash side)
             foreach ($this->expenses as $expense) {
                 if (!empty($expense['description']) && $expense['amount'] > 0) {
                     $shift->expenses()->create([
                         'description' => $expense['description'],
-                        'amount' => $expense['amount'],
-                        'category' => 'operational',
+                        'amount'      => $expense['amount'],
+                        'category'    => 'operational',
                     ]);
                 }
             }
-            
-            // Re-calculate TOTAL expenses (Manual Operational + Automated Refunds)
-            // We need to fetch from DB because refunds are already saved there
-            $totalExpenses = $shift->expenses()->sum('amount');
 
-            // Calculate expected cash
-            // Calculate expected cash (NOW INCLUDES NON-CASH as handled by user input)
-            // As per new requirement: User inputs TOTAL FUNDS (Cash + Non-Cash)
-            // So Expected = Opening + ALL SALES - Expenses
-            $totalSales = $shift->transactions()
-                ->where('status', 'completed')
-                ->sum('total');
-
-            $expectedCash = $this->openingCash + $totalSales - $totalExpenses;
-
-            // Close shift
-            $shift->update([
-                'ended_at' => now(),
-                'actual_cash' => $this->actualCash,
-                'expected_cash' => $expectedCash,
-                'cash_difference' => $this->actualCash - $expectedCash,
-                'close_notes' => $this->closeNotes,
-                'status' => 'closed',
-            ]);
+            // Close shift with separated cash/non-cash values
+            $shift->close(
+                actualCash:    (float) $this->actualCash,
+                actualNonCash: (float) $this->actualNonCash,
+                notes:         $this->closeNotes ?: null
+            );
         });
 
         $this->showCloseShiftModal = false;
         $this->dispatch('notify', type: 'success', message: 'Shift berhasil ditutup');
-        $this->dispatch('open-new-window', url: route('print.shift.detail', $shift->id)); // Send URL directly
+        $this->dispatch('open-new-window', url: route('print.shift.detail', $shift->id));
     }
 
     public function openClosePreviousShiftModal(): void
@@ -883,10 +883,12 @@ class PosCheckout extends Component
         }
         
         $this->unclosedShiftId = $shift->id;
-        $this->openingCash = 0;
-        $this->actualCash = 0;
-        $this->closeNotes = '';
-        $this->expenses = [];
+        $this->openingCash     = 0;
+        $this->actualCash      = 0;
+        $this->expectedNonCash = (float) $shift->calculateExpectedNonCash();
+        $this->actualNonCash   = $this->expectedNonCash;
+        $this->closeNotes      = '';
+        $this->expenses        = [];
         $this->showUnclosedShiftModal = true;
     }
 
@@ -898,56 +900,46 @@ class PosCheckout extends Component
             return;
         }
 
-        // VALIDATION: Ensure inputs are valid
+        // VALIDATION
         if (!is_numeric($this->openingCash) || $this->openingCash < 0) {
             $this->dispatch('notify', type: 'error', message: 'Modal Awal harus diisi dengan valid (minimal 0)');
             return;
         }
         if (!is_numeric($this->actualCash) || $this->actualCash < 0) {
-            $this->dispatch('notify', type: 'error', message: 'Uang Fisik (Total Dana) harus diisi dengan valid (minimal 0)');
+            $this->dispatch('notify', type: 'error', message: 'Uang Fisik Tunai harus diisi dengan valid (minimal 0)');
+            return;
+        }
+        if (!is_numeric($this->actualNonCash) || $this->actualNonCash < 0) {
+            $this->dispatch('notify', type: 'error', message: 'Uang Non-Tunai harus diisi dengan valid (minimal 0)');
             return;
         }
 
         DB::transaction(function () use ($shift) {
             // Update opening cash
-            $shift->opening_cash = (string) $this->openingCash;
+            $shift->opening_cash = (float) $this->openingCash;
+            $shift->save();
 
             // Add expenses
             foreach ($this->expenses as $expense) {
                 if (!empty($expense['description']) && $expense['amount'] > 0) {
                     $shift->expenses()->create([
                         'description' => $expense['description'],
-                        'amount' => $expense['amount'],
-                        'category' => 'operational',
+                        'amount'      => $expense['amount'],
+                        'category'    => 'operational',
                     ]);
                 }
             }
-            
-            // Re-calculate TOTAL expenses (to include Refunds)
-            $totalExpenses = $shift->expenses()->sum('amount');
 
-            // Calculate expected cash (NOW INCLUDES NON-CASH as handled by user input)
-            // As per new requirement: User inputs TOTAL FUNDS (Cash + Non-Cash)
-            // So Expected = Opening + ALL SALES - Expenses
-            $totalSales = $shift->transactions()
-                ->where('status', 'completed')
-                ->sum('total');
-
-            $expectedCash = $this->openingCash + $totalSales - $totalExpenses;
-
-            // Close shift with late closure flag
-            $shift->update([
-                'ended_at' => now(),
-                'actual_cash' => $this->actualCash,
-                'expected_cash' => $expectedCash,
-                'cash_difference' => $this->actualCash - $expectedCash,
-                'close_notes' => $this->closeNotes . ' [DITUTUP TERLAMBAT]',
-                'status' => 'closed',
-            ]);
+            // Close shift with separated cash/non-cash — mark as late closure
+            $notes = trim(($this->closeNotes ?? '') . ' [DITUTUP TERLAMBAT]');
+            $shift->close(
+                actualCash:    (float) $this->actualCash,
+                actualNonCash: (float) $this->actualNonCash,
+                notes:         $notes
+            );
         });
 
         $this->showUnclosedShiftModal = false;
-        $this->unclosedShiftId = null;
         $this->unclosedShiftId = null;
         $this->dispatch('notify', type: 'success', message: 'Shift sebelumnya berhasil ditutup. Anda bisa mulai transaksi.');
         $this->dispatch('open-new-window', url: route('print.shift.detail', $shift->id));
@@ -995,11 +987,15 @@ class PosCheckout extends Component
             'paid_amount' => $this->paidAmount,
             'change_amount' => $this->changeAmount,
             'customer_name' => $this->customerName,
+            'notes' => $this->notes,
+            'order_type' => $this->orderType,
+            'selected_service_area_id' => $this->selectedServiceAreaId,
             'cashier_name' => auth()->user()->name,
             'updated_at' => now()->timestamp,
         ];
 
         \Illuminate\Support\Facades\Cache::put('pos_active_cart_' . auth()->id(), $data, now()->addHours(12));
+        $this->dispatch('cart-updated', data: $data);
     }
 
     public function render()

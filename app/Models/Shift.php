@@ -16,17 +16,24 @@ class Shift extends Model
         'expected_cash',
         'actual_cash',
         'cash_difference',
+        'expected_non_cash',
+        'actual_non_cash',
+        'non_cash_difference',
         'status',
         'notes',
+        'close_notes',
     ];
 
     protected $casts = [
-        'started_at' => 'datetime',
-        'ended_at' => 'datetime',
-        'opening_cash' => 'decimal:2',
-        'expected_cash' => 'decimal:2',
-        'actual_cash' => 'decimal:2',
-        'cash_difference' => 'decimal:2',
+        'started_at'          => 'datetime',
+        'ended_at'            => 'datetime',
+        'opening_cash'        => 'decimal:2',
+        'expected_cash'       => 'decimal:2',
+        'actual_cash'         => 'decimal:2',
+        'cash_difference'     => 'decimal:2',
+        'expected_non_cash'   => 'decimal:2',
+        'actual_non_cash'     => 'decimal:2',
+        'non_cash_difference' => 'decimal:2',
     ];
 
     public function user(): BelongsTo
@@ -69,6 +76,10 @@ class Shift extends Model
         return $this->status === 'closed';
     }
 
+    /**
+     * Expected cash in the drawer:
+     * Opening Cash + All CASH Sales - Expenses (operational/refunds)
+     */
     public function calculateExpectedCash(): float
     {
         $cashSales = $this->completedTransactions()
@@ -77,23 +88,48 @@ class Shift extends Model
 
         $totalExpenses = $this->expenses()->sum('amount');
 
-        return $this->opening_cash + $cashSales - $totalExpenses;
+        return (float) $this->opening_cash + $cashSales - $totalExpenses;
     }
 
-    public function close(float $actualCash, ?string $notes = null): bool
+    /**
+     * Expected non-cash total from system records (QRIS/Transfer/EDC).
+     * Does NOT include expenses as those are cash-based.
+     */
+    public function calculateExpectedNonCash(): float
     {
-        $expectedCash = $this->calculateExpectedCash();
-        $difference = $actualCash - $expectedCash;
+        return (float) $this->completedTransactions()
+            ->where('payment_method', '!=', 'cash')
+            ->sum('total');
+    }
+
+    /**
+     * Close the shift with separate cash and non-cash verification.
+     *
+     * @param  float       $actualCash    Physical cash in drawer counted by cashier
+     * @param  float       $actualNonCash Non-cash (QRIS/Transfer) verified from bank statement
+     * @param  string|null $notes
+     */
+    public function close(float $actualCash, float $actualNonCash, ?string $notes = null): bool
+    {
+        $expectedCash    = $this->calculateExpectedCash();
+        $expectedNonCash = $this->calculateExpectedNonCash();
 
         return $this->update([
-            'ended_at' => now(),
-            'expected_cash' => $expectedCash,
-            'actual_cash' => $actualCash,
-            'cash_difference' => $difference,
-            'status' => 'closed',
-            'notes' => $notes,
+            'ended_at'            => now(),
+            'expected_cash'       => $expectedCash,
+            'actual_cash'         => $actualCash,
+            'cash_difference'     => $actualCash - $expectedCash,
+            'expected_non_cash'   => $expectedNonCash,
+            'actual_non_cash'     => $actualNonCash,
+            'non_cash_difference' => $actualNonCash - $expectedNonCash,
+            'status'              => 'closed',
+            'close_notes'         => $notes,
         ]);
     }
+
+    // -----------------------------------------------------------------
+    // Accessors
+    // -----------------------------------------------------------------
 
     public function getTotalSalesAttribute(): float
     {
