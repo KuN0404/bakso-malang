@@ -90,7 +90,7 @@
     @keydown.f2.window.prevent="$wire.processPayment()"
     @keydown.f3.window.prevent="if(confirm('Hapus semua item?')) $wire.clearCart()"
     @keydown.f4.window.prevent="$wire.openCloseShiftModal()"
-    @keydown.escape.window="$wire.closePaymentModal(); $wire.closeReceiptModal(); $wire.set('showCloseShiftModal', false); showModifierModal = false">
+    @keydown.escape.window="$wire.closePaymentModal(); $wire.closeReceiptModal(); $wire.set('showCloseShiftModal', false); $wire.set('showShiftReceiptModal', false); showModifierModal = false">
     
     <!-- Unclosed Previous Shift Blocking Modal -->
     @if($this->unclosedPreviousShift && !$showUnclosedShiftModal)
@@ -165,13 +165,22 @@
                     <p class="text-sm text-red-500 mt-1">Shift ini akan ditandai sebagai "Ditutup Terlambat"</p>
                 </div>
                 <div class="p-6 space-y-4 overflow-y-auto flex-1 custom-scroll">
-                    <!-- Summary -->
+                    <!-- Summary Breakdown: Cash vs Non-Cash -->
                     @php $unclosedShift = \App\Models\Shift::with('transactions')->find($unclosedShiftId); @endphp
                     @if($unclosedShift)
-                        <div class="bg-blue-50 rounded-lg p-4">
-                            <p class="text-sm text-blue-600">Penjualan Shift Ini</p>
-                            <p class="text-2xl font-bold text-blue-700">Rp {{ number_format($unclosedShift->transactions->sum('total'), 0, ',', '.') }}</p>
-                            <p class="text-sm text-blue-600 mt-1">{{ $unclosedShift->transactions->count() }} transaksi</p>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div class="bg-green-50 rounded-lg p-3">
+                                <p class="text-xs text-green-600 font-medium">Penjualan Tunai</p>
+                                <p class="text-lg font-bold text-green-700">
+                                    Rp {{ number_format($unclosedShift->completedTransactions()->where('payment_method','cash')->sum('total') ?? 0, 0, ',', '.') }}
+                                </p>
+                            </div>
+                            <div class="bg-purple-50 rounded-lg p-3">
+                                <p class="text-xs text-purple-600 font-medium">Non-Tunai (QRIS/EDC)</p>
+                                <p class="text-lg font-bold text-purple-700">
+                                    Rp {{ number_format($unclosedShift->completedTransactions()->where('payment_method','!=','cash')->sum('total') ?? 0, 0, ',', '.') }}
+                                </p>
+                            </div>
                         </div>
                     @endif
 
@@ -179,18 +188,16 @@
                     <div x-data="moneyInput({{ $openingCash }}, 'openingCash')">
                         <label class="block text-sm font-medium text-gray-700 mb-1">Modal Awal (Cash)</label>
                         <input 
+                            id="openingCashInputPrev"
                             type="text" 
                             inputmode="numeric"
                             x-model="formatted"
                             @input="onInput($event)"
+                            @focus="$event.target.select()"
                             @blur="syncToWire()"
                             class="w-full px-4 py-3 border border-gray-200 rounded-lg text-lg focus:ring-2 focus:ring-primary-500" 
                             placeholder="0"
                         >
-                        <!-- <p class="text-xs text-yellow-600 mt-1 flex items-center gap-1">
-                            <x-lucide name="info" class="w-3 h-3" />
-                            Hitung hanya uang tunai. Jangan masukkan Transfer/QRIS.
-                        </p> -->
                     </div>
 
                     <!-- Expenses -->
@@ -210,6 +217,7 @@
                                         inputmode="numeric" 
                                         x-model="formatted" 
                                         @input="onInput($event)" 
+                                        @focus="$event.target.select()"
                                         @blur="syncToWire()"
                                         class="w-full px-3 py-2 border border-gray-200 rounded-lg text-right" 
                                         placeholder="0"
@@ -222,23 +230,57 @@
                         @endforeach
                     </div>
 
-                    <!-- Actual Cash -->
+                    <!-- Actual Cash (Physical in drawer) -->
                     <div x-data="moneyInput({{ $actualCash }}, 'actualCash')">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Uang Fisik di Laci</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                            Uang Fisik Tunai di Laci
+                        </label>
                         <input 
+                            id="actualCashInputPrev"
                             type="text" 
                             inputmode="numeric"
                             x-model="formatted"
                             @input="onInput($event)"
+                            @focus="$event.target.select()"
                             @blur="syncToWire()"
                             class="w-full px-4 py-3 border border-gray-200 rounded-lg text-lg focus:ring-2 focus:ring-primary-500" 
                             placeholder="0"
                         >
-                        <!-- <p class="text-xs text-yellow-600 mt-1 flex items-center gap-1">
-                            <x-lucide name="info" class="w-3 h-3" />
-                            Hitung TOTAL UANG (Fisik di Laci + Total Non-Tunai/QRIS). 
-                            <strong>GABUNGKAN SEMUANYA.</strong>
-                        </p> -->
+                        <p class="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                            <x-lucide name="info" class="w-3 h-3 shrink-0" />
+                            Hitung HANYA uang kertas & koin di laci cash drawer.
+                        </p>
+                    </div>
+
+                    <!-- Actual Non-Cash (QRIS/Transfer verified from bank) -->
+                    <div x-data="moneyInput({{ $actualNonCash }}, 'actualNonCash')">
+                        <div class="flex items-center justify-between mb-1">
+                            <label class="block text-sm font-medium text-gray-700">
+                                Uang Non-Tunai (QRIS / Transfer / EDC)
+                            </label>
+                            @if($expectedNonCash > 0)
+                                <span class="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium">
+                                    Sistem: Rp {{ number_format($expectedNonCash, 0, ',', '.') }}
+                                </span>
+                            @else
+                                <span class="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">Tidak ada transaksi non-tunai</span>
+                            @endif
+                        </div>
+                        <input 
+                            id="actualNonCashInputPrev"
+                            type="text" 
+                            inputmode="numeric"
+                            x-model="formatted"
+                            @input="onInput($event)"
+                            @focus="$event.target.select()"
+                            @blur="syncToWire()"
+                            class="w-full px-4 py-3 border border-gray-200 rounded-lg text-lg focus:ring-2 focus:ring-purple-500" 
+                            placeholder="0"
+                        >
+                        <p class="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                            <x-lucide name="info" class="w-3 h-3 shrink-0" />
+                            Cocokkan dengan mutasi rekening / dashboard QRIS. Nilai default diisi otomatis dari catatan sistem.
+                        </p>
                     </div>
 
                     <!-- Notes -->
@@ -249,7 +291,26 @@
                 </div>
                 <div class="p-6 border-t bg-gray-50 flex gap-3 flex-none rounded-b-2xl">
                     <button wire:click="$set('showUnclosedShiftModal', false)" class="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl">Kembali</button>
-                    <button wire:click="closePreviousShift" class="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white font-medium rounded-xl flex items-center justify-center gap-2">
+                    <button 
+                        @click="
+                            let opEl = document.getElementById('openingCashInputPrev');
+                            let acEl = document.getElementById('actualCashInputPrev');
+                            let ancEl = document.getElementById('actualNonCashInputPrev');
+                            if (!opEl || !acEl || !ancEl) {
+                                $wire.closePreviousShift();
+                            } else {
+                                let op = opEl.value;
+                                let ac = acEl.value;
+                                let anc = ancEl.value;
+                                if(op.trim() === '' || ac.trim() === '' || anc.trim() === '') {
+                                    $dispatch('notify', { type: 'error', message: 'Harap isi semua kolom wajib (isi 0 jika tidak ada)' });
+                                } else {
+                                    $wire.closePreviousShift();
+                                }
+                            }
+                        "
+                        class="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white font-medium rounded-xl flex items-center justify-center gap-2"
+                    >
                         <x-lucide name="check" class="w-5 h-5" />
                         Tutup Shift
                     </button>
@@ -941,6 +1002,17 @@
                             class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500"
                         >
                     </div>
+
+                    <!-- Notes -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Catatan Pesanan (opsional)</label>
+                        <textarea 
+                            wire:model="notes"
+                            placeholder="Masukkan catatan (misal: Bakso A tidak pakai sayur, dll)..."
+                            rows="2"
+                            class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500"
+                        ></textarea>
+                    </div>
                 </div>
 
                 <div class="p-6 border-t bg-gray-50 rounded-b-2xl flex-none">
@@ -1107,13 +1179,20 @@
                     <button wire:click="$set('showCloseShiftModal', false)" class="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl">Batal</button>
                     <button 
                         @click="
-                            let op = document.getElementById('openingCashInput').value;
-                            let ac = document.getElementById('actualCashInput').value;
-                            let anc = document.getElementById('actualNonCashInput').value;
-                            if(op.trim() === '' || ac.trim() === '' || anc.trim() === '') {
-                                $dispatch('notify', { type: 'error', message: 'Harap isi semua kolom wajib (isi 0 jika tidak ada)' });
-                            } else {
+                            let opEl = document.getElementById('openingCashInput');
+                            let acEl = document.getElementById('actualCashInput');
+                            let ancEl = document.getElementById('actualNonCashInput');
+                            if (!opEl || !acEl || !ancEl) {
                                 showConfirmCloseShift = true;
+                            } else {
+                                let op = opEl.value;
+                                let ac = acEl.value;
+                                let anc = ancEl.value;
+                                if(op.trim() === '' || ac.trim() === '' || anc.trim() === '') {
+                                    $dispatch('notify', { type: 'error', message: 'Harap isi semua kolom wajib (isi 0 jika tidak ada)' });
+                                } else {
+                                    showConfirmCloseShift = true;
+                                }
                             }
                         "
                         class="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white font-medium rounded-xl flex items-center justify-center gap-2"
@@ -1377,6 +1456,46 @@
         </div>
     @endif
 
+    <!-- Shift Receipt Modal -->
+    @if($showShiftReceiptModal && $printShift)
+        <div class="fixed inset-0 bg-black/50 flex items-center justify-center p-4" style="z-index: 9999;">
+            <div class="bg-white rounded-2xl w-full max-w-md shadow-2xl max-h-[90vh] flex flex-col">
+                <div class="p-4 border-b flex justify-between items-center flex-none">
+                    <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+                        <x-lucide name="receipt" class="w-5 h-5" />
+                        Struk Laporan Shift
+                    </h3>
+                    <button wire:click="$set('showShiftReceiptModal', false)" class="text-gray-400 hover:text-gray-600 p-1" type="button">
+                        <x-lucide name="x" class="w-6 h-6" />
+                    </button>
+                </div>
+
+                <!-- Receipt Content -->
+                <div id="receipt-container" class="p-4 overflow-y-auto flex-1 custom-scroll">
+                    @include('livewire.partials.shift-receipt', ['shift' => $printShift])
+                </div>
+
+                <div class="p-4 border-t flex gap-3 flex-none">
+                    <button 
+                        @click="window.print()"
+                        class="flex-1 py-3 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-xl flex items-center justify-center gap-2"
+                        type="button"
+                    >
+                        <x-lucide name="printer" class="w-5 h-5" />
+                        Cetak Ulang
+                    </button>
+                    <button 
+                        wire:click="$set('showShiftReceiptModal', false)"
+                        class="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl"
+                        type="button"
+                    >
+                        Tutup
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
+
 
     <!-- Custom Close Shift Confirmation Modal (Logout Style) -->
     <div 
@@ -1431,8 +1550,7 @@
                 </button>
                 
                 <button 
-                    wire:click="closeShift"
-                    @click="showConfirmCloseShift = false"
+                    @click="$wire.closeShift().then(() => { showConfirmCloseShift = false; })"
                     class="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white font-medium rounded-xl shadow-lg shadow-red-600/30 transition-colors flex items-center justify-center gap-2"
                 >
                     <x-lucide name="printer" class="w-4 h-4" />
@@ -1448,10 +1566,7 @@
     // Broadcast Channel for Customer Display (Instant Update, isolated by cashier user ID)
     const posChannel = new BroadcastChannel('pos_channel_' + {{ auth()->id() }});
 
-    // Send heartbeat every 3 seconds to indicate cashier presence
-    setInterval(() => {
-        posChannel.postMessage({ type: 'heartbeat', timestamp: Date.now() });
-    }, 3000);
+
 
     Livewire.hook('commit', ({ component, succeed }) => {
         succeed(() => {
@@ -1462,11 +1577,44 @@
 
 
     // Open new window (For Shift Detail & Returns)
-    $wire.on('open-new-window', (data) => {
-        const url = data.url;
+    const handleOpenNewWindow = (url) => {
         if (url) {
-             window.open(url, '_blank');
+            console.log('Opening print window for URL:', url);
+            if (url.includes('/print/')) {
+                let iframe = document.getElementById('print-iframe');
+                if (!iframe) {
+                    iframe = document.createElement('iframe');
+                    iframe.id = 'print-iframe';
+                    iframe.style.position = 'fixed';
+                    iframe.style.right = '0';
+                    iframe.style.bottom = '0';
+                    iframe.style.width = '0';
+                    iframe.style.height = '0';
+                    iframe.style.border = '0';
+                    document.body.appendChild(iframe);
+                }
+                iframe.src = url;
+            } else {
+                window.open(url, '_blank');
+            }
         }
+    };
+
+    // Support standard browser window event (Livewire 3 default dispatch behavior)
+    window.addEventListener('open-new-window', (event) => {
+        const url = event.detail?.url || (Array.isArray(event.detail) ? event.detail[0]?.url : null);
+        handleOpenNewWindow(url);
+    });
+
+    // Support Livewire 3 $wire.on custom event listener fallback
+    $wire.on('open-new-window', (data) => {
+        let url = null;
+        if (typeof data === 'string') {
+            url = data;
+        } else if (data && typeof data === 'object') {
+            url = data.url || (Array.isArray(data) ? data[0]?.url : null);
+        }
+        handleOpenNewWindow(url);
     });
 </script>
 @endscript

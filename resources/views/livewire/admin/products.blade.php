@@ -127,7 +127,7 @@
                         <td class="px-6 py-4 text-right">
                             <div class="flex items-center justify-end gap-1">
                                 {{-- View Detail --}}
-                                <a href="{{ route('admin.products.show', $product) }}" class="p-2 text-gray-400 hover:text-blue-600 rounded-lg hover:bg-gray-100" title="Lihat Detail">
+                                <a href="{{ route('admin.products.show', $product) }}" wire:navigate class="p-2 text-gray-400 hover:text-blue-600 rounded-lg hover:bg-gray-100" title="Lihat Detail">
                                     <i data-lucide="eye" class="w-4 h-4"></i>
                                 </a>
                                 
@@ -517,6 +517,5 @@
 @script
 <script>
     lucide.createIcons();
-    Livewire.hook('morph.updated', () => lucide.createIcons());
 </script>
 @endscript

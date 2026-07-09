@@ -8,8 +8,6 @@
          changeAmount: @js($changeAmount),
          customerName: @js($customerName),
          cashierName: @js($cashierName),
-         lastHeartbeat: Date.now(),
-         isCashierActive: true,
          formatNumber(num) {
              return new Intl.NumberFormat('id-ID').format(num || 0);
          },
@@ -24,21 +22,7 @@
              this.cashierName = '';
          }
      }"
-     x-init="
-         // Check cashier heartbeat presence every 3 seconds
-         setInterval(() => {
-             if (Date.now() - lastHeartbeat > 7500) { // 7.5 seconds timeout
-                 if (isCashierActive) {
-                     console.log('Cashier became inactive, clearing screen');
-                     isCashierActive = false;
-                     clearDisplay();
-                 }
-             }
-         }, 3000);
-     "
      @cart-data-broadcast.window="
-         lastHeartbeat = Date.now();
-         isCashierActive = true;
          cart = $event.detail.cart || [];
          subtotal = $event.detail.subtotal || 0;
          taxAmount = $event.detail.tax_amount || 0;
@@ -186,50 +170,30 @@
              const channel = new BroadcastChannel('pos_channel_' + {{ auth()->id() }});
              channel.onmessage = (e) => {
                  console.log('Broadcast received', e.data);
-                 if (e.data && e.data.type === 'heartbeat') {
-                     // Update heartbeat timestamp
-                     const root = document.querySelector('[x-data]');
-                     if (root && root.__x) {
-                         const data = root.__x.$data;
-                         const wasActive = data.isCashierActive;
-                         data.lastHeartbeat = Date.now();
-                         data.isCashierActive = true;
-                         
-                         // If cashier was inactive and just became active, reload state from server
-                         if (!wasActive) {
-                             console.log('Cashier became active, fetching state...');
-                             @this.$refresh().then(() => {
-                                 data.cart = @this.cart;
-                                 data.subtotal = @this.subtotal;
-                                 data.taxAmount = @this.taxAmount;
-                                 data.total = @this.total;
-                                 data.paidAmount = @this.paidAmount;
-                                 data.changeAmount = @this.changeAmount;
-                                 data.customerName = @this.customerName;
-                                 data.cashierName = @this.cashierName;
-                             });
-                         }
-                     }
-                 } else if (e.data && typeof e.data === 'object' && e.data.cart) {
-                     // Dispatch custom browser event for Alpine store update
-                     window.dispatchEvent(new CustomEvent('cart-data-broadcast', { detail: e.data }));
-                 } else {
-                     // Fallback to refresh component if no payload
-                     @this.$refresh().then(() => {
-                         // Update Alpine state from refreshed Livewire properties
-                         const root = document.querySelector('[x-data]');
-                         if (root && root.__x) {
-                             root.__x.$data.cart = @this.cart;
-                             root.__x.$data.subtotal = @this.subtotal;
-                             root.__x.$data.taxAmount = @this.taxAmount;
-                             root.__x.$data.total = @this.total;
-                             root.__x.$data.paidAmount = @this.paidAmount;
-                             root.__x.$data.changeAmount = @this.changeAmount;
-                             root.__x.$data.customerName = @this.customerName;
-                             root.__x.$data.cashierName = @this.cashierName;
-                         }
-                     });
-                 }
+                  if (e.data && e.data.type === 'heartbeat') {
+                      return; // Skip heartbeat processing
+                  }
+                  
+                  if (e.data && typeof e.data === 'object' && e.data.cart) {
+                      // Dispatch custom browser event for Alpine store update
+                      window.dispatchEvent(new CustomEvent('cart-data-broadcast', { detail: e.data }));
+                  } else {
+                      // Fallback to refresh component if no payload
+                      @this.$refresh().then(() => {
+                          // Update Alpine state from refreshed Livewire properties
+                          const root = document.querySelector('[x-data]');
+                          if (root && root.__x) {
+                              root.__x.$data.cart = @this.cart;
+                              root.__x.$data.subtotal = @this.subtotal;
+                              root.__x.$data.taxAmount = @this.taxAmount;
+                              root.__x.$data.total = @this.total;
+                              root.__x.$data.paidAmount = @this.paidAmount;
+                              root.__x.$data.changeAmount = @this.changeAmount;
+                              root.__x.$data.customerName = @this.customerName;
+                              root.__x.$data.cashierName = @this.cashierName;
+                          }
+                      });
+                  }
              };
         });
     </script>

@@ -21,7 +21,6 @@ class Shift extends Model
         'non_cash_difference',
         'status',
         'notes',
-        'close_notes',
     ];
 
     protected $casts = [
@@ -123,7 +122,7 @@ class Shift extends Model
             'actual_non_cash'     => $actualNonCash,
             'non_cash_difference' => $actualNonCash - $expectedNonCash,
             'status'              => 'closed',
-            'close_notes'         => $notes,
+            'notes'               => $notes,
         ]);
     }
 

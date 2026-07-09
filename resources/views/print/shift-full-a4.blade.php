@@ -239,10 +239,10 @@
         </div>
     </div>
 
-    @if($shift->close_notes)
+    @if($shift->notes)
     <div style="font-weight: bold; margin-bottom: 5px;">Catatan:</div>
     <div class="box-notes">
-        {{ $shift->close_notes }}
+        {{ $shift->notes }}
     </div>
     @endif
 

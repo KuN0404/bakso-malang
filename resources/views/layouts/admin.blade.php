@@ -59,6 +59,14 @@
     <style>
         [x-cloak] { display: none !important; }
         
+        /* Static preload widths to prevent sidebar flash/animation on hard refresh */
+        .sidebar-collapsed aside {
+            width: 5rem !important; /* lg:w-20 */
+        }
+        .sidebar-collapsed main {
+            margin-left: 5rem !important; /* lg:ml-20 */
+        }
+        
         /* Custom scrollbar */
         .custom-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
         .custom-scroll::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 3px; }
@@ -114,6 +122,7 @@
                 localStorage.setItem('sidebarCollapsed', this.isSidebarCollapsed);
             }
         }" 
+        x-init="document.documentElement.classList.remove('sidebar-collapsed')"
         class="flex h-screen bg-gray-100"
     >
         
@@ -130,6 +139,15 @@
             class="fixed inset-0 z-20 bg-black/50 lg:hidden"
         ></div>
 
+        <!-- Preload script to prevent sidebar collapse transition flash on hard refresh -->
+        <script>
+            if (localStorage.getItem('sidebarCollapsed') === 'true') {
+                document.documentElement.classList.add('sidebar-collapsed');
+            } else {
+                document.documentElement.classList.remove('sidebar-collapsed');
+            }
+        </script>
+
         <!-- Sidebar -->
         <aside 
             @mouseenter="sidebarHover = true"
@@ -138,12 +156,12 @@
                 sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
                 isCompact ? 'lg:w-20' : 'lg:w-64'
             ]"
-            class="fixed inset-y-0 left-0 z-30 bg-sidebar flex flex-col transition-all duration-300 ease-in-out shadow-xl lg:shadow-none overflow-hidden"
+            class="fixed inset-y-0 left-0 z-30 bg-sidebar flex flex-col transition-all duration-300 ease-in-out shadow-xl lg:shadow-none overflow-hidden lg:w-64"
         >
             <!-- Logo -->
             <div class="p-5 border-b border-sidebar-light flex items-center gap-3 whitespace-nowrap overflow-hidden h-20">
                 <div class="flex-shrink-0 w-10 h-10 bg-white rounded-lg flex items-center justify-center">
-                    <i data-lucide="soup" class="w-6 h-6 text-sidebar"></i>
+                    <x-lucide name="soup" class="w-6 h-6 text-sidebar" />
                 </div>
                 <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-40 opacity-100'">
                     <h1 class="text-white font-bold text-lg leading-tight">BAKSO MALANG</h1>
@@ -151,14 +169,14 @@
                 </div>
                 <!-- Close Button (Mobile Only) -->
                 <button @click="sidebarOpen = false" class="lg:hidden ml-auto text-blue-200 hover:text-white">
-                    <i data-lucide="x" class="w-6 h-6"></i>
+                    <x-lucide name="x" class="w-6 h-6" />
                 </button>
             </div>
 
             <!-- Navigation -->
             <nav class="flex-1 p-3 space-y-1 overflow-y-auto custom-scroll overflow-x-hidden">
-                <a href="{{ route('admin.dashboard') }}" class="flex items-center gap-3 px-3 py-3 rounded-lg whitespace-nowrap {{ request()->routeIs('admin.dashboard') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
-                    <div class="flex-shrink-0 w-6 flex justify-center"><i data-lucide="layout-dashboard" class="w-5 h-5"></i></div>
+                <a href="{{ route('admin.dashboard') }}" wire:navigate class="flex items-center gap-3 px-3 py-3 rounded-lg whitespace-nowrap {{ request()->routeIs('admin.dashboard') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
+                    <div class="flex-shrink-0 w-6 flex justify-center"><x-lucide name="layout-dashboard" class="w-5 h-5" /></div>
                      <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'">
                         <span>Dashboard</span>
                     </div>
@@ -176,12 +194,12 @@
                 <div x-data="{ open: {{ $isMasterActive ? 'true' : 'false' }} }" class="mt-4">
                     <button @click="open = !open" class="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-blue-300 uppercase tracking-wider hover:text-white transition-colors group whitespace-nowrap text-left">
                         <div class="flex items-center gap-3">
-                            <div class="flex-shrink-0 w-6 flex justify-center"><i data-lucide="database" class="w-5 h-5 text-blue-300 group-hover:text-white"></i></div>
+                            <div class="flex-shrink-0 w-6 flex justify-center"><x-lucide name="database" class="w-5 h-5 text-blue-300 group-hover:text-white" /></div>
                             <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'">
                                 <span>Master Data</span>
                             </div>
                         </div>
-                        <i data-lucide="chevron-down" class="w-4 h-4 transition-transform duration-200 flex-shrink-0" :class="[open ? 'rotate-180' : '', isCompact ? 'hidden' : 'block']"></i>
+                        <x-lucide name="chevron-down" class="w-4 h-4 transition-transform duration-200 flex-shrink-0" ::class="[open ? 'rotate-180' : '', isCompact ? 'hidden' : 'block']" />
                     </button>
                     <!-- Force hidden if compact to avoid popup artifacts, rely on hover to expand first -->
                     <div x-show="open && !isCompact" 
@@ -190,36 +208,36 @@
                          x-transition:enter-end="opacity-100 translate-y-0"
                          class="space-y-1 mt-1">
                         @can('view_categories')
-                        <a href="{{ route('admin.categories.index') }}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.categories.*') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
-                            <div class="flex-shrink-0 w-6 flex justify-center"><i data-lucide="folder" class="w-4 h-4"></i></div>
+                        <a href="{{ route('admin.categories.index') }}" wire:navigate class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.categories.*') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
+                            <div class="flex-shrink-0 w-6 flex justify-center"><x-lucide name="folder" class="w-4 h-4" /></div>
                             <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Kategori</span></div>
                         </a>
                         @endcan
                         
                         @can('view_products')
-                        <a href="{{ route('admin.products.index') }}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.products.*') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
-                            <div class="flex-shrink-0 w-6 flex justify-center"><i data-lucide="package" class="w-4 h-4"></i></div>
+                        <a href="{{ route('admin.products.index') }}" wire:navigate class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.products.*') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
+                            <div class="flex-shrink-0 w-6 flex justify-center"><x-lucide name="package" class="w-4 h-4" /></div>
                             <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Produk</span></div>
                         </a>
                         @endcan
 
                         @can('view_modifiers')
-                        <a href="{{ route('admin.modifiers.index') }}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.modifiers.*') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
-                            <div class="flex-shrink-0 w-6 flex justify-center"><i data-lucide="sliders" class="w-4 h-4"></i></div>
+                        <a href="{{ route('admin.modifiers.index') }}" wire:navigate class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.modifiers.*') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
+                            <div class="flex-shrink-0 w-6 flex justify-center"><x-lucide name="sliders" class="w-4 h-4" /></div>
                             <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Modifier</span></div>
                         </a>
                         @endcan
 
                         @can('manage_payment_sources')
-                        <a href="{{ route('admin.payment-sources.index') }}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.payment-sources.*') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
-                            <div class="flex-shrink-0 w-6 flex justify-center"><i data-lucide="wallet" class="w-4 h-4"></i></div>
+                        <a href="{{ route('admin.payment-sources.index') }}" wire:navigate class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.payment-sources.*') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
+                            <div class="flex-shrink-0 w-6 flex justify-center"><x-lucide name="wallet" class="w-4 h-4" /></div>
                             <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Metode Bayar</span></div>
                         </a>
                         @endcan
 
                         @can('manage_settings')
-                        <a href="{{ route('admin.service-areas.index') }}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.service-areas.*') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
-                            <div class="flex-shrink-0 w-6 flex justify-center"><i data-lucide="map-pin" class="w-4 h-4"></i></div>
+                        <a href="{{ route('admin.service-areas.index') }}" wire:navigate class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.service-areas.*') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
+                            <div class="flex-shrink-0 w-6 flex justify-center"><x-lucide name="map-pin" class="w-4 h-4" /></div>
                             <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Area Pelayanan</span></div>
                         </a>
                         @endcan
@@ -235,12 +253,12 @@
                 <div x-data="{ open: {{ $isTransActive ? 'true' : 'false' }} }" class="mt-2">
                     <button @click="open = !open" class="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-blue-300 uppercase tracking-wider hover:text-white transition-colors group whitespace-nowrap text-left">
                         <div class="flex items-center gap-3">
-                            <div class="flex-shrink-0 w-6 flex justify-center"><i data-lucide="shopping-bag" class="w-5 h-5 text-blue-300 group-hover:text-white"></i></div>
+                            <div class="flex-shrink-0 w-6 flex justify-center"><x-lucide name="shopping-bag" class="w-5 h-5 text-blue-300 group-hover:text-white" /></div>
                             <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'">
                                 <span>Transaksi</span>
                             </div>
                         </div>
-                        <i data-lucide="chevron-down" class="w-4 h-4 transition-transform duration-200 flex-shrink-0" :class="[open ? 'rotate-180' : '', isCompact ? 'hidden' : 'block']"></i>
+                        <x-lucide name="chevron-down" class="w-4 h-4 transition-transform duration-200 flex-shrink-0" ::class="[open ? 'rotate-180' : '', isCompact ? 'hidden' : 'block']" />
                     </button>
                     <div x-show="open && !isCompact" 
                          x-transition:enter="transition ease-out duration-200"
@@ -248,22 +266,22 @@
                          x-transition:enter-end="opacity-100 translate-y-0"
                          class="space-y-1 mt-1">
                         @can('access_pos')
-                        <a href="{{ route('pos') }}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-blue-200 hover:bg-sidebar-light hover:text-white transition-colors">
-                             <div class="flex-shrink-0 w-6 flex justify-center"><i data-lucide="monitor" class="w-4 h-4"></i></div>
+                        <a href="{{ route('pos') }}" wire:navigate class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-blue-200 hover:bg-sidebar-light hover:text-white transition-colors">
+                             <div class="flex-shrink-0 w-6 flex justify-center"><x-lucide name="monitor" class="w-4 h-4" /></div>
                             <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>POS Kasir</span></div>
                         </a>
                         @endcan
                         
                         @can('view_all_shifts')
-                        <a href="{{ route('admin.shifts.index') }}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.shifts.*') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
-                            <div class="flex-shrink-0 w-6 flex justify-center"><i data-lucide="clock" class="w-4 h-4"></i></div>
+                        <a href="{{ route('admin.shifts.index') }}" wire:navigate class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.shifts.*') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
+                            <div class="flex-shrink-0 w-6 flex justify-center"><x-lucide name="clock" class="w-4 h-4" /></div>
                             <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Shift</span></div>
                         </a>
                         @endcan
 
                         @can('view_kitchen_display')
-                        <a href="{{ route('kitchen.display') }}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('kitchen.display') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
-                            <div class="flex-shrink-0 w-6 flex justify-center"><i data-lucide="chef-hat" class="w-4 h-4"></i></div>
+                        <a href="{{ route('kitchen.display') }}" wire:navigate class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('kitchen.display') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
+                            <div class="flex-shrink-0 w-6 flex justify-center"><x-lucide name="chef-hat" class="w-4 h-4" /></div>
                             <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Dapur / Service</span></div>
                         </a>
                         @endcan
@@ -279,12 +297,12 @@
                 <div x-data="{ open: {{ $isReportActive ? 'true' : 'false' }} }" class="mt-2">
                     <button @click="open = !open" class="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-blue-300 uppercase tracking-wider hover:text-white transition-colors group whitespace-nowrap text-left">
                         <div class="flex items-center gap-3">
-                            <div class="flex-shrink-0 w-6 flex justify-center"><i data-lucide="clipboard-list" class="w-5 h-5 text-blue-300 group-hover:text-white"></i></div>
+                            <div class="flex-shrink-0 w-6 flex justify-center"><x-lucide name="clipboard-list" class="w-5 h-5 text-blue-300 group-hover:text-white" /></div>
                             <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'">
                                 <span>Laporan</span>
                             </div>
                         </div>
-                        <i data-lucide="chevron-down" class="w-4 h-4 transition-transform duration-200 flex-shrink-0" :class="[open ? 'rotate-180' : '', isCompact ? 'hidden' : 'block']"></i>
+                        <x-lucide name="chevron-down" class="w-4 h-4 transition-transform duration-200 flex-shrink-0" ::class="[open ? 'rotate-180' : '', isCompact ? 'hidden' : 'block']" />
                     </button>
                     <div x-show="open && !isCompact" 
                          x-transition:enter="transition ease-out duration-200"
@@ -292,29 +310,29 @@
                          x-transition:enter-end="opacity-100 translate-y-0"
                          class="space-y-1 mt-1">
                         @can('view_transactions')
-                        <a href="{{ route('admin.reports.transactions') }}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.reports.transactions') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
-                            <div class="flex-shrink-0 w-6 flex justify-center"><i data-lucide="receipt" class="w-4 h-4"></i></div>
+                        <a href="{{ route('admin.reports.transactions') }}" wire:navigate class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.reports.transactions') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
+                            <div class="flex-shrink-0 w-6 flex justify-center"><x-lucide name="receipt" class="w-4 h-4" /></div>
                             <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Penjualan</span></div>
                         </a>
                         @endcan
 
                         @can('view_sales_reports')
-                        <a href="{{ route('admin.reports.sales') }}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.reports.sales') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
-                            <div class="flex-shrink-0 w-6 flex justify-center"><i data-lucide="bar-chart-3" class="w-4 h-4"></i></div>
+                        <a href="{{ route('admin.reports.sales') }}" wire:navigate class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.reports.sales') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
+                            <div class="flex-shrink-0 w-6 flex justify-center"><x-lucide name="bar-chart-3" class="w-4 h-4" /></div>
                             <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Analisa & Performa</span></div>
                         </a>
                         @endcan
 
                         @can('view_all_shifts')
-                        <a href="{{ route('admin.reports.shifts') }}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.reports.shifts') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
-                            <div class="flex-shrink-0 w-6 flex justify-center"><i data-lucide="file-clock" class="w-4 h-4"></i></div>
+                        <a href="{{ route('admin.reports.shifts') }}" wire:navigate class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.reports.shifts') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
+                            <div class="flex-shrink-0 w-6 flex justify-center"><x-lucide name="file-clock" class="w-4 h-4" /></div>
                             <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Laporan Shift</span></div>
                         </a>
                         @endcan
 
                         @can('view_cancellation_reports')
-                        <a href="{{ route('admin.returns') }}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.returns') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
-                            <div class="flex-shrink-0 w-6 flex justify-center"><i data-lucide="rotate-ccw" class="w-4 h-4"></i></div>
+                        <a href="{{ route('admin.returns') }}" wire:navigate class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.returns') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
+                            <div class="flex-shrink-0 w-6 flex justify-center"><x-lucide name="rotate-ccw" class="w-4 h-4" /></div>
                             <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Laporan Retur</span></div>
                         </a>
                         @endcan
@@ -332,12 +350,12 @@
                 <div x-data="{ open: {{ $isSettingsActive ? 'true' : 'false' }} }" class="mt-2">
                     <button @click="open = !open" class="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-blue-300 uppercase tracking-wider hover:text-white transition-colors group whitespace-nowrap text-left">
                          <div class="flex items-center gap-3">
-                            <div class="flex-shrink-0 w-6 flex justify-center"><i data-lucide="settings-2" class="w-5 h-5 text-blue-300 group-hover:text-white"></i></div>
+                            <div class="flex-shrink-0 w-6 flex justify-center"><x-lucide name="settings-2" class="w-5 h-5 text-blue-300 group-hover:text-white" /></div>
                             <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'">
                                 <span>Pengaturan</span>
                             </div>
                         </div>
-                        <i data-lucide="chevron-down" class="w-4 h-4 transition-transform duration-200 flex-shrink-0" :class="[open ? 'rotate-180' : '', isCompact ? 'hidden' : 'block']"></i>
+                        <x-lucide name="chevron-down" class="w-4 h-4 transition-transform duration-200 flex-shrink-0" ::class="[open ? 'rotate-180' : '', isCompact ? 'hidden' : 'block']" />
                     </button>
                     <div x-show="open && !isCompact" 
                          x-transition:enter="transition ease-out duration-200"
@@ -345,22 +363,22 @@
                          x-transition:enter-end="opacity-100 translate-y-0"
                          class="space-y-1 mt-1">
                         @can('view_users')
-                        <a href="{{ route('admin.users.index') }}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.users.*') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
-                            <div class="flex-shrink-0 w-6 flex justify-center"><i data-lucide="users" class="w-4 h-4"></i></div>
+                        <a href="{{ route('admin.users.index') }}" wire:navigate class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.users.*') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
+                            <div class="flex-shrink-0 w-6 flex justify-center"><x-lucide name="users" class="w-4 h-4" /></div>
                             <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Pengguna</span></div>
                         </a>
                         @endcan
 
                         @can('manage_roles')
-                        <a href="{{ route('admin.roles.index') }}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.roles.*') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
-                            <div class="flex-shrink-0 w-6 flex justify-center"><i data-lucide="shield" class="w-4 h-4"></i></div>
+                        <a href="{{ route('admin.roles.index') }}" wire:navigate class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.roles.*') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
+                            <div class="flex-shrink-0 w-6 flex justify-center"><x-lucide name="shield" class="w-4 h-4" /></div>
                             <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Role & Permission</span></div>
                         </a>
                         @endcan
                         
                         @can('manage_settings')
-                        <a href="{{ route('admin.settings.index') }}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.settings.*') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
-                            <div class="flex-shrink-0 w-6 flex justify-center"><i data-lucide="settings" class="w-4 h-4"></i></div>
+                        <a href="{{ route('admin.settings.index') }}" wire:navigate class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.settings.*') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
+                            <div class="flex-shrink-0 w-6 flex justify-center"><x-lucide name="settings" class="w-4 h-4" /></div>
                             <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Pengaturan</span></div>
                         </a>
                         @endcan
@@ -372,26 +390,26 @@
             <!-- Logout Button Trigger -->
             <div class="p-4 border-t border-sidebar-light">
                 <button @click="showLogoutModal = true" type="button" class="flex items-center gap-3 w-full px-3 py-3 rounded-lg bg-red-500/20 text-red-300 hover:bg-red-500/30 transition-colors whitespace-nowrap">
-                    <div class="flex-shrink-0 w-6 flex justify-center"><i data-lucide="log-out" class="w-5 h-5"></i></div>
+                    <div class="flex-shrink-0 w-6 flex justify-center"><x-lucide name="log-out" class="w-5 h-5" /></div>
                     <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Logout</span></div>
                 </button>
             </div>
         </aside>
 
         <!-- Main Content -->
-        <main class="flex-1 flex flex-col overflow-hidden transition-all duration-300 lg:transition-none" :class="isSidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'">
+        <main class="flex-1 flex flex-col overflow-hidden transition-all duration-300 lg:transition-none lg:ml-64" :class="isSidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'">
             <!-- Header -->
             <header class="bg-white border-b px-6 py-4">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center gap-4">
                         <!-- Hamburger Button (Mobile) -->
                         <button @click="sidebarOpen = true" class="lg:hidden text-gray-500 hover:text-gray-700">
-                            <i data-lucide="menu" class="w-6 h-6"></i>
+                            <x-lucide name="menu" class="w-6 h-6" />
                         </button>
                         
                         <!-- Collapse Toggle (Desktop) -->
                         <button @click="toggleSidebar()" class="hidden lg:block text-gray-500 hover:text-blue-600 transition-colors transform active:scale-95">
-                            <i data-lucide="align-justify" class="w-6 h-6"></i>
+                            <x-lucide name="align-justify" class="w-6 h-6" />
                         </button>
 
                         <div>
@@ -401,16 +419,16 @@
 
                     <div class="flex items-center gap-4">
                         <div class="hidden sm:flex items-center gap-2 text-gray-600" x-data="realtimeClock()" x-init="startClock()">
-                            <i data-lucide="calendar" class="w-4 h-4"></i>
+                            <x-lucide name="calendar" class="w-4 h-4" />
                             <span>{{ now()->locale('id')->isoFormat('dddd, D MMMM Y') }}</span>
                             <span class="text-gray-400">•</span>
-                            <i data-lucide="clock" class="w-4 h-4"></i>
+                            <x-lucide name="clock" class="w-4 h-4" />
                             <span x-text="time" class="font-medium tabular-nums"></span>
                         </div>
                         <div class="h-8 w-px bg-gray-200 hidden sm:block"></div>
                         <div class="flex items-center gap-3">
                             <div class="w-9 h-9 bg-primary-100 rounded-full flex items-center justify-center">
-                                <i data-lucide="user" class="w-5 h-5 text-primary-600"></i>
+                                <x-lucide name="user" class="w-5 h-5 text-primary-600" />
                             </div>
                             <div class="text-right hidden sm:block">
                                 <p class="text-sm font-medium text-gray-800">{{ auth()->user()->name }}</p>
@@ -445,7 +463,7 @@
                 class="bg-white/80 backdrop-blur-md rounded-2xl shadow-2xl p-8 max-w-sm w-full mx-4 border border-white/50 text-center"
             >
                 <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <i data-lucide="log-out" class="w-8 h-8 text-red-600"></i>
+                    <x-lucide name="log-out" class="w-8 h-8 text-red-600" />
                 </div>
                 
                 <h3 class="text-xl font-bold text-gray-800 mb-2">Konfirmasi Logout</h3>
@@ -864,6 +882,19 @@
                     }
                 }
             }));
+        });
+
+        // Global Lucide Icon re-creation for Livewire SPA navigation and updates
+        document.addEventListener('livewire:init', () => {
+            Livewire.hook('request', ({ respond }) => {
+                respond(() => {
+                    queueMicrotask(() => {
+                        if (window.lucide) {
+                            lucide.createIcons();
+                        }
+                    });
+                });
+            });
         });
     </script>
 </body>

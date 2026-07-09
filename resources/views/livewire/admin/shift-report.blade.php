@@ -368,10 +368,10 @@
                         </div>
                     @endif
 
-                    @if($selectedShift->close_notes)
+                    @if($selectedShift->notes)
                         <div class="bg-yellow-50 p-4 rounded-lg">
                             <p class="text-sm text-yellow-700 font-medium mb-1">Catatan Tutup Shift:</p>
-                            <p class="text-yellow-800">{{ $selectedShift->close_notes }}</p>
+                            <p class="text-yellow-800">{{ $selectedShift->notes }}</p>
                         </div>
                     @endif
                 </div>

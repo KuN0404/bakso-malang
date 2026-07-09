@@ -107,6 +107,13 @@
                 @endif
             </div>
 
+            @if($transaction->notes)
+            <div class="border-b border-dashed border-gray-300 pb-3 mb-3">
+                <span class="font-bold">Catatan:</span>
+                <p class="text-gray-600 italic whitespace-pre-wrap">{{ $transaction->notes }}</p>
+            </div>
+            @endif
+
              <div class="text-center text-[10px] text-gray-400 mt-4">
                  {{ $receiptSettings['header_text'] ?? 'Terima Kasih!' }}
                  @if(!empty($receiptSettings['footer_text']))
@@ -190,6 +197,13 @@
                     </tr>
                 </tfoot>
             </table>
+
+            @if($transaction->notes)
+            <div class="border rounded-lg p-4 bg-gray-50 mb-8">
+                 <p class="text-xs font-bold uppercase text-gray-500 mb-1">Catatan:</p>
+                 <p class="text-sm italic text-gray-700 whitespace-pre-wrap">{{ $transaction->notes }}</p>
+            </div>
+            @endif
 
             <div class="border-t pt-6">
                  <div class="flex justify-between items-center bg-gray-50 p-4 rounded-lg">

@@ -77,6 +77,7 @@ class PosCheckout extends Component
     public function updatedCustomerName() { $this->broadcastCartState(); }
     public function updatedPaymentMethod() { $this->broadcastCartState(); }
     public function updatedPaymentSourceId() { $this->broadcastCartState(); }
+    public function updatedNotes() { $this->broadcastCartState(); }
     
     // Payment state
     public ?int $paymentSourceId = null;
@@ -93,6 +94,8 @@ class PosCheckout extends Component
     public bool $showPaymentModal = false;
     public bool $showReceiptModal = false;
     public bool $showCloseShiftModal = false;
+    public bool $showShiftReceiptModal = false;
+    public ?Shift $printShift = null;
     
     // Close shift form
     public float $openingCash = 0;
@@ -401,9 +404,8 @@ class PosCheckout extends Component
     #[Computed]
     public function todayShift(): ?Shift
     {
-        // Prioritize OPEN shift first
+        // Prioritize OPEN shift first (regardless of date, to support overnight shifts)
         $openShift = Shift::where('user_id', auth()->id())
-            ->whereDate('started_at', today())
             ->where('status', 'open')
             ->first();
 
@@ -411,9 +413,8 @@ class PosCheckout extends Component
             return $openShift;
         }
 
-        // Fallback to latest closed shift (for history/display)
+        // Fallback to latest shift (regardless of date, so buttons still show after closing)
         return Shift::where('user_id', auth()->id())
-            ->whereDate('started_at', today())
             ->latest()
             ->first();
     }
@@ -872,7 +873,9 @@ class PosCheckout extends Component
 
         $this->showCloseShiftModal = false;
         $this->dispatch('notify', type: 'success', message: 'Shift berhasil ditutup');
-        $this->dispatch('open-new-window', url: route('print.shift.detail', $shift->id));
+        $this->printShift = $shift;
+        $this->showShiftReceiptModal = true;
+        $this->dispatch('print-shift-receipt');
     }
 
     public function openClosePreviousShiftModal(): void
@@ -942,7 +945,9 @@ class PosCheckout extends Component
         $this->showUnclosedShiftModal = false;
         $this->unclosedShiftId = null;
         $this->dispatch('notify', type: 'success', message: 'Shift sebelumnya berhasil ditutup. Anda bisa mulai transaksi.');
-        $this->dispatch('open-new-window', url: route('print.shift.detail', $shift->id));
+        $this->printShift = $shift;
+        $this->showShiftReceiptModal = true;
+        $this->dispatch('print-shift-receipt');
     }
 
     protected function generateCartKey(int $productId, array $modifiers): string

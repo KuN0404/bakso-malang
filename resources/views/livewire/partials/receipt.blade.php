@@ -129,6 +129,13 @@
         @endif
     </div>
 
+    @if($transaction->notes)
+    <div class="border-b border-dashed border-gray-300 pb-3 mb-3 text-xs">
+        <span class="font-bold">Catatan:</span>
+        <p class="text-gray-600 italic whitespace-pre-wrap">{{ $transaction->notes }}</p>
+    </div>
+    @endif
+
     <!-- Footer -->
     <div class="text-center text-xs text-gray-600">
         <p>{{ $receiptSettings['header_text'] ?? 'Terima Kasih!' }}</p>

@@ -512,7 +512,7 @@ class ExportController extends Controller
                         $shift->non_cash_difference,
                         // General
                         $shift->status === 'closed' ? 'Ditutup' : 'Aktif',
-                        $shift->close_notes,
+                        $shift->notes,
                     ], ';');
 
                     if (ob_get_level() > 0) ob_flush();

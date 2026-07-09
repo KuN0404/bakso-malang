@@ -2,13 +2,13 @@
     <!-- Breadcrumb & Header -->
     <div class="mb-6">
         <div class="flex items-center gap-2 text-sm text-gray-500 mb-2">
-            <a href="{{ route('admin.products.index') }}" class="hover:text-primary-600">Produk</a>
+            <a href="{{ route('admin.products.index') }}" wire:navigate class="hover:text-primary-600">Produk</a>
             <i data-lucide="chevron-right" class="w-4 h-4"></i>
             <span class="text-gray-900">Detail</span>
         </div>
         <div class="flex items-center justify-between">
             <h1 class="text-2xl font-bold text-gray-800">{{ $product->name }}</h1>
-            <a href="{{ route('admin.products.index') }}" class="px-4 py-2 bg-white border border-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-50 flex items-center gap-2">
+            <a href="{{ route('admin.products.index') }}" wire:navigate class="px-4 py-2 bg-white border border-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-50 flex items-center gap-2">
                 <i data-lucide="arrow-left" class="w-4 h-4"></i>
                 Kembali
             </a>
@@ -280,7 +280,7 @@
                 <h3 class="font-semibold text-gray-800 mb-4">Aksi Cepat</h3>
                 <div class="space-y-3">
                     @can('edit_products')
-                        <a href="{{ route('admin.products.index') }}?edit={{ $product->id }}" class="block w-full text-center px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
+                        <a href="{{ route('admin.products.index') }}?edit={{ $product->id }}" wire:navigate class="block w-full text-center px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
                             Edit Produk
                         </a>
                     @endcan
@@ -293,6 +293,5 @@
 @script
 <script>
     lucide.createIcons();
-    Livewire.hook('morph.updated', () => lucide.createIcons());
 </script>
 @endscript

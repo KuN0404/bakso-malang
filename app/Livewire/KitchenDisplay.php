@@ -75,7 +75,7 @@ class KitchenDisplay extends Component
         $targetSlugs = $this->activeTab === 'drink' ? $drinkSlugs : $foodSlugs;
 
         $items = TransactionDetail::query()
-            ->with(['transaction.user', 'product.category', 'modifiers'])
+            ->with(['transaction.user', 'transaction.serviceArea', 'product.category', 'modifiers'])
             ->whereHas('transaction', function ($q) {
                 // Filter by selected shift
                 $q->where('shift_id', $this->selectedShiftId)

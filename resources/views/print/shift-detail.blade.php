@@ -155,10 +155,10 @@
     @endif
     @endif
 
-    @if($shift->close_notes)
+    @if($shift->notes)
     <div class="border-t py-1 mt-2">
         <div class="font-bold">Catatan:</div>
-        <div>{{ $shift->close_notes }}</div>
+        <div>{{ $shift->notes }}</div>
     </div>
     @endif
 
