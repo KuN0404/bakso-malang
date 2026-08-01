@@ -49,7 +49,7 @@ class TransactionDetail extends Model
     public function modifiers(): BelongsToMany
     {
         return $this->belongsToMany(Modifier::class, 'transaction_detail_modifier')
-            ->withPivot(['modifier_name', 'price_adjustment']);
+            ->withPivot(['modifier_name', 'price_adjustment', 'quantity']);
     }
 
     // -----------------------------------------------------------------
@@ -264,6 +264,9 @@ class TransactionDetail extends Model
 
     public function getModifierNamesAttribute(): string
     {
-        return $this->modifiers->pluck('pivot.modifier_name')->implode(', ');
+        return $this->modifiers->map(function ($m) {
+            $qty = ($m->pivot->quantity ?? 1) > 1 ? " \u00d7{$m->pivot->quantity}" : '';
+            return $m->pivot->modifier_name . $qty;
+        })->implode(', ');
     }
 }

@@ -11,23 +11,18 @@ use App\Models\Product;
 use App\Models\Shift;
 use App\Models\StockLog;
 use App\Models\Transaction;
+use App\Services\ComponentStockService;
 use App\Services\ReportSyncService;
 use Illuminate\Support\Facades\DB;
 
 /**
  * Memproses pembayaran Cash secara atomik dalam satu DB transaction.
- *
- * Flow:
- *  1. Lock produk dan validasi stok
- *  2. Buat PaymentTransaction (status=paid)
- *  3. Buat Transaction (status=completed) + TransactionDetail
- *  4. Kurangi stok + StockLog
- *  5. Sinkronisasi ke ReportDB
  */
 class InitiateCashPaymentAction
 {
     public function __construct(
-        private readonly ReportSyncService $reportSyncService
+        private readonly ReportSyncService $reportSyncService,
+        private readonly ComponentStockService $componentStockService,
     ) {}
 
     /**
@@ -140,15 +135,38 @@ class InitiateCashPaymentAction
 
             if (!empty($item['modifiers'])) {
                 foreach ($item['modifiers'] as $modifierId => $modifierData) {
+                    $modQty = (int) ($modifierData['qty'] ?? 1);
                     $detail->modifiers()->attach($modifierId, [
                         'modifier_name'    => $modifierData['name'],
                         'price_adjustment' => $modifierData['price'],
+                        'quantity'         => $modQty,
                     ]);
+
+                    // Kurangi stok komponen modifier jika modifier terhubung ke komponen
+                    if (!empty($modifierData['component_id'])) {
+                        $totalModQty = $modQty * $item['quantity'];
+                        $this->componentStockService->deductForModifier(
+                            $modifierId,
+                            $totalModQty,
+                            $transaction->id,
+                            $cashierId
+                        );
+                    }
                 }
             }
 
             $product = $products->get($item['product_id']);
-            if ($product && $product->track_stock) {
+
+            if ($product && $product->hasBom()) {
+                // Mode BOM: Kurangi stok komponen yang terdaftar pada BOM produk ini
+                $this->componentStockService->deductForBom(
+                    $item['product_id'],
+                    $item['quantity'],
+                    $transaction->id,
+                    $cashierId
+                );
+            } elseif ($product && $product->track_stock) {
+                // Mode Direct Stock: Kurangi stok produk (backward compat)
                 $product->decrement('stock', $item['quantity']);
                 StockLog::record(
                     productId:  $product->id,

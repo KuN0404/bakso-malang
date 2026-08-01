@@ -32,7 +32,7 @@
         },
         selectModifier(groupId, modifier, selectionType) {
             if (selectionType === 'single') {
-                this.selectedModifiers[groupId] = [modifier];
+                this.selectedModifiers[groupId] = [{ ...modifier, qty: 1 }];
             } else {
                 if (!this.selectedModifiers[groupId]) {
                     this.selectedModifiers[groupId] = [];
@@ -41,10 +41,29 @@
                 if (index > -1) {
                     this.selectedModifiers[groupId].splice(index, 1);
                 } else {
-                    this.selectedModifiers[groupId].push(modifier);
+                    this.selectedModifiers[groupId].push({ ...modifier, qty: 1 });
                 }
             }
             this.calculateModifierTotal();
+        },
+        changeModifierQty(groupId, modifierId, delta) {
+            if (!this.selectedModifiers[groupId]) return;
+            const item = this.selectedModifiers[groupId].find(m => m.id === modifierId);
+            if (item) {
+                const newQty = (item.qty || 1) + delta;
+                if (newQty <= 0) {
+                    const idx = this.selectedModifiers[groupId].findIndex(m => m.id === modifierId);
+                    if (idx > -1) this.selectedModifiers[groupId].splice(idx, 1);
+                } else {
+                    item.qty = newQty;
+                }
+                this.calculateModifierTotal();
+            }
+        },
+        getModifierQty(groupId, modifierId) {
+            if (!this.selectedModifiers[groupId]) return 0;
+            const item = this.selectedModifiers[groupId].find(m => m.id === modifierId);
+            return item ? (item.qty || 1) : 0;
         },
         isModifierSelected(groupId, modifierId) {
             if (!this.selectedModifiers[groupId]) return false;
@@ -54,7 +73,7 @@
             let total = 0;
             Object.values(this.selectedModifiers).forEach(modifiers => {
                 modifiers.forEach(m => {
-                    total += Number(m.price_adjustment) || 0;
+                    total += (Number(m.price_adjustment) || 0) * (Number(m.qty) || 1);
                 });
             });
             this.modifierTotal = total;
@@ -69,7 +88,12 @@
             const result = {};
             Object.values(this.selectedModifiers).forEach(modifiers => {
                 modifiers.forEach(m => {
-                    result[m.id] = { name: m.name, price: Number(m.price_adjustment) || 0 };
+                    result[m.id] = {
+                        name: m.name,
+                        price: Number(m.price_adjustment) || 0,
+                        qty: Number(m.qty) || 1,
+                        component_id: m.component_id || null
+                    };
                 });
             });
             return result;
@@ -769,13 +793,11 @@
                             </div>
                             <div class="space-y-2">
                                 <template x-for="modifier in group.modifiers" :key="modifier.id">
-                                    <button 
-                                        type="button"
-                                        @click="selectModifier(group.id, modifier, group.selection_type)"
+                                    <div 
                                         :class="isModifierSelected(group.id, modifier.id) ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-gray-200 bg-white hover:bg-gray-50'"
                                         class="w-full flex items-center justify-between px-4 py-3 border rounded-lg transition-all"
                                     >
-                                        <div class="flex items-center gap-3">
+                                        <div class="flex items-center gap-3 cursor-pointer flex-1" @click="selectModifier(group.id, modifier, group.selection_type)">
                                             <span 
                                                 :class="isModifierSelected(group.id, modifier.id) ? 'bg-primary-500' : 'border-2 border-gray-300 bg-white'"
                                                 class="w-5 h-5 rounded-full flex items-center justify-center transition-all flex-shrink-0"
@@ -784,15 +806,31 @@
                                             </span>
                                             <span class="font-medium" x-text="modifier.name"></span>
                                         </div>
-                                        <span :class="modifier.price_adjustment > 0 ? 'text-primary-600' : 'text-gray-400'" class="text-sm font-medium">
-                                            <template x-if="Number(modifier.price_adjustment) > 0">
-                                                <span>+Rp <span x-text="formatRupiah(modifier.price_adjustment)"></span></span>
+                                        
+                                        <div class="flex items-center gap-3">
+                                            <span :class="modifier.price_adjustment > 0 ? 'text-primary-600' : 'text-gray-400'" class="text-sm font-medium">
+                                                <template x-if="Number(modifier.price_adjustment) > 0">
+                                                    <span>+Rp <span x-text="formatRupiah(modifier.price_adjustment)"></span></span>
+                                                </template>
+                                                <template x-if="modifier.price_adjustment == 0">
+                                                    <span>Gratis</span>
+                                                </template>
+                                            </span>
+
+                                            <!-- Qty selector if selected -->
+                                            <template x-if="isModifierSelected(group.id, modifier.id)">
+                                                <div class="flex items-center gap-1 bg-white border border-gray-200 rounded-lg p-0.5 shadow-xs">
+                                                    <button type="button" @click.stop="changeModifierQty(group.id, modifier.id, -1)" class="w-6 h-6 rounded flex items-center justify-center bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs">
+                                                        -
+                                                    </button>
+                                                    <span class="w-5 text-center font-bold text-xs" x-text="getModifierQty(group.id, modifier.id)"></span>
+                                                    <button type="button" @click.stop="changeModifierQty(group.id, modifier.id, 1)" class="w-6 h-6 rounded flex items-center justify-center bg-primary-100 hover:bg-primary-200 text-primary-700 font-bold text-xs">
+                                                        +
+                                                    </button>
+                                                </div>
                                             </template>
-                                            <template x-if="modifier.price_adjustment == 0">
-                                                <span>Gratis</span>
-                                            </template>
-                                        </span>
-                                    </button>
+                                        </div>
+                                    </div>
                                 </template>
                             </div>
                         </div>
@@ -896,7 +934,7 @@
                             @if(!empty($item['modifiers']))
                                 <p class="text-xs text-gray-500 mt-0.5">
                                     @foreach($item['modifiers'] as $mod)
-                                        {{ $mod['name'] }}@if(!$loop->last), @endif
+                                        {{ $mod['name'] }}@if(($mod['qty'] ?? 1) > 1) ×{{ $mod['qty'] }}@endif @if(!$loop->last), @endif
                                     @endforeach
                                 </p>
                             @endif

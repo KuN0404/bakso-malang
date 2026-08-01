@@ -251,25 +251,37 @@
                 wire:click="$set('activeTab', 'valuation')"
                 class="pb-3 text-xs font-bold uppercase tracking-wide whitespace-nowrap border-b-2 transition-colors {{ $activeTab === 'valuation' ? 'border-primary-600 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700' }}"
             >
-                1. Stok & Valuasi Aset Bahan
+                1. Valuasi Bahan Baku
+            </button>
+            <button 
+                wire:click="$set('activeTab', 'components')"
+                class="pb-3 text-xs font-bold uppercase tracking-wide whitespace-nowrap border-b-2 transition-colors {{ $activeTab === 'components' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700' }}"
+            >
+                2. Valuasi Komponen
             </button>
             <button 
                 wire:click="$set('activeTab', 'purchases')"
                 class="pb-3 text-xs font-bold uppercase tracking-wide whitespace-nowrap border-b-2 transition-colors {{ $activeTab === 'purchases' ? 'border-primary-600 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700' }}"
             >
-                2. Laporan Pembelian Stok
+                3. Pembelian Stok
             </button>
             <button 
                 wire:click="$set('activeTab', 'productions')"
                 class="pb-3 text-xs font-bold uppercase tracking-wide whitespace-nowrap border-b-2 transition-colors {{ $activeTab === 'productions' ? 'border-primary-600 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700' }}"
             >
-                3. Laporan Repacking / Produksi
+                4. Repacking / Produksi
             </button>
             <button 
                 wire:click="$set('activeTab', 'stock_logs')"
                 class="pb-3 text-xs font-bold uppercase tracking-wide whitespace-nowrap border-b-2 transition-colors {{ $activeTab === 'stock_logs' ? 'border-primary-600 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700' }}"
             >
-                4. Mutasi & History Stok
+                5. Mutasi Bahan Baku
+            </button>
+            <button 
+                wire:click="$set('activeTab', 'component_stock_logs')"
+                class="pb-3 text-xs font-bold uppercase tracking-wide whitespace-nowrap border-b-2 transition-colors {{ $activeTab === 'component_stock_logs' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700' }}"
+            >
+                6. Mutasi Komponen
             </button>
         </nav>
     </div>
@@ -321,6 +333,61 @@
         @if($valuationData && $valuationData->count() > 0)
             <div class="px-6 py-4 border-t border-gray-100">
                 {{ $valuationData->links() }}
+            </div>
+        @endif
+    </div>
+    @endif
+
+    <!-- TAB 2: VALUASI KOMPONEN -->
+    @if($activeTab === 'components')
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-x-auto">
+        <table class="w-full text-left text-sm border-collapse">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-6 py-3 font-semibold text-gray-500 uppercase text-xs">Kode</th>
+                    <th class="px-6 py-3 font-semibold text-gray-500 uppercase text-xs">Komponen</th>
+                    <th class="px-6 py-3 font-semibold text-gray-500 uppercase text-xs">Stok</th>
+                    <th class="px-6 py-3 font-semibold text-gray-500 uppercase text-xs">Stok Min.</th>
+                    <th class="px-6 py-3 font-semibold text-gray-500 uppercase text-xs">HPP Per Satuan</th>
+                    <th class="px-6 py-3 font-semibold text-gray-500 uppercase text-xs">Total Nilai Aset</th>
+                    <th class="px-6 py-3 text-center font-semibold text-gray-500 uppercase text-xs">Status</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                @forelse($componentsData as $comp)
+                    @php
+                        $assetVal = $comp->stock * $comp->cost_price;
+                        $status = $comp->getStockStatus();
+                    @endphp
+                    <tr class="hover:bg-gray-50 transition-colors {{ $status === 'out' ? 'bg-red-50/40' : ($status === 'low' ? 'bg-yellow-50/40' : '') }}">
+                        <td class="px-6 py-4 font-mono text-xs text-blue-700 font-semibold">{{ $comp->code }}</td>
+                        <td class="px-6 py-4 font-medium text-gray-900">{{ $comp->name }}</td>
+                        <td class="px-6 py-4 font-bold {{ $status === 'out' ? 'text-red-600' : ($status === 'low' ? 'text-yellow-700' : 'text-gray-800') }}">
+                            {{ number_format($comp->stock, 2, ',', '.') }} {{ $comp->unit }}
+                        </td>
+                        <td class="px-6 py-4 text-gray-500">{{ number_format($comp->minimum_stock, 2, ',', '.') }} {{ $comp->unit }}</td>
+                        <td class="px-6 py-4">Rp {{ number_format($comp->cost_price, 0, ',', '.') }}</td>
+                        <td class="px-6 py-4 font-extrabold text-blue-700">Rp {{ number_format($assetVal, 0, ',', '.') }}</td>
+                        <td class="px-6 py-4 text-center">
+                            @if($status === 'out')
+                                <span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700">Habis</span>
+                            @elseif($status === 'low')
+                                <span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-700">Menipis</span>
+                            @else
+                                <span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">Aman</span>
+                            @endif
+                        </td>
+                    </tr>
+                @empty
+                    <tr>
+                        <td colspan="7" class="px-6 py-12 text-center text-gray-500">Tidak ada data komponen setengah jadi.</td>
+                    </tr>
+                @endforelse
+            </tbody>
+        </table>
+        @if($componentsData && $componentsData->count() > 0)
+            <div class="px-6 py-4 border-t border-gray-100">
+                {{ $componentsData->links() }}
             </div>
         @endif
     </div>
@@ -395,7 +462,7 @@
                         </td>
                         <td class="px-6 py-4 text-xs text-gray-900 font-medium">
                             @foreach($p->outputs as $out)
-                                <div class="text-emerald-700 font-semibold">+ {{ $out->product?->name }}: {{ number_format($out->quantity, 0) }} Pcs (HPP: Rp {{ number_format($out->unit_cost, 0, ',', '.') }})</div>
+                                <div class="text-emerald-700 font-semibold">+ {{ $out->getOutputName() }}: {{ number_format($out->quantity, 0) }} {{ $out->getOutputUnit() }} (HPP: Rp {{ number_format($out->unit_cost, 0, ',', '.') }})</div>
                             @endforeach
                         </td>
                         <td class="px-6 py-4 font-bold text-gray-900">Rp {{ number_format($p->total_cost, 0, ',', '.') }}</td>
@@ -462,6 +529,59 @@
         @if($stockLogsData && $stockLogsData->count() > 0)
             <div class="px-6 py-4 border-t border-gray-100">
                 {{ $stockLogsData->links() }}
+            </div>
+        @endif
+    </div>
+    @endif
+
+    <!-- TAB 6: MUTASI STOK KOMPONEN -->
+    @if($activeTab === 'component_stock_logs')
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-x-auto">
+        <table class="w-full text-left text-sm border-collapse">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-6 py-3 font-semibold text-gray-500 uppercase text-xs">Waktu Log</th>
+                    <th class="px-6 py-3 font-semibold text-gray-500 uppercase text-xs">Komponen</th>
+                    <th class="px-6 py-3 font-semibold text-gray-500 uppercase text-xs">Tipe Mutasi</th>
+                    <th class="px-6 py-3 font-semibold text-gray-500 uppercase text-xs">Jumlah Perubahan</th>
+                    <th class="px-6 py-3 font-semibold text-gray-500 uppercase text-xs">Stok Akhir</th>
+                    <th class="px-6 py-3 font-semibold text-gray-500 uppercase text-xs">Catatan</th>
+                    <th class="px-6 py-3 font-semibold text-gray-500 uppercase text-xs">Petugas</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                @forelse($componentStockLogsData as $cLog)
+                    <tr class="hover:bg-gray-50 transition-colors">
+                        <td class="px-6 py-4 text-xs text-gray-500">{{ $cLog->created_at->format('d/m/Y H:i') }}</td>
+                        <td class="px-6 py-4 font-medium text-gray-900">{{ $cLog->component?->name ?? 'Komponen Dihapus' }}</td>
+                        <td class="px-6 py-4">
+                            @if($cLog->type === 'production_add')
+                                <span class="px-2 py-0.5 rounded text-xs font-semibold bg-emerald-100 text-emerald-800">Hasil Repacking</span>
+                            @elseif($cLog->type === 'bom_deduct')
+                                <span class="px-2 py-0.5 rounded text-xs font-semibold bg-blue-100 text-blue-800">Penjualan BOM POS</span>
+                            @elseif($cLog->type === 'modifier_deduct')
+                                <span class="px-2 py-0.5 rounded text-xs font-semibold bg-purple-100 text-purple-800">Modifier POS</span>
+                            @else
+                                <span class="px-2 py-0.5 rounded text-xs font-semibold bg-amber-100 text-amber-800">Penyesuaian Manual</span>
+                            @endif
+                        </td>
+                        <td class="px-6 py-4 font-bold {{ $cLog->amount < 0 ? 'text-red-600' : 'text-emerald-600' }}">
+                            {{ $cLog->amount > 0 ? '+' : '' }}{{ number_format($cLog->amount, 2, ',', '.') }} {{ $cLog->component?->unit }}
+                        </td>
+                        <td class="px-6 py-4 font-semibold text-gray-800">{{ number_format($cLog->final_stock, 2, ',', '.') }} {{ $cLog->component?->unit }}</td>
+                        <td class="px-6 py-4 text-xs text-gray-500">{{ $cLog->note ?: '-' }}</td>
+                        <td class="px-6 py-4 text-xs text-gray-500">{{ $cLog->user?->name ?? 'System' }}</td>
+                    </tr>
+                @empty
+                    <tr>
+                        <td colspan="7" class="px-6 py-12 text-center text-gray-500">Tidak ada log mutasi stok komponen pada periode ini.</td>
+                    </tr>
+                @endforelse
+            </tbody>
+        </table>
+        @if($componentStockLogsData && $componentStockLogsData->count() > 0)
+            <div class="px-6 py-4 border-t border-gray-100">
+                {{ $componentStockLogsData->links() }}
             </div>
         @endif
     </div>

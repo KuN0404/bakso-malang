@@ -3,6 +3,7 @@
 namespace App\Livewire\Admin;
 
 use App\Models\Category;
+use App\Models\Component as ComponentModel;
 use App\Models\ModifierGroup;
 use App\Models\Product;
 use Intervention\Image\Laravel\Facades\Image;
@@ -64,6 +65,7 @@ class Products extends Component
     public int $stock = 0;
 
     public array $selectedModifierGroups = [];
+    public array $bomItems = []; // [{component_id, quantity}]
 
     #[Url(except: '')]
     public string $search = '';
@@ -192,9 +194,22 @@ class Products extends Component
         $this->dispatch('notify', type: 'success', message: "Stok {$product->name} berhasil diperbarui ({$logType})");
     }
 
+    public function addBomItem(): void
+    {
+        $this->bomItems[] = ['component_id' => '', 'quantity' => 1];
+    }
+
+    public function removeBomItem(int $index): void
+    {
+        if (isset($this->bomItems[$index])) {
+            unset($this->bomItems[$index]);
+            $this->bomItems = array_values($this->bomItems);
+        }
+    }
+
     public function create(): void
     {
-        $this->reset(['editingId', 'name', 'sku', 'description', 'price', 'cost_price', 'image', 'existingImage', 'is_active', 'is_featured', 'track_stock', 'stock', 'category_id', 'selectedModifierGroups', 'is_unlimited']);
+        $this->reset(['editingId', 'name', 'sku', 'description', 'price', 'cost_price', 'image', 'existingImage', 'is_active', 'is_featured', 'track_stock', 'stock', 'category_id', 'selectedModifierGroups', 'is_unlimited', 'bomItems']);
         $this->is_active = true;
         $this->is_unlimited = true; // Default to unlimited
         // Auto-fill SKU
@@ -204,7 +219,7 @@ class Products extends Component
 
     public function edit(int $id): void
     {
-        $product = Product::getWithModifierGroups($id);
+        $product = Product::with(['modifierGroups', 'bom'])->findOrFail($id);
         $this->editingId = $product->id;
         $this->category_id = $product->category_id;
         $this->name = $product->name;
@@ -220,6 +235,10 @@ class Products extends Component
         // Don't auto-fill stock on edit to prevent overwrites
         $this->stock = $product->stock;
         $this->selectedModifierGroups = $product->modifierGroups->pluck('id')->toArray();
+        $this->bomItems = $product->bom->map(fn($b) => [
+            'component_id' => $b->component_id,
+            'quantity' => $b->quantity,
+        ])->toArray();
         $this->showModal = true;
     }
 
@@ -286,11 +305,18 @@ class Products extends Component
             $product = Product::find($this->editingId);
             $product->update($data);
             $product->modifierGroups()->sync($this->selectedModifierGroups);
+
+            // Sync BOM items
+            $this->syncBomItems($product);
+
             $this->dispatch('notify', type: 'success', message: 'Produk berhasil diperbarui');
         } else {
             $product = Product::create($data);
             $product->modifierGroups()->sync($this->selectedModifierGroups);
-            
+
+            // Sync BOM items
+            $this->syncBomItems($product);
+
             // Log initial stock if any
             if ($this->stock > 0) {
                 StockLog::record(
@@ -307,7 +333,21 @@ class Products extends Component
         }
 
         $this->showModal = false;
-        $this->reset(['editingId', 'name', 'sku', 'description', 'price', 'cost_price', 'image', 'existingImage', 'is_active', 'is_featured', 'track_stock', 'stock', 'category_id', 'selectedModifierGroups', 'is_unlimited']);
+        $this->reset(['editingId', 'name', 'sku', 'description', 'price', 'cost_price', 'image', 'existingImage', 'is_active', 'is_featured', 'track_stock', 'stock', 'category_id', 'selectedModifierGroups', 'is_unlimited', 'bomItems']);
+    }
+
+    private function syncBomItems(Product $product): void
+    {
+        $product->bom()->delete();
+
+        foreach ($this->bomItems as $item) {
+            if (!empty($item['component_id']) && (float)($item['quantity'] ?? 0) > 0) {
+                $product->bom()->create([
+                    'component_id' => $item['component_id'],
+                    'quantity' => (float)$item['quantity'],
+                ]);
+            }
+        }
     }
 
     public function delete(int $id): void
@@ -362,8 +402,9 @@ class Products extends Component
 
         $categories = Category::active()->ordered()->get();
         $modifierGroups = ModifierGroup::active()->get();
+        $components = ComponentModel::where('is_active', true)->orderBy('name')->get();
 
-        return view('livewire.admin.products', compact('products', 'categories', 'modifierGroups'))
+        return view('livewire.admin.products', compact('products', 'categories', 'modifierGroups', 'components'))
             ->title('Produk');
     }
 }

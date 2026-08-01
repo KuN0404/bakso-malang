@@ -243,6 +243,16 @@
                         >
                         @error('priceAdjustment') <p class="text-red-500 text-sm mt-1">{{ $message }}</p> @enderror
                     </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Kurangi Stok Komponen (Opsional)</label>
+                        <select wire:model="modifierComponentId" class="w-full px-4 py-2 border border-gray-200 rounded-lg text-sm bg-white">
+                            <option value="">-- Tidak Ada (Hanya Harga) --</option>
+                            @foreach($components as $comp)
+                                <option value="{{ $comp->id }}">{{ $comp->name }} (Stok: {{ number_format($comp->stock, 0, ',', '.') }} {{ $comp->unit }})</option>
+                            @endforeach
+                        </select>
+                        <p class="text-xs text-gray-500 mt-1">Jika dipilih, setiap pemilihan modifier ini akan mengurangi stok komponen terkait.</p>
+                    </div>
                     <label class="inline-flex items-center gap-2">
                         <input type="checkbox" wire:model="modifierIsActive" class="w-4 h-4 text-primary-600 border-gray-300 rounded">
                         <span class="text-sm text-gray-700">Aktif</span>

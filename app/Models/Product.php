@@ -115,6 +115,16 @@ class Product extends Model
         return $this->belongsToMany(ModifierGroup::class, 'product_modifier_group');
     }
 
+    /**
+     * BOM (Bill of Materials) — komposisi komponen yang dibutuhkan per 1 produk.
+     * Jika BOM ada, checkout mengurangi stok komponen.
+     * Jika BOM tidak ada, checkout mengurangi stok produk (backward compat).
+     */
+    public function bom(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(ProductBom::class);
+    }
+
     public function scopeActive($query)
     {
         return $query->where('is_active', true);
@@ -134,11 +144,14 @@ class Product extends Model
     }
 
     /**
-     * Get product with active modifiers for POS cart additions.
+     * Get product with active modifiers and BOM for POS cart additions.
      */
     public static function getForPos(int $id): ?self
     {
-        return static::with('modifierGroups.activeModifiers')->find($id);
+        return static::with([
+            'modifierGroups.activeModifiers',
+            'bom.component',  // eager load BOM dengan komponen untuk pengecekan stok
+        ])->find($id);
     }
 
     public function getFormattedPriceAttribute(): string
@@ -157,6 +170,23 @@ class Product extends Model
     public function getPaginatedStockLogs(int $perPage = 10): \Illuminate\Contracts\Pagination\LengthAwarePaginator
     {
         return $this->stockLogs()->with('user')->paginate($perPage);
+    }
+
+    /**
+     * Cek apakah produk menggunakan BOM (Bill of Materials).
+     * Jika true → checkout mengurangi stok komponen.
+     * Jika false → checkout mengurangi stok produk (backward compat).
+     *
+     * Catatan: Gunakan relasi yang sudah di-eager-load jika tersedia.
+     */
+    public function hasBom(): bool
+    {
+        // Gunakan loaded relation jika sudah di-eager-load (hindari N+1)
+        if ($this->relationLoaded('bom')) {
+            return $this->bom->isNotEmpty();
+        }
+
+        return $this->bom()->exists();
     }
 
     public function isAvailable(): bool
@@ -196,7 +226,7 @@ class Product extends Model
     public function scopeForPosDisplay($query, ?int $categoryId = null, ?string $search = null)
     {
         $query->where('is_active', true)
-            ->with(['category', 'modifierGroups.activeModifiers']);
+            ->with(['category', 'modifierGroups.activeModifiers', 'bom.component']);
 
         if ($categoryId) {
             $query->where('category_id', $categoryId);

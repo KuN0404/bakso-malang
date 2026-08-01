@@ -30,6 +30,7 @@ class HandleMidtransWebhookAction
 {
     public function __construct(
         private readonly ReportSyncService $reportSyncService,
+        private readonly ComponentStockService $componentStockService,
     ) {}
 
     /**
@@ -215,15 +216,35 @@ class HandleMidtransWebhookAction
 
             if (!empty($item['modifiers'])) {
                 foreach ($item['modifiers'] as $modifierId => $modifierData) {
+                    $modQty = (int) ($modifierData['qty'] ?? 1);
                     $detail->modifiers()->attach($modifierId, [
                         'modifier_name'    => $modifierData['name'],
                         'price_adjustment' => $modifierData['price'],
+                        'quantity'         => $modQty,
                     ]);
+
+                    if (!empty($modifierData['component_id'])) {
+                        $totalModQty = $modQty * $item['quantity'];
+                        $this->componentStockService->deductForModifier(
+                            $modifierId,
+                            $totalModQty,
+                            $transaction->id,
+                            $cashierId
+                        );
+                    }
                 }
             }
 
             $product = $products->get($item['product_id']);
-            if ($product && $product->track_stock) {
+
+            if ($product && $product->hasBom()) {
+                $this->componentStockService->deductForBom(
+                    $item['product_id'],
+                    $item['quantity'],
+                    $transaction->id,
+                    $cashierId
+                );
+            } elseif ($product && $product->track_stock) {
                 $product->decrement('stock', $item['quantity']);
                 StockLog::record(
                     productId:  $product->id,

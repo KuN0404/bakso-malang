@@ -2,6 +2,8 @@
 
 namespace App\Livewire\Admin;
 
+use App\Models\Component as ComponentModel;
+use App\Models\ComponentStockLog;
 use App\Models\Ingredient;
 use App\Models\IngredientStockLog;
 use App\Models\Production;
@@ -42,7 +44,7 @@ class InventoryReport extends Component
 
     // Tabs & Search
     #[Url(except: 'valuation')]
-    public string $activeTab = 'valuation'; // valuation, purchases, productions, stock_logs
+    public string $activeTab = 'valuation'; // valuation, components, purchases, productions, stock_logs, component_stock_logs
 
     #[Url(except: '')]
     public string $search = '';
@@ -228,13 +230,20 @@ class InventoryReport extends Component
         $totalProductionCost = $productionStats->total_cost ?? 0;
 
         // Data queries based on active tab
-        $valuationData = null;
-        $purchasesData = null;
-        $productionsData = null;
-        $stockLogsData = null;
+        $valuationData           = null;
+        $componentsData          = null;
+        $purchasesData           = null;
+        $productionsData         = null;
+        $stockLogsData           = null;
+        $componentStockLogsData  = null;
 
         if ($this->activeTab === 'valuation') {
             $valuationData = Ingredient::query()
+                ->when($this->search, fn($q) => $q->where('name', 'like', "%{$this->search}%")->orWhere('code', 'like', "%{$this->search}%"))
+                ->orderBy('name')
+                ->paginate($this->perPage);
+        } elseif ($this->activeTab === 'components') {
+            $componentsData = ComponentModel::query()
                 ->when($this->search, fn($q) => $q->where('name', 'like', "%{$this->search}%")->orWhere('code', 'like', "%{$this->search}%"))
                 ->orderBy('name')
                 ->paginate($this->perPage);
@@ -248,7 +257,7 @@ class InventoryReport extends Component
                 ->paginate($this->perPage);
         } elseif ($this->activeTab === 'productions') {
             $productionsData = Production::query()
-                ->with(['inputs.ingredient', 'outputs.product', 'user'])
+                ->with(['inputs.ingredient', 'outputs.component', 'outputs.product', 'user'])
                 ->whereBetween('production_date', [$this->startDate, $this->endDate])
                 ->when($this->search, fn($q) => $q->where('production_code', 'like', "%{$this->search}%"))
                 ->orderByDesc('production_date')
@@ -263,21 +272,32 @@ class InventoryReport extends Component
                 })
                 ->orderByDesc('created_at')
                 ->paginate($this->perPage);
+        } elseif ($this->activeTab === 'component_stock_logs') {
+            $componentStockLogsData = ComponentStockLog::query()
+                ->with(['component', 'user'])
+                ->whereBetween('created_at', [Carbon::parse($this->startDate)->startOfDay(), Carbon::parse($this->endDate)->endOfDay()])
+                ->when($this->search, function ($q) {
+                    $q->whereHas('component', fn($comp) => $comp->where('name', 'like', "%{$this->search}%")->orWhere('code', 'like', "%{$this->search}%"));
+                })
+                ->orderByDesc('created_at')
+                ->paginate($this->perPage);
         }
 
         return view('livewire.admin.inventory-report', [
-            'totalIngredients' => $totalIngredients,
-            'criticalStockCount' => $criticalStockCount,
-            'totalAssetValue' => $totalAssetValue,
-            'totalPurchaseCount' => $totalPurchaseCount,
-            'totalPurchaseSum' => $totalPurchaseSum,
-            'totalProductionCount' => $totalProductionCount,
-            'totalProductionCost' => $totalProductionCost,
-            'valuationData' => $valuationData,
-            'purchasesData' => $purchasesData,
-            'productionsData' => $productionsData,
-            'stockLogsData' => $stockLogsData,
-            'months' => $this->months,
+            'totalIngredients'       => $totalIngredients,
+            'criticalStockCount'     => $criticalStockCount,
+            'totalAssetValue'        => $totalAssetValue,
+            'totalPurchaseCount'     => $totalPurchaseCount,
+            'totalPurchaseSum'       => $totalPurchaseSum,
+            'totalProductionCount'   => $totalProductionCount,
+            'totalProductionCost'    => $totalProductionCost,
+            'valuationData'          => $valuationData,
+            'componentsData'         => $componentsData,
+            'purchasesData'          => $purchasesData,
+            'productionsData'        => $productionsData,
+            'stockLogsData'          => $stockLogsData,
+            'componentStockLogsData' => $componentStockLogsData,
+            'months'                 => $this->months,
         ])->title('Laporan Inventori & Produksi');
     }
 }

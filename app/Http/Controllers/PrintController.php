@@ -159,13 +159,15 @@ class PrintController extends Controller
 
         $ingredients = \App\Models\Ingredient::when($search, fn($q) => $q->where('name', 'like', "%{$search}%")->orWhere('code', 'like', "%{$search}%"))->orderBy('name')->get();
 
+        $components = \App\Models\Component::when($search, fn($q) => $q->where('name', 'like', "%{$search}%")->orWhere('code', 'like', "%{$search}%"))->orderBy('name')->get();
+
         $purchases = \App\Models\Purchase::with(['items.ingredient', 'items.product', 'user'])
             ->whereBetween('purchase_date', [$start->format('Y-m-d'), $end->format('Y-m-d')])
             ->when($search, fn($q) => $q->where('invoice_number', 'like', "%{$search}%")->orWhere('supplier_name', 'like', "%{$search}%"))
             ->orderByDesc('purchase_date')
             ->get();
 
-        $productions = \App\Models\Production::with(['inputs.ingredient', 'outputs.product', 'user'])
+        $productions = \App\Models\Production::with(['inputs.ingredient', 'outputs.component', 'outputs.product', 'user'])
             ->whereBetween('production_date', [$start->format('Y-m-d'), $end->format('Y-m-d')])
             ->when($search, fn($q) => $q->where('production_code', 'like', "%{$search}%"))
             ->orderByDesc('production_date')
@@ -179,10 +181,18 @@ class PrintController extends Controller
             ->orderByDesc('created_at')
             ->get();
 
+        $componentStockLogs = \App\Models\ComponentStockLog::with(['component', 'user'])
+            ->whereBetween('created_at', [$start, $end])
+            ->when($search, function ($q) use ($search) {
+                $q->whereHas('component', fn($comp) => $comp->where('name', 'like', "%{$search}%")->orWhere('code', 'like', "%{$search}%"));
+            })
+            ->orderByDesc('created_at')
+            ->get();
+
         return view('print.inventory-report', compact(
             'start', 'end', 'tab', 'search', 'format',
             'totalIngredients', 'criticalStockCount', 'totalAssetValue',
-            'ingredients', 'purchases', 'productions', 'stockLogs'
+            'ingredients', 'components', 'purchases', 'productions', 'stockLogs', 'componentStockLogs'
         ));
     }
 }

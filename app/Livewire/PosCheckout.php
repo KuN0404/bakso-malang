@@ -519,7 +519,15 @@ class PosCheckout extends Component
         $currentQty = isset($this->cart[$cartKey]) ? $this->cart[$cartKey]['quantity'] : 0;
         $newQty     = $currentQty + 1;
 
-        if ($product->track_stock) {
+        if ($product->hasBom()) {
+            $totalInCart = $this->getTotalQuantityForProduct($product->id);
+            $stockErrors = app(\App\Services\ComponentStockService::class)->checkBomAvailability($product->id, $totalInCart + 1);
+            if (!empty($stockErrors)) {
+                $err = $stockErrors[0];
+                $this->dispatch('notify', type: 'error', message: "Stok komponen '{$err['component']}' tidak cukup (Tersisa: {$err['stock']} {$err['unit']}).");
+                return;
+            }
+        } elseif ($product->track_stock) {
             if ($product->stock <= 0) {
                 $this->dispatch('notify', type: 'error', message: "Stok '{$product->name}' habis (0). Produk tidak dapat dimasukkan ke keranjang.");
                 return;
@@ -529,6 +537,19 @@ class PosCheckout extends Component
             if (($totalInCart + 1) > $product->stock) {
                 $this->dispatch('notify', type: 'error', message: "Stok '{$product->name}' tidak cukup. Sisa stok tersedia: {$product->stock}");
                 return;
+            }
+        }
+
+        // Cek stok komponen modifier
+        foreach ($modifiers as $modId => $modData) {
+            if (!empty($modData['component_id'])) {
+                $modQty = (float)($modData['qty'] ?? 1);
+                $modErrors = app(\App\Services\ComponentStockService::class)->checkModifierAvailability((int)$modId, $modQty);
+                if (!empty($modErrors)) {
+                    $err = $modErrors[0];
+                    $this->dispatch('notify', type: 'error', message: "Stok komponen '{$err['component']}' untuk modifier '{$modData['name']}' tidak cukup.");
+                    return;
+                }
             }
         }
 
@@ -563,7 +584,15 @@ class PosCheckout extends Component
 
         if (isset($this->cart[$cartKey])) {
             $product = Product::find($this->cart[$cartKey]['product_id']);
-            if ($product && $product->track_stock) {
+            if ($product && $product->hasBom()) {
+                $currentTotal = $this->getTotalQuantityForProduct($product->id, $cartKey);
+                $stockErrors = app(\App\Services\ComponentStockService::class)->checkBomAvailability($product->id, $currentTotal + $quantity);
+                if (!empty($stockErrors)) {
+                    $err = $stockErrors[0];
+                    $this->dispatch('notify', type: 'error', message: "Stok komponen '{$err['component']}' tidak cukup (Tersisa: {$err['stock']} {$err['unit']}).");
+                    return;
+                }
+            } elseif ($product && $product->track_stock) {
                 $currentTotal = $this->getTotalQuantityForProduct($product->id, $cartKey);
                 if (($currentTotal + $quantity) > $product->stock) {
                     $this->dispatch('notify', type: 'error', message: "Stok total tidak cukup. Max: {$product->stock}");
@@ -962,6 +991,26 @@ class PosCheckout extends Component
             return;
         }
 
+        // Keamanan 1: Cek Pesanan Pending (Held Carts)
+        $pendingCarts = $this->pendingCarts;
+        if (!empty($pendingCarts)) {
+            $count = count($pendingCarts);
+            $this->dispatch('notify', type: 'error', message: "Tidak dapat menutup shift: Masih ada {$count} pesanan pending (ditunda). Harap selesaikan atau batalkan pesanan pending terlebih dahulu.");
+            return;
+        }
+
+        // Keamanan 2: Cek QRIS Aktif
+        if (!empty($this->qrisOrderId)) {
+            $this->dispatch('notify', type: 'error', message: "Tidak dapat menutup shift: Masih ada transaksi QRIS yang sedang aktif. Harap batalkan atau selesaikan QRIS terlebih dahulu.");
+            return;
+        }
+
+        // Keamanan 3: Cek Keranjang Aktif di Layar POS
+        if (!empty($this->cart)) {
+            $this->dispatch('notify', type: 'error', message: "Tidak dapat menutup shift: Keranjang aktif POS masih terisi item. Kosongkan atau selesaikan transaksi terlebih dahulu.");
+            return;
+        }
+
         $pendingItems = TransactionDetail::getPendingItemsForShift($shift->id);
 
         $this->pendingFoodCount  = $pendingItems->filter(fn($item) => $item->product->category->slug !== 'minuman')->count();
@@ -999,6 +1048,19 @@ class PosCheckout extends Component
             return;
         }
 
+        // Keamanan: Re-validate pesanan pending & keranjang aktif
+        if (!empty($this->pendingCarts)) {
+            $this->dispatch('notify', type: 'error', message: 'Gagal menutup shift: Masih ada pesanan pending yang belum diselesaikan.');
+            return;
+        }
+        if (!empty($this->cart)) {
+            $this->dispatch('notify', type: 'error', message: 'Gagal menutup shift: Keranjang aktif POS belum kosong.');
+            return;
+        }
+        if (!empty($this->qrisOrderId)) {
+            $this->dispatch('notify', type: 'error', message: 'Gagal menutup shift: Transaksi QRIS masih aktif.');
+            return;
+        }
 
         if (!is_numeric($this->openingCash) || $this->openingCash < 0) {
             $this->dispatch('notify', type: 'error', message: 'Modal Awal harus diisi dengan valid (minimal 0)');
@@ -1036,6 +1098,10 @@ class PosCheckout extends Component
 
         // Sinkronisasi shift ke DB Laporan
         app(\App\Services\ReportSyncService::class)->syncShift($shift->load('expenses'));
+
+        // Bersihkan cache pending & active cart untuk kasir ini setelah shift ditutup
+        Cache::forget('pos_pending_carts_' . auth()->id());
+        Cache::forget('pos_active_cart_' . auth()->id());
 
         $this->showCloseShiftModal = false;
         $this->dispatch('notify', type: 'success', message: 'Shift berhasil ditutup');

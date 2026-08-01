@@ -437,6 +437,46 @@
                             </div>
                         @endif
                     </div>
+                    <!-- BOM (Bill of Materials) Section -->
+                    <div class="space-y-3 bg-blue-50/60 p-4 rounded-xl border border-blue-100">
+                        <div class="flex justify-between items-center border-b border-blue-200/60 pb-2">
+                            <div>
+                                <h4 class="text-sm font-bold text-blue-900 flex items-center gap-1.5">
+                                    <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+                                    Komposisi Komponen (BOM)
+                                </h4>
+                                <p class="text-xs text-blue-700">Jika diisi, checkout POS akan mengurangi stok komponen terkait.</p>
+                            </div>
+                            <button type="button" wire:click="addBomItem" class="inline-flex items-center gap-1 text-xs font-semibold text-blue-700 hover:text-blue-800">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                                <span>Tambah Komponen</span>
+                            </button>
+                        </div>
+
+                        @foreach($bomItems as $bIndex => $bItem)
+                            <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end p-2 bg-white rounded-lg border border-blue-200/60">
+                                <div class="sm:col-span-7">
+                                    <label class="block text-xs font-medium text-gray-600 mb-1">Komponen Setengah Jadi</label>
+                                    <select wire:model="bomItems.{{ $bIndex }}.component_id" class="w-full text-xs border border-gray-200 rounded-lg p-2 bg-white">
+                                        <option value="">-- Pilih Komponen --</option>
+                                        @foreach($components as $comp)
+                                            <option value="{{ $comp->id }}">{{ $comp->name }} (Stok: {{ number_format($comp->stock, 0, ',', '.') }} {{ $comp->unit }})</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div class="sm:col-span-4">
+                                    <label class="block text-xs font-medium text-gray-600 mb-1">Qty per 1 Produk</label>
+                                    <input type="number" step="0.01" min="0.01" wire:model="bomItems.{{ $bIndex }}.quantity" class="w-full text-xs border border-gray-200 rounded-lg p-2">
+                                </div>
+                                <div class="sm:col-span-1 flex justify-end">
+                                    <button type="button" wire:click="removeBomItem({{ $bIndex }})" class="p-1.5 text-red-500 hover:bg-red-50 rounded-lg">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                    </button>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">Modifier Groups</label>
                         <div class="flex flex-wrap gap-2">

@@ -17,6 +17,7 @@ class Modifier extends Model
         'price_adjustment',
         'is_active',
         'sort_order',
+        'component_id', // Jika diisi, checkout akan mengurangi stok komponen ini
     ];
 
     protected $casts = [
@@ -30,9 +31,26 @@ class Modifier extends Model
         return $this->belongsTo(ModifierGroup::class);
     }
 
+    /**
+     * Komponen yang stoknya dikurangi saat modifier ini dipilih di POS.
+     * Nullable — jika null, modifier tidak mengurangi stok komponen.
+     */
+    public function component(): BelongsTo
+    {
+        return $this->belongsTo(Component::class);
+    }
+
     public function scopeActive($query)
     {
         return $query->where('is_active', true);
+    }
+
+    /**
+     * Cek apakah modifier ini dikaitkan ke stok komponen.
+     */
+    public function hasComponentStock(): bool
+    {
+        return !is_null($this->component_id);
     }
 
     public function getFormattedPriceAttribute(): string

@@ -120,6 +120,47 @@ class SampleProductsSeeder extends Seeder
             }
         }
 
-        $this->command->info('Sample products seeded successfully!');
+        // Components (Item Setengah Jadi)
+        $components = [
+            ['code' => 'CMP-001', 'name' => 'Bakso Kecil', 'unit' => 'pcs', 'stock' => 100, 'minimum_stock' => 20, 'cost_price' => 1500],
+            ['code' => 'CMP-002', 'name' => 'Bakso Besar Urat', 'unit' => 'pcs', 'stock' => 50, 'minimum_stock' => 10, 'cost_price' => 4000],
+            ['code' => 'CMP-003', 'name' => 'Kuah Kaldu', 'unit' => 'porsi', 'stock' => 80, 'minimum_stock' => 15, 'cost_price' => 1000],
+            ['code' => 'CMP-004', 'name' => 'Tahu Goreng Komponen', 'unit' => 'pcs', 'stock' => 60, 'minimum_stock' => 10, 'cost_price' => 800],
+        ];
+
+        $createdComponents = [];
+        foreach ($components as $c) {
+            $createdComponents[$c['code']] = \App\Models\Component::firstOrCreate(['code' => $c['code']], $c);
+        }
+
+        // Link modifier "Tahu Goreng" ke komponen "Tahu Goreng Komponen"
+        $tahuModifier = Modifier::where('name', 'Tahu Goreng')->first();
+        if ($tahuModifier && isset($createdComponents['CMP-004'])) {
+            $tahuModifier->update(['component_id' => $createdComponents['CMP-004']->id]);
+        }
+
+        // BOM for Products
+        $baksoBiasa   = Product::where('sku', 'BSO-001')->first();
+        $baksoUrat    = Product::where('sku', 'BSO-002')->first();
+        $baksoKomplit = Product::where('sku', 'BSO-006')->first();
+
+        if ($baksoBiasa && isset($createdComponents['CMP-001'], $createdComponents['CMP-003'])) {
+            \App\Models\ProductBom::firstOrCreate(['product_id' => $baksoBiasa->id, 'component_id' => $createdComponents['CMP-001']->id], ['quantity' => 3]);
+            \App\Models\ProductBom::firstOrCreate(['product_id' => $baksoBiasa->id, 'component_id' => $createdComponents['CMP-003']->id], ['quantity' => 1]);
+        }
+
+        if ($baksoUrat && isset($createdComponents['CMP-002'], $createdComponents['CMP-001'], $createdComponents['CMP-003'])) {
+            \App\Models\ProductBom::firstOrCreate(['product_id' => $baksoUrat->id, 'component_id' => $createdComponents['CMP-002']->id], ['quantity' => 1]);
+            \App\Models\ProductBom::firstOrCreate(['product_id' => $baksoUrat->id, 'component_id' => $createdComponents['CMP-001']->id], ['quantity' => 2]);
+            \App\Models\ProductBom::firstOrCreate(['product_id' => $baksoUrat->id, 'component_id' => $createdComponents['CMP-003']->id], ['quantity' => 1]);
+        }
+
+        if ($baksoKomplit && isset($createdComponents['CMP-002'], $createdComponents['CMP-001'], $createdComponents['CMP-003'])) {
+            \App\Models\ProductBom::firstOrCreate(['product_id' => $baksoKomplit->id, 'component_id' => $createdComponents['CMP-002']->id], ['quantity' => 1]);
+            \App\Models\ProductBom::firstOrCreate(['product_id' => $baksoKomplit->id, 'component_id' => $createdComponents['CMP-001']->id], ['quantity' => 3]);
+            \App\Models\ProductBom::firstOrCreate(['product_id' => $baksoKomplit->id, 'component_id' => $createdComponents['CMP-003']->id], ['quantity' => 1]);
+        }
+
+        $this->command->info('Sample products & components seeded successfully!');
     }
 }

@@ -86,6 +86,13 @@ class RolesAndPermissionsSeeder extends Seeder
             'view_hpp_calculator',
             'apply_hpp_calculator',
             'view_menu_catalog',
+
+            // Components (Item Setengah Jadi)
+            'view_components',
+            'create_components',
+            'edit_components',
+            'delete_components',
+            'adjust_component_stock',
         ];
 
         // Create all permissions
@@ -108,6 +115,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'view_modifiers', 'create_modifiers', 'edit_modifiers',
             'view_ingredients', 'create_ingredients', 'edit_ingredients', 'delete_ingredients',
             'view_purchases', 'create_purchases', 'view_productions', 'create_productions', 'view_hpp_calculator', 'apply_hpp_calculator',
+            'view_components', 'create_components', 'edit_components', 'delete_components', 'adjust_component_stock',
             'access_pos', 'view_transactions', 'cancel_transactions',
             'open_shift', 'close_shift', 'view_own_shifts', 'view_all_shifts', 'add_shift_expense',
             'view_sales_reports', 'view_financial_reports', 'view_peak_hours_reports', 'view_cancellation_reports', 'view_inventory_reports', 'export_reports',

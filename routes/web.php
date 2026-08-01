@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\ExportController;
 use App\Livewire\Admin\Categories;
+use App\Livewire\Admin\Components;
 use App\Livewire\Admin\Dashboard;
 use App\Livewire\Admin\Ingredients;
 use App\Livewire\Admin\InventoryReport;
@@ -53,6 +54,7 @@ Route::middleware(['auth', 'throttle:admin'])->prefix('admin')->name('admin.')->
     
     // Inventory & Production
     Route::get('/ingredients', Ingredients::class)->name('ingredients.index');
+    Route::get('/components', Components::class)->name('components.index');
     Route::get('/purchases', Purchases::class)->name('purchases.index');
     Route::get('/productions', Productions::class)->name('productions.index');
     

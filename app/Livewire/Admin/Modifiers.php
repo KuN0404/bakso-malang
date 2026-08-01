@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Admin;
 
+use App\Models\Component as ComponentModel;
 use App\Models\Modifier;
 use App\Models\ModifierGroup;
 use Livewire\Attributes\Layout;
@@ -64,6 +65,8 @@ class Modifiers extends Component
 
     public bool $modifierIsActive = true;
 
+    public ?int $modifierComponentId = null;
+
     public function createGroup(): void
     {
         $this->reset(['editingGroupId', 'groupName', 'groupSelectionType', 'groupIsRequired', 'groupIsActive']);
@@ -121,7 +124,7 @@ class Modifiers extends Component
             $this->dispatch('notify', type: 'error', message: 'Pilih grup terlebih dahulu');
             return;
         }
-        $this->reset(['editingModifierId', 'modifierName', 'priceAdjustment', 'modifierIsActive']);
+        $this->reset(['editingModifierId', 'modifierName', 'priceAdjustment', 'modifierIsActive', 'modifierComponentId']);
         $this->modifierIsActive = true;
         $this->showModifierModal = true;
     }
@@ -133,6 +136,7 @@ class Modifiers extends Component
         $this->modifierName = $modifier->name;
         $this->priceAdjustment = $modifier->price_adjustment;
         $this->modifierIsActive = $modifier->is_active;
+        $this->modifierComponentId = $modifier->component_id;
         $this->showModifierModal = true;
     }
 
@@ -145,6 +149,7 @@ class Modifiers extends Component
             'name' => $this->modifierName,
             'price_adjustment' => $this->priceAdjustment,
             'is_active' => $this->modifierIsActive,
+            'component_id' => $this->modifierComponentId ?: null,
         ];
 
         if ($this->editingModifierId) {
@@ -189,8 +194,9 @@ class Modifiers extends Component
             
         // Correctness: Must query DB because selected group might not be in current page pagination
         $selectedGroup = $this->selectedGroupId ? ModifierGroup::find($this->selectedGroupId) : null;
+        $components = ComponentModel::where('is_active', true)->orderBy('name')->get();
 
-        return view('livewire.admin.modifiers', compact('groups', 'modifiers', 'selectedGroup'))
+        return view('livewire.admin.modifiers', compact('groups', 'modifiers', 'selectedGroup', 'components'))
             ->title('Modifier');
     }
 }

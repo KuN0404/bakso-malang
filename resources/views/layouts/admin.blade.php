@@ -395,6 +395,13 @@
                             <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Bahan Baku</span></div>
                         </a>
                         @endcan
+
+                        @can('view_components')
+                        <a href="{{ route('admin.components.index') }}" wire:navigate class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.components.*') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
+                            <div class="flex-shrink-0 w-6 flex justify-center"><x-lucide name="layers" class="w-4 h-4" /></div>
+                            <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Komponen</span></div>
+                        </a>
+                        @endcan
                         
                         @can('view_purchases')
                         <a href="{{ route('admin.purchases.index') }}" wire:navigate class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.purchases.*') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
@@ -463,7 +470,7 @@
                 @php
                     $isReportActive = request()->routeIs('admin.reports.*') || request()->routeIs('admin.returns');
                 @endphp
-                @canany(['view_transactions', 'view_sales_reports', 'view_all_shifts', 'view_cancellation_reports'])
+                @canany(['view_transactions', 'view_sales_reports', 'view_all_shifts', 'view_inventory_reports', 'view_cancellation_reports'])
                 <div x-data="{ open: {{ $isReportActive ? 'true' : 'false' }} }" class="mt-2">
                     <button @click="open = !open" class="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-blue-300 uppercase tracking-wider hover:text-white transition-colors group whitespace-nowrap text-left">
                         <div class="flex items-center gap-3">
@@ -482,37 +489,64 @@
                          x-transition:enter-end="opacity-100 translate-y-0"
                          class="ml-6 pl-3 border-l border-sidebar-light/40 space-y-1 mt-1">
                         @can('view_transactions')
-                        <a href="{{ route('admin.reports.transactions') }}" wire:navigate class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.reports.transactions') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
+                        <a href="{{ route('admin.reports.transactions') }}" wire:navigate class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.reports.transactions') ? 'bg-sidebar-light text-white font-semibold' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
                             <div class="flex-shrink-0 w-6 flex justify-center"><x-lucide name="receipt" class="w-4 h-4" /></div>
-                            <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Penjualan</span></div>
+                            <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Laporan Penjualan</span></div>
                         </a>
                         @endcan
 
                         @can('view_sales_reports')
-                        <a href="{{ route('admin.reports.sales') }}" wire:navigate class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.reports.sales') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
+                        <a href="{{ route('admin.reports.sales') }}" wire:navigate class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.reports.sales') ? 'bg-sidebar-light text-white font-semibold' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
                             <div class="flex-shrink-0 w-6 flex justify-center"><x-lucide name="bar-chart-3" class="w-4 h-4" /></div>
                             <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Analisa & Performa</span></div>
                         </a>
                         @endcan
 
                         @can('view_all_shifts')
-                        <a href="{{ route('admin.reports.shifts') }}" wire:navigate class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.reports.shifts') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
+                        <a href="{{ route('admin.reports.shifts') }}" wire:navigate class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.reports.shifts') ? 'bg-sidebar-light text-white font-semibold' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
                             <div class="flex-shrink-0 w-6 flex justify-center"><x-lucide name="file-clock" class="w-4 h-4" /></div>
                             <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Laporan Shift</span></div>
                         </a>
                         @endcan
 
-                        @can('view_inventory_reports')
-                        <a href="{{ route('admin.reports.inventory') }}" wire:navigate class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.reports.inventory') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
-                            <div class="flex-shrink-0 w-6 flex justify-center"><x-lucide name="boxes" class="w-4 h-4" /></div>
-                            <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Laporan Inventori</span></div>
+                        @can('view_cancellation_reports')
+                        <a href="{{ route('admin.returns') }}" wire:navigate class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.returns') ? 'bg-sidebar-light text-white font-semibold' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
+                            <div class="flex-shrink-0 w-6 flex justify-center"><x-lucide name="rotate-ccw" class="w-4 h-4" /></div>
+                            <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Laporan Retur</span></div>
                         </a>
                         @endcan
 
-                        @can('view_cancellation_reports')
-                        <a href="{{ route('admin.returns') }}" wire:navigate class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.returns') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
-                            <div class="flex-shrink-0 w-6 flex justify-center"><x-lucide name="rotate-ccw" class="w-4 h-4" /></div>
-                            <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Laporan Retur</span></div>
+                        @can('view_inventory_reports')
+                        <div class="pt-2 pb-1 px-3 text-[10px] font-bold text-blue-300 uppercase tracking-wider">Inventori & Stok</div>
+
+                        <a href="{{ route('admin.reports.inventory', ['activeTab' => 'valuation']) }}" wire:navigate class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.reports.inventory') && request('activeTab', 'valuation') === 'valuation' ? 'bg-sidebar-light text-white font-semibold' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
+                            <div class="flex-shrink-0 w-6 flex justify-center"><x-lucide name="boxes" class="w-4 h-4" /></div>
+                            <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Stok Bahan Baku</span></div>
+                        </a>
+
+                        <a href="{{ route('admin.reports.inventory', ['activeTab' => 'components']) }}" wire:navigate class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.reports.inventory') && request('activeTab') === 'components' ? 'bg-sidebar-light text-white font-semibold' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
+                            <div class="flex-shrink-0 w-6 flex justify-center"><x-lucide name="layers" class="w-4 h-4" /></div>
+                            <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Stok Komponen</span></div>
+                        </a>
+
+                        <a href="{{ route('admin.reports.inventory', ['activeTab' => 'purchases']) }}" wire:navigate class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.reports.inventory') && request('activeTab') === 'purchases' ? 'bg-sidebar-light text-white font-semibold' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
+                            <div class="flex-shrink-0 w-6 flex justify-center"><x-lucide name="shopping-cart" class="w-4 h-4" /></div>
+                            <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Laporan Pembelian</span></div>
+                        </a>
+
+                        <a href="{{ route('admin.reports.inventory', ['activeTab' => 'productions']) }}" wire:navigate class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.reports.inventory') && request('activeTab') === 'productions' ? 'bg-sidebar-light text-white font-semibold' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
+                            <div class="flex-shrink-0 w-6 flex justify-center"><x-lucide name="utensils-crossed" class="w-4 h-4" /></div>
+                            <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Laporan Repacking</span></div>
+                        </a>
+
+                        <a href="{{ route('admin.reports.inventory', ['activeTab' => 'stock_logs']) }}" wire:navigate class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.reports.inventory') && request('activeTab') === 'stock_logs' ? 'bg-sidebar-light text-white font-semibold' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
+                            <div class="flex-shrink-0 w-6 flex justify-center"><x-lucide name="history" class="w-4 h-4" /></div>
+                            <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Mutasi Bahan Baku</span></div>
+                        </a>
+
+                        <a href="{{ route('admin.reports.inventory', ['activeTab' => 'component_stock_logs']) }}" wire:navigate class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.reports.inventory') && request('activeTab') === 'component_stock_logs' ? 'bg-sidebar-light text-white font-semibold' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
+                            <div class="flex-shrink-0 w-6 flex justify-center"><x-lucide name="file-clock" class="w-4 h-4" /></div>
+                            <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Mutasi Komponen</span></div>
                         </a>
                         @endcan
                     </div>
