@@ -18,26 +18,7 @@ class Dashboard extends Component
     #[Computed]
     public function todayStats(): array
     {
-        $today = Carbon::today();
-        
-        $transactions = Transaction::query()
-            ->whereDate('created_at', $today)
-            ->where('status', 'completed')
-            ->get();
-
-        $cancelled = Transaction::query()
-            ->whereDate('cancelled_at', $today)
-            ->where('status', 'cancelled')
-            ->count();
-
-        return [
-            'total_sales' => $transactions->sum('total'),
-            'transaction_count' => $transactions->count(),
-            'average_transaction' => $transactions->count() > 0 
-                ? $transactions->sum('total') / $transactions->count() 
-                : 0,
-            'cancelled_count' => $cancelled,
-        ];
+        return Transaction::getTodayStats();
     }
 
     #[Computed]
@@ -46,17 +27,14 @@ class Dashboard extends Component
         return [
             'products' => Product::count(),
             'categories' => Category::count(),
-            'active_shifts' => Shift::where('status', 'open')->count(),
+            'active_shifts' => Shift::open()->count(),
         ];
     }
 
     #[Computed]
     public function recentTransactions()
     {
-        return Transaction::with(['user', 'details'])
-            ->latest()
-            ->take(10)
-            ->get();
+        return Transaction::getRecentTransactions(10);
     }
 
     #[Computed]

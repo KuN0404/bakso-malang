@@ -37,7 +37,7 @@ class ProductSalesReport extends Component
         }
 
         // Validate categoryId
-        if ($this->categoryId && !Category::where('id', $this->categoryId)->exists()) {
+        if ($this->categoryId && !Category::existsById($this->categoryId)) {
             $this->categoryId = null;
         }
     }
@@ -91,46 +91,21 @@ class ProductSalesReport extends Component
         $start = Carbon::parse($this->startDate)->startOfDay();
         $end = Carbon::parse($this->endDate)->endOfDay();
 
-        $productSales = TransactionDetail::query()
-            ->join('transactions', 'transaction_details.transaction_id', '=', 'transactions.id')
-            ->join('products', 'transaction_details.product_id', '=', 'products.id')
-            ->leftJoin('categories', 'products.category_id', '=', 'categories.id')
-            ->where('transactions.status', 'completed')
-            ->whereBetween('transactions.created_at', [$start, $end])
-            ->when($this->categoryId, fn($q) => $q->where('products.category_id', $this->categoryId))
-            ->selectRaw('
-                products.id as product_id,
-                products.name as product_name,
-                categories.name as category_name,
-                SUM(transaction_details.quantity) as total_qty,
-                AVG(transaction_details.unit_price) as avg_price,
-                SUM(transaction_details.subtotal) as total_revenue
-            ')
-            ->groupBy('products.id', 'products.name', 'categories.name')
-            ->orderByDesc('total_revenue')
-            ->paginate(20);
+        $productSales = TransactionDetail::getProductSalesReport($start, $end, $this->categoryId);
 
         // Smart pagination
         if ($productSales->lastPage() < $this->getPage() && $productSales->lastPage() > 0) {
             $this->setPage($productSales->lastPage());
         }
 
-        // Summary
+        $summaryData = TransactionDetail::getProductSalesSummary($start, $end, $this->categoryId);
         $summary = [
             'total_products' => $productSales->total(),
-            'total_qty' => TransactionDetail::query()
-                ->join('transactions', 'transaction_details.transaction_id', '=', 'transactions.id')
-                ->where('transactions.status', 'completed')
-                ->whereBetween('transactions.created_at', [$start, $end])
-                ->sum('transaction_details.quantity'),
-            'total_revenue' => TransactionDetail::query()
-                ->join('transactions', 'transaction_details.transaction_id', '=', 'transactions.id')
-                ->where('transactions.status', 'completed')
-                ->whereBetween('transactions.created_at', [$start, $end])
-                ->sum('transaction_details.subtotal'),
+            'total_qty'      => $summaryData['total_qty'],
+            'total_revenue'  => $summaryData['total_revenue'],
         ];
 
-        $categories = Category::orderBy('name')->get();
+        $categories = Category::getAllSortedByName();
 
         return view('livewire.admin.product-sales-report', compact('productSales', 'summary', 'categories'))
             ->title('Laporan Penjualan per Produk');

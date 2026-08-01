@@ -28,9 +28,9 @@ class DailyQueueNumber extends Model
             $today = now()->toDateString();
             
             $record = static::lockForUpdate()
-                ->where('date', $today)
+                ->whereDate('date', $today)
                 ->first();
-
+ 
             if (!$record) {
                 $record = static::create([
                     'date' => $today,
@@ -39,14 +39,14 @@ class DailyQueueNumber extends Model
                 
                 return 1;
             }
-
+ 
             $nextNumber = $record->last_number + 1;
             $record->update(['last_number' => $nextNumber]);
             
             return $nextNumber;
         });
     }
-
+ 
     /**
      * Get the current queue number without incrementing.
      */
@@ -54,7 +54,7 @@ class DailyQueueNumber extends Model
     {
         $today = now()->toDateString();
         
-        $record = static::where('date', $today)->first();
+        $record = static::whereDate('date', $today)->first();
         
         return $record ? $record->last_number : 0;
     }

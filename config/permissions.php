@@ -47,6 +47,7 @@ return [
         'view_financial_reports' => 'Lihat Laporan Keuangan',
         'view_peak_hours_reports' => 'Lihat Laporan Jam Sibuk',
         'view_cancellation_reports' => 'Lihat Laporan Pembatalan',
+        'view_inventory_reports' => 'Lihat Laporan Inventori & Produksi',
         'export_reports' => 'Ekspor Laporan',
         
         // Settings
@@ -60,6 +61,20 @@ return [
         'edit_users' => 'Edit Pengguna',
         'delete_users' => 'Hapus Pengguna',
         'manage_roles' => 'Kelola Peran',
+
+        // Inventory & Production
+        'manage_unlimited_stock' => 'Kelola Stok Unlimited Produk',
+        'view_ingredients' => 'Lihat Bahan Baku',
+        'create_ingredients' => 'Buat Bahan Baku',
+        'edit_ingredients' => 'Edit Bahan Baku',
+        'delete_ingredients' => 'Hapus Bahan Baku',
+        'view_purchases' => 'Lihat Pembelian Stok',
+        'create_purchases' => 'Buat Pembelian Stok',
+        'view_productions' => 'Lihat Repacking / Produksi',
+        'create_productions' => 'Buat Repacking / Produksi',
+        'view_hpp_calculator' => 'Lihat & Gunakan Kalkulator HPP',
+        'apply_hpp_calculator' => 'Terapkan HPP ke Produk',
+        'view_menu_catalog' => 'Lihat Katalog Menu',
     ],
     
     /**
@@ -78,12 +93,26 @@ return [
             'edit_products',
             'delete_products',
             'adjust_stock',
+            'manage_unlimited_stock',
+            'view_menu_catalog',
         ],
         'Modifier' => [
             'view_modifiers',
             'create_modifiers',
             'edit_modifiers',
             'delete_modifiers',
+        ],
+        'Inventori & Produksi' => [
+            'view_ingredients',
+            'create_ingredients',
+            'edit_ingredients',
+            'delete_ingredients',
+            'view_purchases',
+            'create_purchases',
+            'view_productions',
+            'create_productions',
+            'view_hpp_calculator',
+            'apply_hpp_calculator',
         ],
         'Transaksi' => [
             'access_pos',
@@ -104,6 +133,7 @@ return [
             'view_financial_reports',
             'view_peak_hours_reports',
             'view_cancellation_reports',
+            'view_inventory_reports',
             'export_reports',
         ],
         'Pengaturan' => [

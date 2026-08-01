@@ -2,6 +2,9 @@
 
 namespace App\Livewire\Admin;
 
+use App\Models\Category;
+use App\Models\Transaction;
+use App\Models\TransactionDetail;
 use App\Services\ReportService;
 use Carbon\Carbon;
 use Livewire\Attributes\Layout;
@@ -152,8 +155,6 @@ class SalesReport extends Component
     public function applyDateRange(): void
     {
         // Manual date range picked by user via Flatpickr
-        // Period type is already 'daily' or implicitly 'daily' when picking range
-        // Just refresh data
         $this->resetPage();
     }
 
@@ -195,7 +196,6 @@ class SalesReport extends Component
             ]);
         }
         
-        // Default export for Analysis (maybe just summary or empty for now if not implemented)
         return '#'; 
     }
 
@@ -211,10 +211,6 @@ class SalesReport extends Component
         $serviceAreaReport = [];
         $topProducts = [];
         $peakHours = [];
-        // Note: dailySummary logic might need adjustment if service only supports single day
-        // For now, passing endDate. If User selects range, this might only show last day stats.
-        // Ideally should refactor service, but let's keep it safe.
-        // Calculate Summary based on Range using Service
         $dailySummary = $reportService->getRangeSummaryReport($start, $end);
 
         if ($this->activeTab === 'analysis') {
@@ -225,57 +221,15 @@ class SalesReport extends Component
         }
 
         if ($this->activeTab === 'categories') {
-            $categoryReport = \App\Models\TransactionDetail::query()
-                ->join('products', 'transaction_details.product_id', '=', 'products.id')
-                ->join('categories', 'products.category_id', '=', 'categories.id')
-                ->join('transactions', 'transaction_details.transaction_id', '=', 'transactions.id')
-                ->where('transactions.status', 'completed')
-                ->whereBetween('transactions.created_at', [$start, $end])
-                ->groupBy('categories.id', 'categories.name')
-                ->selectRaw('
-                    categories.id as category_id,
-                    categories.name as category_name, 
-                    SUM(transaction_details.subtotal) as total_sales, 
-                    SUM(transaction_details.quantity) as total_quantity,
-                    COUNT(DISTINCT transactions.id) as transaction_count
-                ')
-                ->orderByDesc('total_sales')
-                ->paginate(10);
+            $categoryReport = Transaction::getSalesByCategoryReport($start, $end);
         }
 
         if ($this->activeTab === 'payments') {
-            $paymentReport = \App\Models\Transaction::query()
-                ->leftJoin('payment_sources', 'transactions.payment_source_id', '=', 'payment_sources.id')
-                ->where('transactions.status', 'completed')
-                ->whereBetween('transactions.created_at', [$start, $end])
-                ->groupBy('transactions.payment_method', 'payment_sources.name')
-                ->selectRaw('
-                    CASE 
-                        WHEN transactions.payment_method = "cash" THEN "Tunai"
-                        ELSE COALESCE(payment_sources.name, transactions.payment_method)
-                    END as payment_name,
-                    COUNT(*) as transaction_count,
-                    SUM(transactions.total) as total_sales,
-                    AVG(transactions.total) as average_amount
-                ')
-                ->orderByDesc('total_sales')
-                ->paginate(10);
+            $paymentReport = Transaction::getSalesByPaymentReport($start, $end);
         }
 
         if ($this->activeTab === 'service_areas') {
-            $serviceAreaReport = \App\Models\Transaction::query()
-                ->join('service_areas', 'transactions.service_area_id', '=', 'service_areas.id')
-                ->where('transactions.status', 'completed')
-                ->whereBetween('transactions.created_at', [$start, $end])
-                ->groupBy('service_areas.id', 'service_areas.name')
-                ->selectRaw('
-                    service_areas.name as area_name,
-                    COUNT(transactions.id) as transaction_count,
-                    SUM(transactions.total) as total_sales,
-                    AVG(transactions.total) as average_amount
-                ')
-                ->orderByDesc('transaction_count')
-                ->paginate(10);
+            $serviceAreaReport = Transaction::getSalesByServiceAreaReport($start, $end);
         }
 
         // Data for Products Tab
@@ -284,44 +238,14 @@ class SalesReport extends Component
         $productSummary = [];
 
         if ($this->activeTab === 'products') {
-            $categories = \App\Models\Category::orderBy('name')->get();
+            $categories = Category::getAllSortedByName();
+            $productSales = TransactionDetail::getProductSalesReport($start, $end, $this->categoryId);
             
-            $productSales = \App\Models\TransactionDetail::query()
-                ->join('transactions', 'transaction_details.transaction_id', '=', 'transactions.id')
-                ->join('products', 'transaction_details.product_id', '=', 'products.id')
-                ->leftJoin('categories', 'products.category_id', '=', 'categories.id')
-                ->where('transactions.status', 'completed')
-                ->whereBetween('transactions.created_at', [$start, $end])
-                ->when($this->categoryId, fn($q) => $q->where('products.category_id', $this->categoryId))
-                ->selectRaw('
-                    products.id as product_id,
-                    products.name as product_name,
-                    categories.name as category_name,
-                    SUM(transaction_details.quantity) as total_qty,
-                    AVG(transaction_details.unit_price) as avg_price,
-                    SUM(transaction_details.subtotal) as total_revenue
-                ')
-                ->groupBy('products.id', 'products.name', 'categories.name')
-                ->orderByDesc('total_revenue')
-                ->paginate(20);
-
-            // Summary specific to Product Tab
+            $summaryData = TransactionDetail::getProductSalesSummary($start, $end, $this->categoryId);
             $productSummary = [
                 'total_products' => $productSales->total(),
-                'total_qty' => \App\Models\TransactionDetail::query()
-                    ->join('transactions', 'transaction_details.transaction_id', '=', 'transactions.id')
-                    ->join('products', 'transaction_details.product_id', '=', 'products.id') // Join products for category filter
-                    ->where('transactions.status', 'completed')
-                    ->whereBetween('transactions.created_at', [$start, $end])
-                    ->when($this->categoryId, fn($q) => $q->where('products.category_id', $this->categoryId))
-                    ->sum('transaction_details.quantity'),
-                'total_revenue' => \App\Models\TransactionDetail::query()
-                    ->join('transactions', 'transaction_details.transaction_id', '=', 'transactions.id')
-                    ->join('products', 'transaction_details.product_id', '=', 'products.id')
-                    ->where('transactions.status', 'completed')
-                    ->whereBetween('transactions.created_at', [$start, $end])
-                    ->when($this->categoryId, fn($q) => $q->where('products.category_id', $this->categoryId))
-                    ->sum('transaction_details.subtotal'),
+                'total_qty' => $summaryData['total_qty'],
+                'total_revenue' => $summaryData['total_revenue'],
             ];
         }
 

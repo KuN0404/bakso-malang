@@ -54,7 +54,7 @@ class KitchenDisplay extends Component
         // If no shift selected, show selection screen
         if (!$this->selectedShiftId) {
             return view('livewire.kitchen-display', [
-                'shifts' => \App\Models\Shift::where('status', 'open')->with('user')->orderBy('created_at', 'desc')->get()
+                'shifts' => \App\Models\Shift::getOpenShifts()
             ])->layout('layouts.pos');
         }
 
@@ -64,7 +64,7 @@ class KitchenDisplay extends Component
             $this->changeShift(); // Reset and clear session
             $this->dispatch('notify', type: 'warning', message: 'Shift kasir telah ditutup.');
             return view('livewire.kitchen-display', [
-                'shifts' => \App\Models\Shift::where('status', 'open')->with('user')->orderBy('created_at', 'desc')->get()
+                'shifts' => \App\Models\Shift::getOpenShifts()
             ])->layout('layouts.pos');
         }
 
@@ -74,19 +74,7 @@ class KitchenDisplay extends Component
 
         $targetSlugs = $this->activeTab === 'drink' ? $drinkSlugs : $foodSlugs;
 
-        $items = TransactionDetail::query()
-            ->with(['transaction.user', 'transaction.serviceArea', 'product.category', 'modifiers'])
-            ->whereHas('transaction', function ($q) {
-                // Filter by selected shift
-                $q->where('shift_id', $this->selectedShiftId)
-                  ->whereIn('status', ['pending', 'completed']);
-            })
-            ->where('status', 'pending') // Item status logic
-            ->whereHas('product.category', function ($q) use ($targetSlugs) {
-                $q->whereIn('slug', $targetSlugs);
-            })
-            ->orderBy('created_at', 'asc') // FIFO
-            ->get()
+        $items = TransactionDetail::getKitchenQueue($this->selectedShiftId, $targetSlugs)
             ->groupBy('transaction_id'); // Group by Order for "Queue" visualization
 
         return view('livewire.kitchen-display', [

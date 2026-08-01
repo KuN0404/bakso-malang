@@ -5,9 +5,12 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
+use App\Traits\SyncsToReport;
 
 class Category extends Model
 {
+    use SyncsToReport;
+
     protected $fillable = [
         'name',
         'slug',
@@ -52,4 +55,67 @@ class Category extends Model
     {
         return $query->orderBy('sort_order')->orderBy('name');
     }
+
+    /**
+     * Scope untuk tampilan POS: hanya yang aktif, diurutkan berdasarkan sort_order.
+     */
+    public function scopeForPos($query)
+    {
+        return $query->where('is_active', true)->orderBy('sort_order')->orderBy('name');
+    }
+
+    /**
+     * Get maximum sort order value.
+     */
+    public static function getMaxSortOrder(): int
+    {
+        return static::max('sort_order') ?? 0;
+    }
+
+    /**
+     * Check if a sort order exists.
+     */
+    public static function isSortOrderExists(int $sortOrder, ?int $exceptId = null): bool
+    {
+        return static::where('sort_order', $sortOrder)
+            ->when($exceptId, fn($q) => $q->where('id', '!=', $exceptId))
+            ->exists();
+    }
+
+    /**
+     * Get paginated categories with product counts.
+     */
+    public static function getPaginated(string $search = '', int $perPage = 10): \Illuminate\Contracts\Pagination\LengthAwarePaginator
+    {
+        return static::query()
+            ->when($search, fn($q) => $q->where('name', 'like', "%{$search}%"))
+            ->withCount('products')
+            ->orderBy('sort_order')
+            ->paginate($perPage);
+    }
+
+    /**
+     * Check if category exists by ID.
+     */
+    public static function existsById(int $id): bool
+    {
+        return static::where('id', $id)->exists();
+    }
+
+    /**
+     * Check if category exists by slug.
+     */
+    public static function existsBySlug(string $slug): bool
+    {
+        return static::where('slug', $slug)->exists();
+    }
+
+    /**
+     * Get all categories sorted by name.
+     */
+    public static function getAllSortedByName(): \Illuminate\Database\Eloquent\Collection
+    {
+        return static::orderBy('name')->get();
+    }
 }
+

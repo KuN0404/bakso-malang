@@ -17,6 +17,8 @@ return new class extends Migration
             $table->integer('quantity');
             $table->decimal('modifier_total', 12, 2)->default(0);
             $table->decimal('subtotal', 14, 2);
+            $table->string('status')->default('pending');
+            $table->timestamp('fulfilled_at')->nullable();
             $table->text('notes')->nullable();
             $table->timestamps();
             

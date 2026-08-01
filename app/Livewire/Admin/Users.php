@@ -7,7 +7,7 @@ use Livewire\Attributes\Layout;
 use Livewire\Attributes\Rule;
 use Livewire\Component;
 use Livewire\WithPagination;
-use Spatie\Permission\Models\Role;
+use App\Models\Role;
 
 #[Layout('layouts.admin')]
 class Users extends Component
@@ -43,7 +43,7 @@ class Users extends Component
 
     public function edit(int $id): void
     {
-        $user = User::with('roles')->findOrFail($id);
+        $user = User::getForEdit($id);
         $this->editingId = $user->id;
         $this->username = $user->username;
         $this->name = $user->name;
@@ -123,7 +123,7 @@ class Users extends Component
             return;
         }
 
-        $user = User::with('roles')->findOrFail($id);
+        $user = User::getForEdit($id);
         
         if ($user->hasRole('Super Admin')) {
             $this->dispatch('notify', type: 'error', message: 'Super Admin tidak dapat dihapus');
@@ -136,12 +136,8 @@ class Users extends Component
 
     public function render()
     {
-        $users = User::with('roles')
-            ->when($this->search, fn($q) => $q->where('name', 'like', "%{$this->search}%")->orWhere('username', 'like', "%{$this->search}%"))
-            ->latest()
-            ->paginate(10);
-
-        $roles = Role::where('name', '!=', 'Super Admin')->get();
+        $users = User::getPaginated($this->search, 10);
+        $roles = Role::getAssignableRoles();
 
         return view('livewire.admin.users', compact('users', 'roles'))
             ->title('Pengguna');

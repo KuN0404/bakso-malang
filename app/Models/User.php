@@ -9,10 +9,11 @@ use Illuminate\Notifications\Notifiable;
 use Spatie\Permission\Traits\HasRoles;
 use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\Activitylog\LogOptions;
+use App\Traits\SyncsToReport;
 
 class User extends Authenticatable
 {
-    use HasFactory, Notifiable, HasRoles, LogsActivity;
+    use HasFactory, Notifiable, HasRoles, LogsActivity, SyncsToReport;
 
     protected $fillable = [
         'username',
@@ -73,9 +74,45 @@ class User extends Authenticatable
         }
 
         return $this->shifts()->create([
-            'started_at' => now(),
+            'started_at'   => now(),
             'opening_cash' => $openingCash,
-            'status' => 'open',
+            'status'       => 'open',
         ]);
     }
+
+    /**
+     * Get paginated users list with roles.
+     */
+    public static function getPaginated(string $search = '', int $perPage = 10): \Illuminate\Contracts\Pagination\LengthAwarePaginator
+    {
+        return static::with('roles')
+            ->when($search, fn($q) => $q->where('name', 'like', "%{$search}%")->orWhere('username', 'like', "%{$search}%"))
+            ->latest()
+            ->paginate($perPage);
+    }
+
+    /**
+     * Find user with roles for editing.
+     */
+    public static function getForEdit(int $id): self
+    {
+        return static::with('roles')->findOrFail($id);
+    }
+
+    /**
+     * Get all users sorted by name.
+     */
+    public static function getAllSortedByName(): \Illuminate\Database\Eloquent\Collection
+    {
+        return static::orderBy('name')->get();
+    }
+
+    /**
+     * Get users who have transactions (for cashier filter dropdown).
+     */
+    public static function getCashiersWithTransactions(): \Illuminate\Database\Eloquent\Collection
+    {
+        return static::whereHas('transactions')->orderBy('name')->get(['id', 'name']);
+    }
 }
+

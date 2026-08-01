@@ -7,11 +7,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Storage;
+use App\Traits\SyncsToReport;
 
 class Product extends Model
 {
-    use SoftDeletes;
-    use \Spatie\Activitylog\Traits\LogsActivity;
+    use SoftDeletes, \Spatie\Activitylog\Traits\LogsActivity, SyncsToReport;
     
     protected $fillable = [
         'category_id',
@@ -133,6 +133,14 @@ class Product extends Model
         });
     }
 
+    /**
+     * Get product with active modifiers for POS cart additions.
+     */
+    public static function getForPos(int $id): ?self
+    {
+        return static::with('modifierGroups.activeModifiers')->find($id);
+    }
+
     public function getFormattedPriceAttribute(): string
     {
         return 'Rp ' . number_format($this->price, 0, ',', '.');
@@ -141,6 +149,14 @@ class Product extends Model
     public function stockLogs()
     {
         return $this->hasMany(StockLog::class)->latest();
+    }
+
+    /**
+     * Get paginated stock logs for the product.
+     */
+    public function getPaginatedStockLogs(int $perPage = 10): \Illuminate\Contracts\Pagination\LengthAwarePaginator
+    {
+        return $this->stockLogs()->with('user')->paginate($perPage);
     }
 
     public function isAvailable(): bool
@@ -168,5 +184,59 @@ class Product extends Model
         }
 
         return false;
+    }
+
+    /**
+     * Scope untuk tampilan POS: ambil produk aktif dengan filter kategori dan pencarian.
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder  $query
+     * @param  int|null  $categoryId
+     * @param  string|null  $search
+     */
+    public function scopeForPosDisplay($query, ?int $categoryId = null, ?string $search = null)
+    {
+        $query->where('is_active', true)
+            ->with(['category', 'modifierGroups.activeModifiers']);
+
+        if ($categoryId) {
+            $query->where('category_id', $categoryId);
+        }
+
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('sku', 'like', "%{$search}%");
+            });
+        }
+
+        return $query;
+    }
+
+    /**
+     * Get paginated products for admin view with search and category filtering.
+     */
+    public static function getPaginatedForAdmin(?string $search = null, ?string $filterCategory = null, int $perPage = 10): \Illuminate\Contracts\Pagination\LengthAwarePaginator
+    {
+        return static::with('category')
+            ->when($search, fn($q) => $q->where('name', 'like', "%{$search}%")->orWhere('sku', 'like', "%{$search}%"))
+            ->when($filterCategory, fn($q) => $q->whereHas('category', fn($c) => $c->where('slug', $filterCategory)))
+            ->latest()
+            ->paginate($perPage);
+    }
+
+    /**
+     * Get products by IDs with pessimistic locking for order processing.
+     */
+    public static function getForCheckout(array $productIds): \Illuminate\Database\Eloquent\Collection
+    {
+        return static::whereIn('id', $productIds)->lockForUpdate()->get();
+    }
+
+    /**
+     * Get product with modifier groups for editing.
+     */
+    public static function getWithModifierGroups(int $id): self
+    {
+        return static::with('modifierGroups')->findOrFail($id);
     }
 }

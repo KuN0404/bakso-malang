@@ -53,8 +53,7 @@ class PaymentSources extends Component
     {
         $this->reset(['editingId', 'name', 'type', 'description', 'is_active', 'sort_order']);
         $this->is_active = true;
-        // Auto-fill sort_order with next available (max + 1)
-        $this->sort_order = (PaymentSource::max('sort_order') ?? 0) + 1;
+        $this->sort_order = PaymentSource::getMaxSortOrder() + 1;
         $this->showModal = true;
     }
 
@@ -115,18 +114,12 @@ class PaymentSources extends Component
 
     public function render()
     {
-        $sources = PaymentSource::query()
-            ->when($this->search, fn($q) => $q->where('name', 'like', "%{$this->search}%"))
-            ->orderBy('sort_order')
-            ->paginate(10);
+        $sources = PaymentSource::getPaginated($this->search, 10);
 
         // Smart Redirect: If page > lastPage, redirect to lastPage
         if ($sources->lastPage() < $this->getPage() && $sources->lastPage() > 0) {
             $this->setPage($sources->lastPage());
-            $sources = PaymentSource::query()
-                ->when($this->search, fn($q) => $q->where('name', 'like', "%{$this->search}%"))
-                ->orderBy('sort_order')
-                ->paginate(10);
+            $sources = PaymentSource::getPaginated($this->search, 10);
         }
 
         return view('livewire.admin.payment-sources', compact('sources'))

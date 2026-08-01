@@ -16,17 +16,11 @@ class PrintController extends Controller
         $cashierId = $request->query('cashier');
         $format = $request->query('format', 'A4');
 
-        $transactions = Transaction::with(['user', 'paymentSource'])
-            ->whereBetween('created_at', [$start, $end])
-            ->where('status', 'completed')
-            ->when($search, fn($q) => $q->where('invoice_number', 'like', "%{$search}%"))
-            ->when($cashierId, fn($q) => $q->where('user_id', $cashierId))
-            ->latest()
-            ->get();
+        $transactions = Transaction::getForPrintTable($start, $end, $search, $cashierId);
 
         $summary = [
             'total_transactions' => $transactions->count(),
-            'total_revenue' => $transactions->sum('total'),
+            'total_revenue'      => $transactions->sum('total'),
         ];
 
         return view('print.transactions-table', compact('transactions', 'start', 'end', 'summary', 'format'));
@@ -40,17 +34,11 @@ class PrintController extends Controller
         $cashierId = $request->query('cashier');
         $format = $request->query('format', 'A4');
 
-        $transactions = Transaction::with(['user', 'paymentSource', 'details.product', 'details.modifiers'])
-            ->whereBetween('created_at', [$start, $end])
-            ->where('status', 'completed')
-            ->when($search, fn($q) => $q->where('invoice_number', 'like', "%{$search}%"))
-            ->when($cashierId, fn($q) => $q->where('user_id', $cashierId))
-            ->latest()
-            ->get();
-            
+        $transactions = Transaction::getForPrintDetail($start, $end, $search, $cashierId);
+
         $summary = [
             'total_transactions' => $transactions->count(),
-            'total_revenue' => $transactions->sum('total'),
+            'total_revenue'      => $transactions->sum('total'),
         ];
 
         return view('print.transactions-detail', compact('transactions', 'start', 'end', 'summary', 'format'));
@@ -62,28 +50,20 @@ class PrintController extends Controller
         $end = Carbon::parse($request->query('end'))->endOfDay();
         $search = $request->query('search');
 
-        $returns = \App\Models\ProductReturn::with(['items.product', 'transaction', 'user'])
-            ->whereBetween('created_at', [$start, $end])
-            ->when($search, function($q) use ($search) {
-                 $q->where('return_number', 'like', "%{$search}%")
-                   ->orWhereHas('transaction', fn($st) => $st->where('invoice_number', 'like', "%{$search}%"));
-            })
-            ->orderBy('created_at', 'desc')
-            ->get();
+        $returns = \App\Models\ProductReturn::getForPrintReport($start, $end, $search);
 
-        // Calculate Totals based on DATE RANGE (consistent with dashboard cards)
-        $todayTotal = \App\Models\ProductReturn::whereBetween('created_at', [$start, $end])->sum('total_refund');
-        $returnsCount = \App\Models\ProductReturn::whereBetween('created_at', [$start, $end])->count();
-        $returnsQty = \App\Models\ReturnItem::whereHas('return', function($q) use ($start, $end) {
-            $q->whereBetween('created_at', [$start, $end]);
-        })->sum('quantity');
+        // Use model helper for summary calculations
+        $summary = \App\Models\ProductReturn::getReturnsSummary($start, $end);
+        $todayTotal   = $summary['today_total'];
+        $returnsCount = $summary['returns_count'];
+        $returnsQty   = $summary['returns_qty'];
 
         $format = $request->query('format', 'A4');
         return view('print.returns-report', compact('returns', 'start', 'end', 'todayTotal', 'returnsCount', 'returnsQty', 'format'));
     }
     public function returnDetail(Request $request, $id)
     {
-        $return = \App\Models\ProductReturn::with(['items.product', 'transaction', 'user'])->findOrFail($id);
+        $return = \App\Models\ProductReturn::getForDetail($id);
         $format = $request->query('format', '58mm');
         return view('print.return-detail', compact('return', 'format'));
     }
@@ -91,10 +71,10 @@ class PrintController extends Controller
     public function transactionSingle(Request $request, Transaction $transaction)
     {
         $format = $request->query('format', '58mm');
-        $transaction->increment('print_count');
+        Transaction::incrementPrintCount($transaction->id);
 
         // Load relationships
-        $transaction->load(['user', 'paymentSource', 'details.product', 'details.modifiers', 'details.product.category']);
+        $transaction->loadForPrintSingle();
         
         return view('print.transaction-single', compact('transaction', 'format'));
     }
@@ -106,11 +86,7 @@ class PrintController extends Controller
         $cashierId = $request->query('cashier');
         $format = $request->query('format', 'A4');
 
-        $shifts = \App\Models\Shift::with(['user', 'transactions', 'expenses'])
-            ->whereBetween('started_at', [$start, $end])
-            ->when($cashierId, fn($q) => $q->where('user_id', $cashierId))
-            ->latest('started_at')
-            ->get();
+        $shifts = \App\Models\Shift::getForPrintTable($start, $end, $cashierId);
 
         $summary = [
             'total_shifts' => $shifts->count(),
@@ -125,7 +101,7 @@ class PrintController extends Controller
     public function shiftDetail(Request $request, \App\Models\Shift $shift)
     {
         $format = $request->query('format', '58mm');
-        $shift->load(['user', 'transactions.paymentSource', 'expenses']);
+        $shift->loadForPrintDetail();
         
         return view('print.shift-detail', compact('shift', 'format'));
     }
@@ -136,9 +112,7 @@ class PrintController extends Controller
         $format = $request->query('format', '58mm');
 
         // Eager load for performance
-        $shift->load(['user', 'expenses', 'transactions' => function($q) {
-             $q->where('status', 'completed')->orderBy('created_at');
-        }]);
+        $shift->loadForPrintCustom();
 
         if ($type === 'detail') {
             if (in_array($format, ['A4', 'A5'])) {
@@ -168,6 +142,47 @@ class PrintController extends Controller
         return view('print.sales-report', compact(
             'start', 'end', 'format',
             'summary', 'categories', 'payments', 'topProducts'
+        ));
+    }
+
+    public function inventoryReport(Request $request)
+    {
+        $start = Carbon::parse($request->query('start', now()->format('Y-m-d')))->startOfDay();
+        $end = Carbon::parse($request->query('end', now()->format('Y-m-d')))->endOfDay();
+        $tab = $request->query('tab', 'valuation');
+        $search = $request->query('search');
+        $format = $request->query('format', 'A4');
+
+        $totalIngredients = \App\Models\Ingredient::count();
+        $criticalStockCount = \App\Models\Ingredient::whereColumn('stock', '<=', 'minimum_stock')->count();
+        $totalAssetValue = \App\Models\Ingredient::select(\Illuminate\Support\Facades\DB::raw('SUM(stock * cost_price) as total_asset'))->value('total_asset') ?? 0;
+
+        $ingredients = \App\Models\Ingredient::when($search, fn($q) => $q->where('name', 'like', "%{$search}%")->orWhere('code', 'like', "%{$search}%"))->orderBy('name')->get();
+
+        $purchases = \App\Models\Purchase::with(['items.ingredient', 'items.product', 'user'])
+            ->whereBetween('purchase_date', [$start->format('Y-m-d'), $end->format('Y-m-d')])
+            ->when($search, fn($q) => $q->where('invoice_number', 'like', "%{$search}%")->orWhere('supplier_name', 'like', "%{$search}%"))
+            ->orderByDesc('purchase_date')
+            ->get();
+
+        $productions = \App\Models\Production::with(['inputs.ingredient', 'outputs.product', 'user'])
+            ->whereBetween('production_date', [$start->format('Y-m-d'), $end->format('Y-m-d')])
+            ->when($search, fn($q) => $q->where('production_code', 'like', "%{$search}%"))
+            ->orderByDesc('production_date')
+            ->get();
+
+        $stockLogs = \App\Models\IngredientStockLog::with(['ingredient', 'user'])
+            ->whereBetween('created_at', [$start, $end])
+            ->when($search, function ($q) use ($search) {
+                $q->whereHas('ingredient', fn($ing) => $ing->where('name', 'like', "%{$search}%")->orWhere('code', 'like', "%{$search}%"));
+            })
+            ->orderByDesc('created_at')
+            ->get();
+
+        return view('print.inventory-report', compact(
+            'start', 'end', 'tab', 'search', 'format',
+            'totalIngredients', 'criticalStockCount', 'totalAssetValue',
+            'ingredients', 'purchases', 'productions', 'stockLogs'
         ));
     }
 }

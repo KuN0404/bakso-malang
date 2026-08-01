@@ -5,8 +5,12 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+use App\Traits\SyncsToReport;
+
 class ServiceArea extends Model
 {
+    use SyncsToReport;
+
     protected $fillable = [
         'name',
         'code',
@@ -52,5 +56,37 @@ class ServiceArea extends Model
     public function getTypeLabelAttribute(): string
     {
         return self::TYPE_LABELS[$this->type] ?? $this->type;
+    }
+
+    /**
+     * Get maximum sort order value.
+     */
+    public static function getMaxSortOrder(): int
+    {
+        return static::max('sort_order') ?? 0;
+    }
+
+    /**
+     * Get paginated service areas with transaction counts.
+     */
+    public static function getPaginated(string $search = '', string $filterType = '', int $perPage = 10): \Illuminate\Contracts\Pagination\LengthAwarePaginator
+    {
+        return static::query()
+            ->when($search, fn($q) => $q->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('code', 'like', "%{$search}%");
+            }))
+            ->when($filterType, fn($q) => $q->where('type', $filterType))
+            ->withCount('transactions')
+            ->orderBy('sort_order')
+            ->paginate($perPage);
+    }
+
+    /**
+     * Check if area has any completed transactions.
+     */
+    public function hasCompletedTransactions(): bool
+    {
+        return $this->transactions()->where('status', 'completed')->exists();
     }
 }

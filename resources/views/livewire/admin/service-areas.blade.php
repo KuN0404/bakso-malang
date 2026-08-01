@@ -29,7 +29,7 @@
     </div>
 
     <!-- Table -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden relative">
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-x-auto relative">
         <!-- Loading Overlay -->
         <div wire:loading.flex wire:target="search, filterType, gotoPage, previousPage, nextPage" class="absolute inset-0 bg-white/70 z-10 items-center justify-center">
             <div class="flex flex-col items-center gap-2">
@@ -173,7 +173,11 @@
                     </div>
                     <div class="flex gap-3 pt-4">
                         <button type="button" wire:click="closeModal" class="flex-1 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg">Batal</button>
-                        <button type="submit" class="flex-1 py-2 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-lg">Simpan</button>
+                        <button
+                            type="submit"
+                            wire:loading.attr="disabled"
+                            class="flex-1 py-2 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                        >Simpan</button>
                     </div>
                 </form>
             </div>
@@ -192,7 +196,11 @@
                     <p class="text-gray-500 mb-6">Area yang sudah memiliki transaksi tidak dapat dihapus.</p>
                     <div class="flex gap-3">
                         <button wire:click="cancelDelete" class="flex-1 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg">Batal</button>
-                        <button wire:click="delete" class="flex-1 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg">Ya, Hapus</button>
+                        <button
+                            wire:click="delete"
+                            wire:loading.attr="disabled"
+                            class="flex-1 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                        >Ya, Hapus</button>
                     </div>
                 </div>
             </div>

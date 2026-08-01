@@ -3,19 +3,23 @@
     deleteType: '', 
     deleteId: null, 
     deleteName: '',
+    isDeleting: false,
     openDelete(type, id, name) {
         this.deleteType = type;
         this.deleteId = id;
         this.deleteName = name;
+        this.isDeleting = false;
         this.showDeleteModal = true;
     },
     confirmDelete() {
+        if (this.isDeleting) return;
+        this.isDeleting = true;
+        this.showDeleteModal = false;
         if (this.deleteType === 'group') {
             $wire.deleteGroup(this.deleteId);
         } else {
             $wire.deleteModifier(this.deleteId);
         }
-        this.showDeleteModal = false;
     }
 }">
     <div class="flex items-center justify-between mb-6">
@@ -166,7 +170,11 @@
                     </div>
                     <div class="flex gap-3 pt-4">
                         <button type="button" wire:click="$set('showGroupModal', false)" class="flex-1 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg">Batal</button>
-                        <button type="submit" class="flex-1 py-2 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-lg">Simpan</button>
+                        <button
+                            type="submit"
+                            wire:loading.attr="disabled"
+                            class="flex-1 py-2 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                        >Simpan</button>
                     </div>
                 </form>
             </div>
@@ -241,7 +249,11 @@
                     </label>
                     <div class="flex gap-3 pt-4">
                         <button type="button" wire:click="$set('showModifierModal', false)" class="flex-1 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg">Batal</button>
-                        <button type="submit" class="flex-1 py-2 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-lg">Simpan</button>
+                        <button
+                            type="submit"
+                            wire:loading.attr="disabled"
+                            class="flex-1 py-2 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                        >Simpan</button>
                     </div>
                 </form>
             </div>
@@ -285,7 +297,8 @@
                 
                 <button 
                     @click="confirmDelete()" 
-                    class="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white font-medium rounded-xl shadow-lg shadow-red-600/30 transition-colors"
+                    :disabled="isDeleting"
+                    class="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white font-medium rounded-xl shadow-lg shadow-red-600/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     Ya, Hapus
                 </button>

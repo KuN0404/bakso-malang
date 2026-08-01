@@ -31,8 +31,7 @@ class Products extends Component
 
         // Validate Filter Category Slug from URL
         if ($this->filterCategory) {
-            $exists = Category::where('slug', $this->filterCategory)->exists();
-            if (!$exists) {
+            if (!Category::existsBySlug($this->filterCategory)) {
                 $this->filterCategory = ''; // Reset if invalid
             }
         }
@@ -180,14 +179,14 @@ class Products extends Component
             $product->update(['track_stock' => true]);
         }
 
-        StockLog::create([
-            'product_id' => $product->id,
-            'user_id' => Auth::id(),
-            'type' => $type,
-            'amount' => $amount,
-            'final_stock' => $newStock,
-            'note' => $note,
-        ]);
+        StockLog::record(
+            productId:  $product->id,
+            userId:     Auth::id(),
+            type:       $type,
+            amount:     $amount,
+            finalStock: $newStock,
+            note:       $note
+        );
 
         $this->showStockModal = false;
         $this->dispatch('notify', type: 'success', message: "Stok {$product->name} berhasil diperbarui ({$logType})");
@@ -205,7 +204,7 @@ class Products extends Component
 
     public function edit(int $id): void
     {
-        $product = Product::with('modifierGroups')->findOrFail($id);
+        $product = Product::getWithModifierGroups($id);
         $this->editingId = $product->id;
         $this->category_id = $product->category_id;
         $this->name = $product->name;
@@ -247,6 +246,14 @@ class Products extends Component
         
         $this->validate($rules, $messages);
 
+        $trackStock = $this->editingId
+            ? (Product::find($this->editingId)?->track_stock ?? false)
+            : false;
+
+        if (Auth::user()?->can('manage_unlimited_stock')) {
+            $trackStock = !$this->is_unlimited;
+        }
+
         $data = [
             'category_id' => $this->category_id,
             'name' => $this->name,
@@ -256,7 +263,7 @@ class Products extends Component
             'cost_price' => $this->cost_price,
             'is_active' => $this->is_active,
             'is_featured' => $this->is_featured,
-            'track_stock' => !$this->is_unlimited,
+            'track_stock' => $trackStock,
             'stock' => $this->stock,
         ];
 
@@ -286,14 +293,14 @@ class Products extends Component
             
             // Log initial stock if any
             if ($this->stock > 0) {
-                StockLog::create([
-                    'product_id' => $product->id,
-                    'user_id' => Auth::id(),
-                    'type' => 'initial',
-                    'amount' => $this->stock,
-                    'final_stock' => $this->stock,
-                    'note' => 'Stok awal saat pembuatan produk',
-                ]);
+                StockLog::record(
+                    productId:  $product->id,
+                    userId:     Auth::id(),
+                    type:       'initial',
+                    amount:     $this->stock,
+                    finalStock: $this->stock,
+                    note:       'Stok awal saat pembuatan produk'
+                );
             }
 
             $this->dispatch('notify', type: 'success', message: 'Produk berhasil ditambahkan');
@@ -344,22 +351,13 @@ class Products extends Component
 
     public function render()
     {
-        $products = Product::with('category')
-            ->when($this->search, fn($q) => $q->where('name', 'like', "%{$this->search}%")->orWhere('sku', 'like', "%{$this->search}%"))
-            // Filter by Category Slug
-            ->when($this->filterCategory, fn($q) => $q->whereHas('category', fn($c) => $c->where('slug', $this->filterCategory)))
-            ->latest()
-            ->paginate($this->perPage);
+        $products = Product::getPaginatedForAdmin($this->search, $this->filterCategory, $this->perPage);
 
         // Smart Redirect: If page > lastPage, redirect to lastPage
         if ($products->lastPage() < $this->getPage() && $products->lastPage() > 0) {
             $this->setPage($products->lastPage());
             // Re-query with correct page
-            $products = Product::with('category')
-                ->when($this->search, fn($q) => $q->where('name', 'like', "%{$this->search}%")->orWhere('sku', 'like', "%{$this->search}%"))
-                ->when($this->filterCategory, fn($q) => $q->where('category_id', $this->filterCategory))
-                ->latest()
-                ->paginate($this->perPage);
+            $products = Product::getPaginatedForAdmin($this->search, $this->filterCategory, $this->perPage);
         }
 
         $categories = Category::active()->ordered()->get();

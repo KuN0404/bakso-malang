@@ -126,7 +126,7 @@ class Returns extends Component
 
     public function viewDetail(int $id): void
     {
-        $this->selectedReturn = ProductReturn::with(['transaction', 'items', 'user'])->findOrFail($id);
+        $this->selectedReturn = ProductReturn::getForDetail($id);
         $this->showDetailModal = true;
     }
 
@@ -143,17 +143,12 @@ class Returns extends Component
         $start = \Carbon\Carbon::parse($this->startDate)->startOfDay();
         $end = \Carbon\Carbon::parse($this->endDate)->endOfDay();
 
-        $returns = ProductReturn::with(['transaction', 'user'])
-            ->whereBetween('created_at', [$start, $end])
-            ->when($this->search, fn($q) => $q->where('return_number', 'like', "%{$this->search}%"))
-            ->latest()
-            ->paginate(15);
+        $returns = ProductReturn::getPaginatedReport($start, $end, $this->search, 15);
 
-        $todayTotal = ProductReturn::whereBetween('created_at', [$start, $end])->sum('total_refund');
-        $returnsCount = ProductReturn::whereBetween('created_at', [$start, $end])->count();
-        $returnsQty = \App\Models\ReturnItem::whereHas('return', function($q) use ($start, $end) {
-            $q->whereBetween('created_at', [$start, $end]);
-        })->sum('quantity');
+        $summary = ProductReturn::getReturnsSummary($start, $end);
+        $todayTotal = $summary['today_total'];
+        $returnsCount = $summary['returns_count'];
+        $returnsQty = $summary['returns_qty'];
 
         return view('livewire.admin.returns', compact('returns', 'todayTotal', 'returnsCount', 'returnsQty'))
             ->title('Laporan Retur');

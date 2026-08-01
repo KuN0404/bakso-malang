@@ -22,7 +22,7 @@ class ProductDetail extends Component
     public function render()
     {
         return view('livewire.admin.product-detail', [
-            'stockLogs' => $this->product->stockLogs()->with('user')->latest()->paginate(10)
+            'stockLogs' => $this->product->getPaginatedStockLogs(10)
         ])->title('Detail Produk: ' . $this->product->name);
     }
 }

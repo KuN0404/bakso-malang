@@ -36,8 +36,13 @@ return [
     ],
 
     'recaptcha' => [
-        'site_key' => env('RECAPTCHA_SITE_KEY'),
+        'site_key'   => env('RECAPTCHA_SITE_KEY'),
         'secret_key' => env('RECAPTCHA_SECRET_KEY'),
+    ],
+
+    'turnstile' => [
+        'site_key'   => env('TURNSTILE_SITE_KEY'),
+        'secret_key' => env('TURNSTILE_SECRET_KEY'),
     ],
 
 ];

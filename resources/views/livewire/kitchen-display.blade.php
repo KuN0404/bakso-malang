@@ -58,8 +58,8 @@
         </div>
     @else
         <!-- Header -->
-        <header class="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between sticky top-0 z-50 shadow-sm">
-            <div class="flex items-center gap-4">
+        <header class="bg-white border-b border-gray-200 px-4 md:px-6 py-4 flex flex-wrap items-center justify-between gap-4 sticky top-0 z-50 shadow-sm">
+            <div class="flex flex-wrap items-center gap-4">
                 <div class="flex items-center gap-3">
                     <div class="w-10 h-10 bg-primary-600 rounded-lg flex items-center justify-center text-white">
                          <x-lucide name="chef-hat" class="w-6 h-6" />
@@ -73,14 +73,14 @@
                 <div class="flex bg-gray-100 p-1 rounded-lg">
                     <button 
                         wire:click="setTab('food')"
-                        class="px-6 py-2 rounded-md text-sm font-medium transition-all {{ $activeTab === 'food' ? 'bg-white text-primary-600 shadow-sm' : 'text-gray-500 hover:text-gray-700' }}"
+                        class="px-4 md:px-6 py-2 rounded-md text-sm font-medium transition-all {{ $activeTab === 'food' ? 'bg-white text-primary-600 shadow-sm' : 'text-gray-500 hover:text-gray-700' }}"
                     >
                         <x-lucide name="utensils" class="w-4 h-4 inline-block mr-2" />
                         Makanan
                     </button>
                     <button 
                         wire:click="setTab('drink')"
-                        class="px-6 py-2 rounded-md text-sm font-medium transition-all {{ $activeTab === 'drink' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700' }}"
+                        class="px-4 md:px-6 py-2 rounded-md text-sm font-medium transition-all {{ $activeTab === 'drink' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700' }}"
                     >
                         <x-lucide name="cup-soda" class="w-4 h-4 inline-block mr-2" />
                         Minuman

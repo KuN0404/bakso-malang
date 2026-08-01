@@ -19,6 +19,7 @@ return new class extends Migration
             $table->integer('amount');
             $table->integer('final_stock');
             $table->string('note')->nullable();
+            $table->unsignedBigInteger('reference_id')->nullable();
             $table->timestamps();
         });
     }

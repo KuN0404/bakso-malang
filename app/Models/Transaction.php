@@ -2,6 +2,9 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -13,6 +16,7 @@ class Transaction extends Model
         'user_id',
         'shift_id',
         'payment_source_id',
+        'payment_transaction_id',
         'service_area_id',
         'invoice_number',
         'queue_number',
@@ -23,6 +27,7 @@ class Transaction extends Model
         'paid_amount',
         'change_amount',
         'payment_method',
+        'payment_gateway_status',
         'status',
         'cancelled_reason',
         'cancelled_by',
@@ -34,19 +39,23 @@ class Transaction extends Model
     ];
 
     protected $casts = [
-        'subtotal' => 'decimal:2',
+        'subtotal'        => 'decimal:2',
         'discount_amount' => 'decimal:2',
-        'tax_amount' => 'decimal:2',
-        'total' => 'decimal:2',
-        'paid_amount' => 'decimal:2',
-        'change_amount' => 'decimal:2',
-        'queue_number' => 'integer',
-        'print_count' => 'integer',
-        'cancelled_at' => 'datetime',
+        'tax_amount'      => 'decimal:2',
+        'total'           => 'decimal:2',
+        'paid_amount'     => 'decimal:2',
+        'change_amount'   => 'decimal:2',
+        'queue_number'    => 'integer',
+        'print_count'     => 'integer',
+        'cancelled_at'    => 'datetime',
     ];
 
     // Eager load these relations by default for performance
     protected $with = ['details'];
+
+    // -----------------------------------------------------------------
+    // Relationships
+    // -----------------------------------------------------------------
 
     public function user(): BelongsTo
     {
@@ -57,7 +66,6 @@ class Transaction extends Model
     {
         return $this->belongsTo(Shift::class);
     }
-
 
     public function paymentSource(): BelongsTo
     {
@@ -79,6 +87,15 @@ class Transaction extends Model
         return $this->hasMany(TransactionDetail::class);
     }
 
+    public function paymentTransaction(): BelongsTo
+    {
+        return $this->belongsTo(PaymentTransaction::class);
+    }
+
+    // -----------------------------------------------------------------
+    // Scopes
+    // -----------------------------------------------------------------
+
     public function scopePending($query)
     {
         return $query->where('status', 'pending');
@@ -98,6 +115,126 @@ class Transaction extends Model
     {
         return $query->whereDate('created_at', today());
     }
+
+    /**
+     * Scope filter untuk daftar riwayat transaksi (TransactionHistory Livewire).
+     * Mendukung filter berdasarkan periode, pencarian invoice, dan kasir.
+     */
+    public function scopeFilter($query, Carbon $start, Carbon $end, ?string $search = null, ?int $cashierId = null)
+    {
+        return $query
+            ->whereBetween('created_at', [$start, $end])
+            ->where('status', 'completed')
+            ->when($search, fn($q) => $q->where('invoice_number', 'like', "%{$search}%"))
+            ->when($cashierId, fn($q) => $q->where('user_id', $cashierId));
+    }
+
+    // -----------------------------------------------------------------
+    // Static Query Methods (dipanggil dari Livewire/Controller)
+    // -----------------------------------------------------------------
+
+    /**
+     * Summary statistik transaksi (total count + total revenue) untuk suatu periode.
+     */
+    public static function getSummaryStats(Carbon $start, Carbon $end, ?int $cashierId = null): array
+    {
+        $base = static::whereBetween('created_at', [$start, $end])
+            ->where('status', 'completed')
+            ->when($cashierId, fn($q) => $q->where('user_id', $cashierId));
+
+        return [
+            'total_transactions' => (clone $base)->count(),
+            'total_revenue'      => (clone $base)->sum('total'),
+        ];
+    }
+
+    /**
+     * Laporan penjualan per kategori (SalesReport tab categories).
+     */
+    public static function getSalesByCategoryReport(Carbon $start, Carbon $end, int $perPage = 10): LengthAwarePaginator
+    {
+        return TransactionDetail::query()
+            ->join('products', 'transaction_details.product_id', '=', 'products.id')
+            ->join('categories', 'products.category_id', '=', 'categories.id')
+            ->join('transactions', 'transaction_details.transaction_id', '=', 'transactions.id')
+            ->where('transactions.status', 'completed')
+            ->whereBetween('transactions.created_at', [$start, $end])
+            ->groupBy('categories.id', 'categories.name')
+            ->selectRaw('
+                categories.id as category_id,
+                categories.name as category_name,
+                SUM(transaction_details.subtotal) as total_sales,
+                SUM(transaction_details.quantity) as total_quantity,
+                COUNT(DISTINCT transactions.id) as transaction_count
+            ')
+            ->orderByDesc('total_sales')
+            ->paginate($perPage);
+    }
+
+    /**
+     * Laporan penjualan per metode pembayaran (SalesReport tab payments).
+     */
+    public static function getSalesByPaymentReport(Carbon $start, Carbon $end, int $perPage = 10): LengthAwarePaginator
+    {
+        return static::query()
+            ->leftJoin('payment_sources', 'transactions.payment_source_id', '=', 'payment_sources.id')
+            ->where('transactions.status', 'completed')
+            ->whereBetween('transactions.created_at', [$start, $end])
+            ->groupBy('transactions.payment_method', 'payment_sources.name')
+            ->selectRaw('
+                CASE
+                    WHEN transactions.payment_method = "cash" THEN "Tunai"
+                    ELSE COALESCE(payment_sources.name, transactions.payment_method)
+                END as payment_name,
+                COUNT(*) as transaction_count,
+                SUM(transactions.total) as total_sales,
+                AVG(transactions.total) as average_amount
+            ')
+            ->orderByDesc('total_sales')
+            ->paginate($perPage);
+    }
+
+    /**
+     * Laporan penjualan per area servis/meja (SalesReport tab service_areas).
+     */
+    public static function getSalesByServiceAreaReport(Carbon $start, Carbon $end, int $perPage = 10): LengthAwarePaginator
+    {
+        return static::query()
+            ->join('service_areas', 'transactions.service_area_id', '=', 'service_areas.id')
+            ->where('transactions.status', 'completed')
+            ->whereBetween('transactions.created_at', [$start, $end])
+            ->groupBy('service_areas.id', 'service_areas.name')
+            ->selectRaw('
+                service_areas.name as area_name,
+                COUNT(transactions.id) as transaction_count,
+                SUM(transactions.total) as total_sales,
+                AVG(transactions.total) as average_amount
+            ')
+            ->orderByDesc('transaction_count')
+            ->paginate($perPage);
+    }
+
+    /**
+     * Query ringkasan penjualan per metode pembayaran (untuk Export).
+     */
+    public static function getSalesByPaymentMethodExportQuery(Carbon $start, Carbon $end)
+    {
+        return static::query()
+            ->where('status', 'completed')
+            ->whereBetween('created_at', [$start, $end])
+            ->groupBy('payment_method')
+            ->selectRaw('
+                payment_method,
+                COUNT(*) as transaction_count,
+                SUM(total) as total_amount,
+                AVG(total) as average_amount
+            ')
+            ->orderByDesc('total_amount');
+    }
+
+    // -----------------------------------------------------------------
+    // Status helpers
+    // -----------------------------------------------------------------
 
     public function isPending(): bool
     {
@@ -119,11 +256,15 @@ class Transaction extends Model
         return $this->payment_method === 'cash';
     }
 
+    // -----------------------------------------------------------------
+    // Business Logic
+    // -----------------------------------------------------------------
+
     public static function generateInvoiceNumber(): string
     {
         $prefix = 'INV';
         $date = now()->format('Ymd');
-        
+
         $lastInvoice = static::whereDate('created_at', today())
             ->orderByDesc('id')
             ->first();
@@ -140,10 +281,10 @@ class Transaction extends Model
     public function complete(float $paidAmount): bool
     {
         $change = $paidAmount - $this->total;
-        
+
         return $this->update([
-            'status' => 'completed',
-            'paid_amount' => $paidAmount,
+            'status'        => 'completed',
+            'paid_amount'   => $paidAmount,
             'change_amount' => max(0, $change),
         ]);
     }
@@ -152,26 +293,190 @@ class Transaction extends Model
     {
         return DB::transaction(function () use ($cancelledBy, $reason) {
             $this->update([
-                'status' => 'cancelled',
-                'cancelled_by' => $cancelledBy,
+                'status'           => 'cancelled',
+                'cancelled_by'     => $cancelledBy,
                 'cancelled_reason' => $reason,
-                'cancelled_at' => now(),
+                'cancelled_at'     => now(),
             ]);
 
             // Create refund expense if transaction was completed with cash
             if ($this->isCompleted() && $this->isCash() && $this->shift_id) {
                 ShiftExpense::create([
-                    'shift_id' => $this->shift_id,
-                    'order_id' => $this->id,
+                    'shift_id'    => $this->shift_id,
+                    'order_id'    => $this->id,
                     'description' => "Refund: {$this->invoice_number}",
-                    'amount' => $this->total,
-                    'category' => 'refund',
+                    'amount'      => $this->total,
+                    'category'    => 'refund',
                 ]);
             }
 
             return true;
         });
     }
+
+    /**
+     * Get transaction with details loaded for printing.
+     */
+    public static function getForPrinting(int $id): ?self
+    {
+        return static::with(['details.modifiers', 'paymentSource', 'user', 'serviceArea'])->find($id);
+    }
+
+    /**
+     * Get a completed transaction by invoice number.
+     */
+    public static function getCompletedByInvoice(string $invoiceNumber): ?self
+    {
+        return static::with(['details.modifiers'])
+            ->where('invoice_number', $invoiceNumber)
+            ->where('status', 'completed')
+            ->first();
+    }
+
+    /**
+     * Get today's completed transactions for a user.
+     */
+    public static function getTodayUserTransactions(int $userId): Collection
+    {
+        return static::where('user_id', $userId)
+            ->whereDate('created_at', today())
+            ->where('status', 'completed')
+            ->get();
+    }
+
+    /**
+     * Get recent transactions with details.
+     */
+    public static function getRecentTransactions(int $limit = 10): Collection
+    {
+        return static::with(['user', 'details'])
+            ->latest()
+            ->take($limit)
+            ->get();
+    }
+
+    /**
+     * Get paginated transaction history for admin view.
+     */
+    public static function getPaginatedHistory(
+        Carbon $start,
+        Carbon $end,
+        ?string $search = null,
+        ?int $cashierId = null,
+        int $perPage = 15
+    ): LengthAwarePaginator {
+        return static::with(['user', 'paymentSource'])
+            ->filter($start, $end, $search, $cashierId)
+            ->latest()
+            ->paginate($perPage);
+    }
+
+    /**
+     * Get transaction query for export.
+     */
+    public static function getExportQuery(
+        Carbon $start,
+        Carbon $end,
+        ?string $search = null,
+        ?int $cashierId = null
+    ) {
+        return static::with(['paymentSource', 'user'])
+            ->filter($start, $end, $search, $cashierId)
+            ->latest();
+    }
+
+
+    /**
+     * Get transaction detail with full details and related entities.
+     */
+    public static function getForDetail(int $id): self
+    {
+        return static::with(['user', 'details.product.category', 'details.modifiers', 'paymentSource'])->findOrFail($id);
+    }
+
+    /**
+     * Get paginated transactions for admin transactions list.
+     */
+    public static function getPaginatedForAdminList(
+        ?string $search = null,
+        ?string $filterStatus = null,
+        ?string $filterDate = null,
+        int $perPage = 15
+    ): LengthAwarePaginator {
+        return static::with(['user', 'paymentSource'])
+            ->when($search, fn($q) => $q->where('invoice_number', 'like', "%{$search}%")->orWhere('customer_name', 'like', "%{$search}%"))
+            ->when($filterStatus, fn($q) => $q->where('status', $filterStatus))
+            ->when($filterDate, fn($q) => $q->whereDate('created_at', $filterDate))
+            ->latest()
+            ->paginate($perPage);
+    }
+
+    /**
+     * Get today's stats summary (completed & cancelled).
+     */
+    public static function getTodayStats(): array
+    {
+        $today = Carbon::today();
+        
+        $transactions = static::query()
+            ->whereDate('created_at', $today)
+            ->where('status', 'completed')
+            ->get();
+
+        $cancelled = static::query()
+            ->whereDate('cancelled_at', $today)
+            ->where('status', 'cancelled')
+            ->count();
+
+        return [
+            'total_sales' => $transactions->sum('total'),
+            'transaction_count' => $transactions->count(),
+            'average_transaction' => $transactions->count() > 0 
+                ? $transactions->sum('total') / $transactions->count() 
+                : 0,
+            'cancelled_count' => $cancelled,
+        ];
+    }
+
+    /**
+     * Get transactions for print table (summary print view).
+     */
+    public static function getForPrintTable(
+        Carbon $start,
+        Carbon $end,
+        ?string $search = null,
+        ?int $cashierId = null
+    ): \Illuminate\Database\Eloquent\Collection {
+        return static::with(['user', 'paymentSource'])
+            ->whereBetween('created_at', [$start, $end])
+            ->where('status', 'completed')
+            ->when($search, fn($q) => $q->where('invoice_number', 'like', "%{$search}%"))
+            ->when($cashierId, fn($q) => $q->where('user_id', $cashierId))
+            ->latest()
+            ->get();
+    }
+
+    /**
+     * Get transactions with full detail for print detail view.
+     */
+    public static function getForPrintDetail(
+        Carbon $start,
+        Carbon $end,
+        ?string $search = null,
+        ?int $cashierId = null
+    ): \Illuminate\Database\Eloquent\Collection {
+        return static::with(['user', 'paymentSource', 'details.product', 'details.modifiers'])
+            ->whereBetween('created_at', [$start, $end])
+            ->where('status', 'completed')
+            ->when($search, fn($q) => $q->where('invoice_number', 'like', "%{$search}%"))
+            ->when($cashierId, fn($q) => $q->where('user_id', $cashierId))
+            ->latest()
+            ->get();
+    }
+
+    // -----------------------------------------------------------------
+    // Accessors
+    // -----------------------------------------------------------------
 
     public function getFormattedTotalAttribute(): string
     {
@@ -182,4 +487,23 @@ class Transaction extends Model
     {
         return str_pad($this->queue_number, 3, '0', STR_PAD_LEFT);
     }
+
+    /**
+     * Increment print count for a transaction by ID.
+     */
+    public static function incrementPrintCount(int $id): void
+    {
+        static::where('id', $id)->increment('print_count');
+    }
+
+
+
+    /**
+     * Load relationships needed for single transaction print receipt.
+     */
+    public function loadForPrintSingle(): self
+    {
+        return $this->load(['user', 'paymentSource', 'details.product', 'details.modifiers', 'details.product.category']);
+    }
 }
+

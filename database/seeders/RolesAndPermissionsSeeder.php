@@ -22,6 +22,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'edit_products',
             'delete_products',
             'adjust_stock',
+            'manage_unlimited_stock',
             
             // Categories
             'view_categories',
@@ -54,6 +55,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'view_financial_reports',
             'view_peak_hours_reports',
             'view_cancellation_reports',
+            'view_inventory_reports',
             'export_reports',
             
             // Settings
@@ -71,6 +73,19 @@ class RolesAndPermissionsSeeder extends Seeder
             // Kitchen / Service Display
             'view_kitchen_display',
             'update_order_status',
+
+            // Inventory & Production
+            'view_ingredients',
+            'create_ingredients',
+            'edit_ingredients',
+            'delete_ingredients',
+            'view_purchases',
+            'create_purchases',
+            'view_productions',
+            'create_productions',
+            'view_hpp_calculator',
+            'apply_hpp_calculator',
+            'view_menu_catalog',
         ];
 
         // Create all permissions
@@ -88,13 +103,14 @@ class RolesAndPermissionsSeeder extends Seeder
         // Manager - can manage products, view reports, manage shifts
         $manager = Role::firstOrCreate(['name' => 'Manager']);
         $manager->syncPermissions([
-            'view_products', 'create_products', 'edit_products', 'adjust_stock',
+            'view_products', 'create_products', 'edit_products', 'adjust_stock', 'manage_unlimited_stock', 'view_menu_catalog',
             'view_categories', 'create_categories', 'edit_categories',
             'view_modifiers', 'create_modifiers', 'edit_modifiers',
+            'view_ingredients', 'create_ingredients', 'edit_ingredients', 'delete_ingredients',
+            'view_purchases', 'create_purchases', 'view_productions', 'create_productions', 'view_hpp_calculator', 'apply_hpp_calculator',
             'access_pos', 'view_transactions', 'cancel_transactions',
             'open_shift', 'close_shift', 'view_own_shifts', 'view_all_shifts', 'add_shift_expense',
-            'view_sales_reports', 'view_financial_reports', 'view_peak_hours_reports', 'view_cancellation_reports', 'export_reports',
-            'view_sales_reports', 'view_financial_reports', 'view_peak_hours_reports', 'view_cancellation_reports', 'export_reports',
+            'view_sales_reports', 'view_financial_reports', 'view_peak_hours_reports', 'view_cancellation_reports', 'view_inventory_reports', 'export_reports',
             'manage_payment_sources',
             'view_kitchen_display', 'update_order_status',
         ]);

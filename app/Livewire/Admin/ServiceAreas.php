@@ -65,7 +65,7 @@ class ServiceAreas extends Component
     public function getLastSortOrderProperty(): int
     {
         if ($this->cachedLastOrder === null) {
-            $this->cachedLastOrder = ServiceArea::max('sort_order') ?? 0;
+            $this->cachedLastOrder = ServiceArea::getMaxSortOrder();
         }
         return $this->cachedLastOrder;
     }
@@ -162,7 +162,7 @@ class ServiceAreas extends Component
             $area = ServiceArea::findOrFail($this->deletingId);
             
             // Check if area has completed transactions
-            if ($area->transactions()->where('status', 'completed')->exists()) {
+            if ($area->hasCompletedTransactions()) {
                 $this->dispatch('notify', type: 'error', message: 'Area tidak dapat dihapus karena memiliki transaksi');
                 $this->showDeleteModal = false;
                 $this->deletingId = null;
@@ -194,28 +194,12 @@ class ServiceAreas extends Component
 
     public function render()
     {
-        $areas = ServiceArea::query()
-            ->when($this->search, fn($q) => $q->where(function($q) {
-                $q->where('name', 'like', "%{$this->search}%")
-                  ->orWhere('code', 'like', "%{$this->search}%");
-            }))
-            ->when($this->filterType, fn($q) => $q->where('type', $this->filterType))
-            ->withCount('transactions')
-            ->orderBy('sort_order')
-            ->paginate(10);
+        $areas = ServiceArea::getPaginated($this->search, $this->filterType, 10);
 
         // Smart Redirect for Pagination
         if ($areas->lastPage() < $this->getPage() && $areas->lastPage() > 0) {
             $this->setPage($areas->lastPage());
-            $areas = ServiceArea::query()
-                ->when($this->search, fn($q) => $q->where(function($q) {
-                    $q->where('name', 'like', "%{$this->search}%")
-                      ->orWhere('code', 'like', "%{$this->search}%");
-                }))
-                ->when($this->filterType, fn($q) => $q->where('type', $this->filterType))
-                ->withCount('transactions')
-                ->orderBy('sort_order')
-                ->paginate(10);
+            $areas = ServiceArea::getPaginated($this->search, $this->filterType, 10);
         }
 
         $typeLabels = ServiceArea::TYPE_LABELS;

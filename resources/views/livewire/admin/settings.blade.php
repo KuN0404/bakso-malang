@@ -28,13 +28,86 @@
                 </div>
                 <div class="grid grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Pajak (%)</label>
-                        <input type="number" step="0.01" wire:model="tax_percentage" class="w-full px-4 py-2 border border-gray-200 rounded-lg">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Logo Web</label>
+                        <div class="space-y-2">
+                            @if ($logo_web)
+                                <div class="relative w-24 h-24 border border-gray-200 rounded-lg overflow-hidden bg-gray-50 flex items-center justify-center p-1">
+                                    <img src="{{ $logo_web->temporaryUrl() }}" class="max-w-full max-h-full object-contain">
+                                </div>
+                            @elseif ($existing_logo_web)
+                                <div class="relative w-24 h-24 border border-gray-200 rounded-lg overflow-hidden group bg-gray-50 flex items-center justify-center p-1">
+                                    <img src="{{ asset('storage/' . $existing_logo_web) }}" class="max-w-full max-h-full object-contain">
+                                    <button type="button" wire:click="removeLogoWeb" class="absolute inset-0 bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <i data-lucide="trash-2" class="w-5 h-5"></i>
+                                    </button>
+                                </div>
+                            @endif
+                            <input type="file" wire:model="logo_web" class="block w-full text-xs text-gray-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100">
+                            <span class="text-[10px] text-gray-400">Rekomendasi format WebP/PNG, max 2MB (Akan diconvert ke WebP)</span>
+                            @error('logo_web') <span class="text-xs text-red-500 block">{{ $message }}</span> @enderror
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Site Logo (Favicon)</label>
+                        <div class="space-y-2">
+                            @if ($site_logo)
+                                <div class="relative w-24 h-24 border border-gray-200 rounded-lg overflow-hidden bg-gray-50 flex items-center justify-center p-1">
+                                    <img src="{{ $site_logo->temporaryUrl() }}" class="max-w-full max-h-full object-contain">
+                                </div>
+                            @elseif ($existing_site_logo)
+                                <div class="relative w-24 h-24 border border-gray-200 rounded-lg overflow-hidden group bg-gray-50 flex items-center justify-center p-1">
+                                    <img src="{{ asset('storage/' . $existing_site_logo) }}" class="max-w-full max-h-full object-contain">
+                                    <button type="button" wire:click="removeSiteLogo" class="absolute inset-0 bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <i data-lucide="trash-2" class="w-5 h-5"></i>
+                                    </button>
+                                </div>
+                            @endif
+                            <input type="file" wire:model="site_logo" class="block w-full text-xs text-gray-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100">
+                            <span class="text-[10px] text-gray-400">Rekomendasi format WebP/PNG/ICO, max 1MB (Akan diconvert ke WebP)</span>
+                            @error('site_logo') <span class="text-xs text-red-500 block">{{ $message }}</span> @enderror
+                        </div>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Pajak (PPN)</label>
+                        <select wire:model="tax_percentage" class="w-full px-4 py-2 border border-gray-200 rounded-lg">
+                            <option value="0">Tanpa Pajak (0%)</option>
+                            <option value="11">PPN Indonesia (11%)</option>
+                            <option value="12">PPN Indonesia (12%)</option>
+                        </select>
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Simbol Mata Uang</label>
-                        <input type="text" wire:model="currency_symbol" class="w-full px-4 py-2 border border-gray-200 rounded-lg">
+                        <select wire:model="currency_symbol" class="w-full px-4 py-2 border border-gray-200 rounded-lg">
+                            <option value="Rp">Rp (Rupiah)</option>
+                            <option value="$">$ (Dollar)</option>
+                            <option value="RM">RM (Ringgit)</option>
+                            <option value="S$">S$ (SGD)</option>
+                            <option value="¥">¥ (Yen)</option>
+                            <option value="€">€ (Euro)</option>
+                        </select>
                     </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Font Family Web</label>
+                    <select wire:model="font_family_web" class="w-full px-4 py-2 border border-gray-200 rounded-lg">
+                        <option value="Poppins">Poppins (Modern, Sans-Serif)</option>
+                        <option value="Inter">Inter (Sleek, Clean)</option>
+                        <option value="Roboto">Roboto (Neo-Grotesque)</option>
+                        <option value="Outfit">Outfit (Geometric, Elegant)</option>
+                        <option value="Montserrat">Montserrat (Stylish, Bold)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Masa Berlaku Kode QRIS</label>
+                    <select wire:model="qris_expiry_minutes" class="w-full px-4 py-2 border border-gray-200 rounded-lg">
+                        <option value="3">3 Menit (Cepat / Antrean Padat)</option>
+                        <option value="5">5 Menit (Rekomendasi Standar POS)</option>
+                        <option value="10">10 Menit (Sedang)</option>
+                        <option value="15">15 Menit (Maksimum Layanan)</option>
+                    </select>
+                    <span class="text-[10px] text-gray-400 block mt-1">Batas waktu aktif kode QRIS sebelum otomatis kadaluarsa jika pelanggan belum menyelesaikan pembayaran.</span>
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Teks Header Struk</label>
@@ -44,7 +117,16 @@
                     <label class="block text-sm font-medium text-gray-700 mb-1">Teks Footer Struk</label>
                     <input type="text" wire:model="footer_text" class="w-full px-4 py-2 border border-gray-200 rounded-lg" placeholder="Selamat Menikmati">
                 </div>
-                <button type="submit" class="w-full py-2 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-lg">Simpan Pengaturan Toko</button>
+                <button type="submit" wire:loading.attr="disabled" wire:target="logo_web, site_logo" class="w-full py-2 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-lg disabled:opacity-50">
+                    <span wire:loading.remove wire:target="logo_web, site_logo">Simpan Pengaturan Toko</span>
+                    <span wire:loading wire:target="logo_web, site_logo" class="flex items-center justify-center gap-2">
+                        <svg class="animate-spin h-5 w-5 text-white inline" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                        </svg>
+                        Mengunggah berkas...
+                    </span>
+                </button>
             </form>
         </div>
 

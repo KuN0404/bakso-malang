@@ -32,7 +32,7 @@ class Modifiers extends Component
 
         // Validation: If selectedGroupId from URL is invalid (not in DB), reset it and go to page 1
         if ($this->selectedGroupId) {
-            $exists = ModifierGroup::where('id', $this->selectedGroupId)->exists();
+            $exists = ModifierGroup::existsById($this->selectedGroupId);
             if (!$exists) {
                 $this->selectedGroupId = null;
                 $this->resetPage(); // Back to page 1
@@ -174,23 +174,17 @@ class Modifiers extends Component
 
     public function render()
     {
-        $groups = ModifierGroup::withCount('modifiers')
-            ->when($this->search, fn($q) => $q->where('name', 'like', "%{$this->search}%"))
-            ->latest()
-            ->paginate(10); // Scalability: Pagination
+        $groups = ModifierGroup::getPaginated($this->search, 10);
 
         // Smart Redirect: If page > lastPage, redirect to lastPage
         if ($groups->lastPage() < $this->getPage() && $groups->lastPage() > 0) {
             $this->setPage($groups->lastPage());
             // Re-query with correct page
-            $groups = ModifierGroup::withCount('modifiers')
-                ->when($this->search, fn($q) => $q->where('name', 'like', "%{$this->search}%"))
-                ->latest()
-                ->paginate(10);
+            $groups = ModifierGroup::getPaginated($this->search, 10);
         }
             
         $modifiers = $this->selectedGroupId 
-            ? Modifier::where('modifier_group_id', $this->selectedGroupId)->get()
+            ? Modifier::getByGroup($this->selectedGroupId)
             : collect();
             
         // Correctness: Must query DB because selected group might not be in current page pagination

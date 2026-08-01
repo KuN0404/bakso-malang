@@ -18,7 +18,7 @@ class Shifts extends Component
 
     public function viewDetail(int $id): void
     {
-        $shift = Shift::with(['user', 'transactions', 'expenses'])->findOrFail($id);
+        $shift = Shift::getForDetail($id);
         
         // Check permission
         if (!auth()->user()->can('view_all_shifts') && $shift->user_id !== auth()->id()) {
@@ -32,17 +32,9 @@ class Shifts extends Component
 
     public function render()
     {
-        // Permission-based query
-        $query = Shift::with(['user'])
-            ->whereDate('started_at', today()) // Only today's shifts
-            ->latest('started_at');
-
-        // If user can't view all shifts, only show their own
-        if (!auth()->user()->can('view_all_shifts')) {
-            $query->where('user_id', auth()->id());
-        }
-
-        $shifts = $query->get();
+        // Permission-based query - only show own shift if user can't view all
+        $userId = auth()->user()->can('view_all_shifts') ? null : auth()->id();
+        $shifts = Shift::getTodayShiftsForUser($userId);
 
         // Calculate today's stats
         $totalSales = $shifts->sum(function ($s) {

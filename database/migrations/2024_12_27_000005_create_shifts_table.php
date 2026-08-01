@@ -17,6 +17,9 @@ return new class extends Migration
             $table->decimal('expected_cash', 14, 2)->default(0);
             $table->decimal('actual_cash', 14, 2)->nullable();
             $table->decimal('cash_difference', 14, 2)->nullable();
+            $table->decimal('expected_non_cash', 14, 2)->default(0);
+            $table->decimal('actual_non_cash', 14, 2)->nullable();
+            $table->decimal('non_cash_difference', 14, 2)->nullable();
             $table->enum('status', ['open', 'closed'])->default('open');
             $table->text('notes')->nullable();
             $table->timestamps();

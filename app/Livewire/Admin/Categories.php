@@ -38,7 +38,7 @@ class Categories extends Component
     public function getLastSortOrderProperty(): int
     {
         if ($this->cachedLastOrder === null) {
-            $this->cachedLastOrder = Category::max('sort_order') ?? 0;
+            $this->cachedLastOrder = Category::getMaxSortOrder();
         }
         return $this->cachedLastOrder;
     }
@@ -85,9 +85,7 @@ class Categories extends Component
         $this->validate($rules);
         
         // Check unique sort_order (except current editing)
-        $existingOrder = Category::where('sort_order', $this->sort_order)
-            ->when($this->editingId, fn($q) => $q->where('id', '!=', $this->editingId))
-            ->exists();
+        $existingOrder = Category::isSortOrderExists($this->sort_order, $this->editingId);
             
         if ($existingOrder) {
             $this->addError('sort_order', 'Urutan ini sudah digunakan oleh kategori lain.');
@@ -131,11 +129,7 @@ class Categories extends Component
 
     public function render()
     {
-        $categories = Category::query()
-            ->when($this->search, fn($q) => $q->where('name', 'like', "%{$this->search}%"))
-            ->withCount('products')
-            ->orderBy('sort_order')
-            ->paginate(10);
+        $categories = Category::getPaginated($this->search, 10);
 
         return view('livewire.admin.categories', compact('categories'))
             ->title('Kategori');

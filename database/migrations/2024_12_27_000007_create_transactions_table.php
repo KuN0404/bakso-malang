@@ -29,6 +29,7 @@ return new class extends Migration
             $table->string('customer_name')->nullable();
             $table->enum('order_type', ['dine_in', 'take_away'])->default('dine_in');
             $table->text('notes')->nullable();
+            $table->unsignedInteger('print_count')->default(0);
             $table->timestamps();
             
             // Heavy indexing for reports

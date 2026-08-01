@@ -1,5 +1,15 @@
 <div>
-<div x-data="{ printFormat: 'A4' }" x-init="lucide.createIcons();">
+<div x-data="{ printFormat: 'A4' }" x-init="lucide.createIcons();" class="relative">
+    <!-- Loading Overlay -->
+    <div wire:loading wire:target="search, filterCashier, periodType, selectedWeek, selectedWeekYear, selectedMonth, selectedMonthYear, selectedYear, applyDateRange, resetFilters, gotoPage, previousPage, nextPage" class="absolute inset-0 bg-white/50 backdrop-blur-[1px] z-50 rounded-xl">
+        <div class="sticky top-[40vh] flex flex-col items-center justify-center w-full gap-2">
+            <svg class="animate-spin h-8 w-8 text-primary-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span class="text-sm font-medium text-primary-600">Memuat Transaksi...</span>
+        </div>
+    </div>
     <div class="flex items-center justify-between mb-6">
         <div>
             <h1 class="text-2xl font-bold text-gray-800">Laporan Penjualan</h1>
@@ -48,23 +58,84 @@
                 <!-- Right: Period-specific Filters -->
                 @if($periodType === 'daily')
                     <!-- Date Range Picker -->
-                    <div class="flex items-center gap-3" 
-                         x-data="{ init() { initDatePicker(@js($startDate), @js($endDate)) } }" 
-                         x-init="init()"
-                         wire:key="date-picker-daily">
-                        <div class="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-white to-gray-50 border border-gray-200 rounded-xl hover:border-primary-400 hover:shadow-md transition-all cursor-pointer group" id="startDateContainer">
+                    <!-- Alpine Flatpickr Date Range Picker Component -->
+                    <div 
+                        x-data="{
+                            fp: null,
+                            formatDate(d) {
+                                return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+                            },
+                            init() {
+                                this.$nextTick(() => {
+                                    if (typeof flatpickr === 'undefined') return;
+                                    if (this.fp) { try { this.fp.destroy(); } catch(e){} }
+                                    this.fp = flatpickr(this.$refs.hiddenInput, {
+                                        mode: 'range',
+                                        locale: 'id',
+                                        dateFormat: 'Y-m-d',
+                                        defaultDate: [@js($startDate), @js($endDate)],
+                                        showMonths: 2,
+                                        animate: true,
+                                        positionElement: this.$refs.startCard,
+                                        onReady: (selectedDates) => {
+                                            if (selectedDates.length >= 1) this.$refs.startInput.value = this.formatDate(selectedDates[0]);
+                                            if (selectedDates.length >= 2) this.$refs.endInput.value = this.formatDate(selectedDates[1]);
+                                        },
+                                        onChange: (selectedDates) => {
+                                            if (selectedDates.length >= 1) this.$refs.startInput.value = this.formatDate(selectedDates[0]);
+                                            if (selectedDates.length >= 2) {
+                                                this.$refs.endInput.value = this.formatDate(selectedDates[1]);
+                                                const startStr = new Date(selectedDates[0].getTime() - (selectedDates[0].getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+                                                const endStr = new Date(selectedDates[1].getTime() - (selectedDates[1].getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+                                                $wire.set('startDate', startStr);
+                                                $wire.set('endDate', endStr);
+                                                $wire.applyDateRange();
+                                            }
+                                        }
+                                    });
+                                });
+                                $wire.on('reset-date-picker', (data) => {
+                                    if (this.fp) {
+                                        const start = data?.start ?? data?.[0]?.start;
+                                        const end = data?.end ?? data?.[0]?.end;
+                                        if (start && end) {
+                                            this.fp.setDate([start, end], false);
+                                            const startD = new Date(start + 'T00:00:00');
+                                            const endD = new Date(end + 'T00:00:00');
+                                            this.$refs.startInput.value = this.formatDate(startD);
+                                            this.$refs.endInput.value = this.formatDate(endD);
+                                        }
+                                    }
+                                });
+                            }
+                        }"
+                        x-init="init()"
+                        wire:key="date-picker-trx-daily"
+                        wire:ignore
+                        class="flex items-center gap-3"
+                    >
+                        <!-- Hidden flatpickr anchor -->
+                        <input x-ref="hiddenInput" type="text" class="hidden">
+
+                        <!-- Dari Card -->
+                        <div x-ref="startCard" @click="fp && fp.open()" class="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-white to-gray-50 border border-gray-200 rounded-xl hover:border-primary-400 hover:shadow-md transition-all cursor-pointer group">
+                            <i data-lucide="calendar" class="w-4 h-4 text-primary-600"></i>
                             <div class="flex flex-col">
                                 <span class="text-[9px] text-gray-400 uppercase tracking-wide leading-none mb-0.5">Dari</span>
-                                <input type="text" id="dateRangeStart" class="bg-transparent border-none outline-none text-xs font-bold text-gray-700 cursor-pointer w-24 p-0" placeholder="Pilih" readonly>
+                                <input x-ref="startInput" type="text" class="bg-transparent border-none outline-none text-xs font-bold text-gray-700 cursor-pointer w-24 p-0" placeholder="Pilih" readonly>
                             </div>
                         </div>
+
                         <div class="text-gray-300">
-                             <i data-lucide="arrow-right" class="w-3 h-3"></i>
+                            <i data-lucide="arrow-right" class="w-3 h-3"></i>
                         </div>
-                        <div class="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-white to-gray-50 border border-gray-200 rounded-xl hover:border-primary-400 hover:shadow-md transition-all cursor-pointer group" id="endDateContainer">
+
+                        <!-- Sampai Card -->
+                        <div @click="fp && fp.open()" class="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-white to-gray-50 border border-gray-200 rounded-xl hover:border-primary-400 hover:shadow-md transition-all cursor-pointer group">
+                            <i data-lucide="calendar" class="w-4 h-4 text-primary-600"></i>
                             <div class="flex flex-col">
                                 <span class="text-[9px] text-gray-400 uppercase tracking-wide leading-none mb-0.5">Sampai</span>
-                                <input type="text" id="dateRangeEnd" class="bg-transparent border-none outline-none text-xs font-bold text-gray-700 cursor-pointer w-24 p-0" placeholder="Pilih" readonly>
+                                <input x-ref="endInput" type="text" class="bg-transparent border-none outline-none text-xs font-bold text-gray-700 cursor-pointer w-24 p-0" placeholder="Pilih" readonly>
                             </div>
                         </div>
                     </div>
@@ -179,16 +250,6 @@
 
     <!-- Table -->
     <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden relative">
-        <!-- Loading Overlay -->
-        <div wire:loading.flex wire:target="search, filterCashier, periodType, selectedWeek, selectedWeekYear, selectedMonth, selectedMonthYear, selectedYear, applyDateRange, resetFilters, gotoPage, previousPage, nextPage" class="absolute inset-0 bg-white/70 z-10 items-center justify-center">
-            <div class="flex flex-col items-center gap-2">
-                <svg class="animate-spin h-8 w-8 text-primary-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                <span class="text-sm text-gray-600 font-medium">Memuat data...</span>
-            </div>
-        </div>
         <div class="overflow-x-auto">
             <table class="w-full">
                 <thead class="bg-gray-50">
@@ -448,11 +509,13 @@ window.initDatePicker = function(startDateStr, endDateStr) {
         });
         
         // Make both inputs and containers open the picker
-        const openPicker = (e) => { e.stopPropagation(); fp.open(); };
-        startInput.addEventListener('click', openPicker);
-        endInput.addEventListener('click', openPicker);
-        document.getElementById('startDateContainer')?.addEventListener('click', openPicker);
-        document.getElementById('endDateContainer')?.addEventListener('click', openPicker);
+        const openPicker = (e) => { if (e) e.stopPropagation(); fp.open(); };
+        startInput.onclick = openPicker;
+        endInput.onclick = openPicker;
+        const sCont = document.getElementById('startDateContainer');
+        const eCont = document.getElementById('endDateContainer');
+        if (sCont) sCont.onclick = openPicker;
+        if (eCont) eCont.onclick = openPicker;
         
         // Store reference for reset
         window._datePicker = fp;

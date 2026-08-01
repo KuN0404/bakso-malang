@@ -5,8 +5,8 @@ namespace App\Livewire\Admin;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Rule;
 use Livewire\Component;
-use Spatie\Permission\Models\Permission;
-use Spatie\Permission\Models\Role;
+use App\Models\Permission;
+use App\Models\Role;
 
 #[Layout('layouts.admin')]
 class Roles extends Component
@@ -27,7 +27,7 @@ class Roles extends Component
 
     public function edit(int $id): void
     {
-        $role = Role::with('permissions')->findOrFail($id);
+        $role = Role::getWithPermissions($id);
         $this->editingId = $role->id;
         $this->name = $role->name;
         $this->selectedPermissions = $role->permissions->pluck('name')->toArray();
@@ -65,11 +65,8 @@ class Roles extends Component
 
     public function render()
     {
-        $roles = Role::where('name', '!=', 'Super Admin')
-            ->with('permissions')
-            ->withCount('users')
-            ->get();
-        $permissions = Permission::orderBy('name')->get();
+        $roles = Role::getRolesForAdmin();
+        $permissions = Permission::getAllSorted();
 
         // Group permissions using config groups (Indonesian labels)
         $configGroups = config('permissions.groups', []);

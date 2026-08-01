@@ -5,15 +5,13 @@ namespace App\Http\Controllers;
 use App\Models\Transaction;
 use App\Models\TransactionDetail;
 use App\Models\Shift;
+use App\Models\ProductReturn;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ExportController extends Controller
 {
-    /**
-     * Export transactions to CSV with chunking for large datasets
-     */
     /**
      * Export transactions to CSV (Summary) - Optimized Streaming
      */
@@ -36,13 +34,7 @@ class ExportController extends Controller
                 'Invoice', 'Tanggal', 'Waktu', 'Kasir', 'Pelanggan', 'Metode Bayar', 'Total', 'Status'
             ], ';');
 
-            Transaction::query()
-                ->with(['paymentSource', 'user'])
-                ->whereBetween('created_at', [$start, $end])
-                ->where('status', 'completed')
-                ->when($search, fn($q) => $q->where('invoice_number', 'like', "%{$search}%"))
-                ->when($cashierId, fn($q) => $q->where('user_id', $cashierId))
-                ->latest()
+            Transaction::getExportQuery($start, $end, $search ?: null, $cashierId)
                 ->cursor()
                 ->each(function ($t) use ($handle) {
                     fputcsv($handle, [
@@ -56,7 +48,6 @@ class ExportController extends Controller
                         'Selesai',
                     ], ';');
 
-                    // Flush buffer to prevent timeout
                     if (ob_get_level() > 0) ob_flush();
                     flush();
                 });
@@ -82,7 +73,6 @@ class ExportController extends Controller
         $filename = 'Laporan_Detail_' . $start->format('d_M_Y') . '_sd_' . $end->format('d_M_Y') . '.csv';
         $tempPath = storage_path('app/public/exports/' . uniqid() . '_' . $filename);
         
-        // Ensure directory exists
         if (!file_exists(dirname($tempPath))) {
             mkdir(dirname($tempPath), 0755, true);
         }
@@ -90,60 +80,26 @@ class ExportController extends Controller
         $handle = fopen($tempPath, 'w');
         fprintf($handle, chr(0xEF).chr(0xBB).chr(0xBF)); // BOM
         
-        // Report Header
         fputcsv($handle, ['Bakso Malang'], ';');
         fputcsv($handle, ['LAPORAN DETAIL DATA PENJUALAN'], ';');
         fputcsv($handle, ['PERIODE ' . $start->format('d F Y') . ' - ' . $end->format('d F Y')], ';');
-        fputcsv($handle, [''], ';'); // Empty line
+        fputcsv($handle, [''], ';');
 
-        // Query: Join Master & Detail, Ordered by Transaction to allow grouping
-        $query = \Illuminate\Support\Facades\DB::table('transaction_details')
-            ->join('transactions', 'transaction_details.transaction_id', '=', 'transactions.id')
-            ->join('products', 'transaction_details.product_id', '=', 'products.id')
-            ->leftJoin('users', 'transactions.user_id', '=', 'users.id')
-            ->leftJoin('payment_sources', 'transactions.payment_source_id', '=', 'payment_sources.id')
-            ->whereBetween('transactions.created_at', [$start, $end])
-            ->where('transactions.status', 'completed')
-            ->when($search, fn($q) => $q->where('transactions.invoice_number', 'like', "%{$search}%"))
-            ->when($cashierId, fn($q) => $q->where('transactions.user_id', $cashierId))
-            ->orderBy('transactions.created_at', 'desc') // Grouping key
-            ->orderBy('transactions.id', 'desc')         // Secondary grouping key
-            ->select([
-                'transactions.id as trans_id',
-                'transactions.invoice_number',
-                'transactions.created_at',
-                'transactions.customer_name',
-                'transactions.subtotal as trans_subtotal',
-                'transactions.tax_amount',
-                'transactions.total as trans_total',
-                'users.name as cashier_name',
-                'payment_sources.name as payment_name',
-                'products.name as product_name',
-                'transaction_details.unit_price',
-                'transaction_details.quantity',
-                'transaction_details.subtotal as item_subtotal',
-                \Illuminate\Support\Facades\DB::raw('(SELECT GROUP_CONCAT(modifier_name SEPARATOR ", ") FROM transaction_detail_modifier WHERE transaction_detail_id = transaction_details.id) as modifiers_list')
-            ]);
+        $query = TransactionDetail::getTransactionsDetailExportQuery($start, $end, $search ?: null, $cashierId);
 
-        // State Machine for Control Break
         $currentTransId = null;
         $currentTransData = null;
 
         foreach ($query->cursor() as $row) {
-            // Check for new transaction group
             if ($currentTransId !== $row->trans_id) {
-                
-                // If not the very first iteration, print footer for the PREVIOUS transaction
                 if ($currentTransId !== null) {
                     $this->writeTransactionFooter($handle, $currentTransData);
                 }
 
-                // Start NEW Transaction
                 $currentTransId = $row->trans_id;
-                $currentTransData = $row; // Save master data for footer usage
+                $currentTransData = $row;
                 
-                // Print Transaction Header Block
-                fputcsv($handle, [''], ';'); // Separator
+                fputcsv($handle, [''], ';');
                 fputcsv($handle, [
                     'No Faktur', 'Tanggal', 'Waktu', 'Kasir', 'Pelanggan', 'Metode Bayar'
                 ], ';');
@@ -156,19 +112,16 @@ class ExportController extends Controller
                     $row->payment_name ?? 'Tunai'
                 ], ';');
 
-                // Print Items Header
                 fputcsv($handle, [
                     '', 'Menu', 'Harga', 'Qty', 'Subtotal'
                 ], ';');
             }
 
-            // Format Product Name with Modifiers
             $productName = $row->product_name;
             if (!empty($row->modifiers_list)) {
                 $productName .= ' (' . $row->modifiers_list . ')';
             }
 
-            // Print Item Row (Always)
             fputcsv($handle, [
                 '',
                 $productName,
@@ -178,7 +131,6 @@ class ExportController extends Controller
             ], ';');
         }
 
-        // Print footer for the LAST transaction
         if ($currentTransId !== null) {
             $this->writeTransactionFooter($handle, $currentTransData);
         }
@@ -190,7 +142,6 @@ class ExportController extends Controller
 
     private function writeTransactionFooter($handle, $data)
     {
-        // Hanya tampilkan Total sesuai request (simpel)
         fputcsv($handle, [
             '', '', '', 'TOTAL :', number_format($data->trans_total, 0, ',', '.')
         ], ';');
@@ -226,22 +177,7 @@ class ExportController extends Controller
                 'Total Pendapatan'
             ], ';');
 
-            // Use raw query for performance with grouping
-            $query = TransactionDetail::query()
-                ->join('transactions', 'transaction_details.transaction_id', '=', 'transactions.id')
-                ->join('products', 'transaction_details.product_id', '=', 'products.id')
-                ->leftJoin('categories', 'products.category_id', '=', 'categories.id')
-                ->where('transactions.status', 'completed')
-                ->whereBetween('transactions.created_at', [$start, $end])
-                ->selectRaw('
-                    products.name as product_name,
-                    categories.name as category_name,
-                    SUM(transaction_details.quantity) as total_qty,
-                    AVG(transaction_details.unit_price) as avg_price,
-                    SUM(transaction_details.subtotal) as total_revenue
-                ')
-                ->groupBy('products.id', 'products.name', 'categories.name')
-                ->orderByDesc('total_qty');
+            $query = TransactionDetail::getProductSalesExportQuery($start, $end);
 
             foreach ($query->cursor() as $row) {
                 fputcsv($handle, [
@@ -285,22 +221,9 @@ class ExportController extends Controller
                 'Total Pendapatan'
             ], ';');
 
-            $query = TransactionDetail::query()
-                ->join('products', 'transaction_details.product_id', '=', 'products.id')
-                ->join('categories', 'products.category_id', '=', 'categories.id')
-                ->join('transactions', 'transaction_details.transaction_id', '=', 'transactions.id')
-                ->where('transactions.status', 'completed')
-                ->whereBetween('transactions.created_at', [$start, $end])
-                ->groupBy('categories.id', 'categories.name')
-                ->selectRaw('
-                    categories.name as category_name,
-                    SUM(transaction_details.quantity) as total_qty,
-                    COUNT(DISTINCT transactions.id) as transaction_count,
-                    SUM(transaction_details.subtotal) as total_sales
-                ')
-                ->orderByDesc('total_sales');
+            $query = TransactionDetail::getCategorySalesReport($start, $end);
 
-            foreach ($query->cursor() as $row) {
+            foreach ($query as $row) {
                 fputcsv($handle, [
                     $row->category_name,
                     $row->total_qty,
@@ -341,17 +264,7 @@ class ExportController extends Controller
                 'Rata-rata'
             ], ';');
 
-            $query = Transaction::query()
-                ->where('status', 'completed')
-                ->whereBetween('created_at', [$start, $end])
-                ->groupBy('payment_method')
-                ->selectRaw('
-                    payment_method,
-                    COUNT(*) as transaction_count,
-                    SUM(total) as total_amount,
-                    AVG(total) as average_amount
-                ')
-                ->orderByDesc('total_amount');
+            $query = Transaction::getSalesByPaymentMethodExportQuery($start, $end);
 
             foreach ($query->cursor() as $row) {
                 fputcsv($handle, [
@@ -367,6 +280,7 @@ class ExportController extends Controller
             'Content-Type' => 'text/csv; charset=UTF-8',
         ]);
     }
+
     public function productReturns(Request $request): StreamedResponse
     {
         $request->validate([
@@ -395,13 +309,9 @@ class ExportController extends Controller
                 'Total / Subtotal'
             ], ';');
 
-            // Optimasi: Gunakan Eager Loading
-            $query = \App\Models\ProductReturn::with(['transaction', 'user', 'items.product'])
-                ->whereBetween('created_at', [$start, $end])
-                ->orderBy('created_at', 'desc');
+            $query = ProductReturn::getExportQuery($start, $end);
 
             foreach ($query->cursor() as $return) {
-                // Header Transaksi Retur
                 fputcsv($handle, [
                     $return->return_number,
                     $return->transaction->invoice_number,
@@ -411,7 +321,6 @@ class ExportController extends Controller
                     number_format($return->total_refund, 0, ',', '.')
                 ], ';');
 
-                // Detail Item
                 foreach ($return->items as $item) {
                     $productName = $item->product ? $item->product->name : ($item->product_name ?? 'Item Terhapus');
                     if (is_array($item->modifiers) && count($item->modifiers) > 0) {
@@ -436,9 +345,9 @@ class ExportController extends Controller
         ]);
     }
 
-    public function printReturn(\App\Models\ProductReturn $return)
+    public function printReturn(ProductReturn $return)
     {
-        $return->load(['items.product', 'transaction', 'user', 'shift']);
+        $return->loadForPrint();
         return view('admin.exports.print-return', compact('return'));
     }
 
@@ -466,24 +375,17 @@ class ExportController extends Controller
                 'Penjualan Tunai',
                 'Penjualan Non-Tunai',
                 'Pengeluaran',
-                // Cash reconciliation
                 'Ekspektasi Tunai (Sistem)',
                 'Fisik di Laci (Kasir)',
                 'Selisih Tunai',
-                // Non-cash reconciliation
                 'Non-Tunai Sistem',
                 'Non-Tunai Terverifikasi (Kasir)',
                 'Selisih Non-Tunai',
-                // General
                 'Status',
                 'Catatan',
             ], ';');
 
-            Shift::query()
-                ->with(['user', 'transactions', 'expenses'])
-                ->whereBetween('started_at', [$start, $end])
-                ->when($cashierId, fn($q) => $q->where('user_id', $cashierId))
-                ->latest('started_at')
+            Shift::getExportQuery($start, $end, $cashierId)
                 ->cursor()
                 ->each(function ($shift) use ($handle) {
                     $completedTrx   = $shift->transactions->where('status', 'completed');
@@ -502,15 +404,12 @@ class ExportController extends Controller
                         $cashSales,
                         $nonCashSales,
                         $expenses,
-                        // Cash
                         $shift->expected_cash,
                         $shift->actual_cash,
                         $shift->cash_difference,
-                        // Non-Cash
                         $shift->expected_non_cash ?? $nonCashSales,
                         $shift->actual_non_cash,
                         $shift->non_cash_difference,
-                        // General
                         $shift->status === 'closed' ? 'Ditutup' : 'Aktif',
                         $shift->notes,
                     ], ';');
@@ -523,4 +422,3 @@ class ExportController extends Controller
         }, $filename);
     }
 }
-

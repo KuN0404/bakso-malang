@@ -42,7 +42,7 @@
     </div>
 
     <!-- Table -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-x-auto">
         <table class="w-full">
             <thead class="bg-gray-50">
                 <tr>
@@ -76,31 +76,11 @@
                         <td class="px-6 py-4 font-medium text-gray-800">{{ $product->formatted_price }}</td>
                         <td class="px-6 py-4 text-gray-600">
                             @if($product->track_stock)
-                                @can('adjust_stock')
-                                    <button 
-                                        wire:click="openStockModal({{ $product->id }})"
-                                        class="px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors flex items-center gap-1 group"
-                                        title="Atur Stok"
-                                    >
-                                        {{ $product->stock }}
-                                        <i data-lucide="chevrons-up-down" class="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity"></i>
-                                    </button>
-                                @else
-                                    <span class="px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">{{ $product->stock }}</span>
-                                @endcan
+                                <span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
+                                    {{ $product->stock }}
+                                </span>
                             @else
-                                @can('adjust_stock')
-                                    <button 
-                                        wire:click="openStockModal({{ $product->id }})"
-                                        class="text-gray-400 hover:text-blue-600 transition-colors flex items-center gap-1 text-sm"
-                                        title="Aktifkan Stok"
-                                    >
-                                        -
-                                        <i data-lucide="plus-circle" class="w-4 h-4"></i>
-                                    </button>
-                                @else
-                                    <span class="text-gray-400">-</span>
-                                @endcan
+                                <span class="text-gray-400 font-medium">-</span>
                             @endif
                         </td>
                         <td class="px-6 py-4">
@@ -487,10 +467,12 @@
                             <input type="checkbox" wire:model="is_featured" class="w-4 h-4 text-primary-600 border-gray-300 rounded">
                             <span class="text-sm text-gray-700">Unggulan</span>
                         </label>
-                        <label class="inline-flex items-center gap-2">
-                            <input type="checkbox" wire:model="is_unlimited" class="w-4 h-4 text-primary-600 border-gray-300 rounded">
-                            <span class="text-sm text-gray-700">Stok Unlimited</span>
-                        </label>
+                        @can('manage_unlimited_stock')
+                            <label class="inline-flex items-center gap-2">
+                                <input type="checkbox" wire:model="is_unlimited" class="w-4 h-4 text-primary-600 border-gray-300 rounded">
+                                <span class="text-sm text-gray-700">Stok Unlimited</span>
+                            </label>
+                        @endcan
                     </div>
                     @if(!$is_unlimited && !$editingId)
                         <div>
@@ -506,8 +488,13 @@
                     <button 
                         type="button" 
                         @click="$wire.set('selectedModifierGroups', localModifierGroups); $wire.save()"
-                        class="flex-1 py-3 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-lg transition-colors"
-                    >Simpan</button>
+                        wire:loading.attr="disabled"
+                        wire:target="save"
+                        class="flex-1 py-3 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        <span wire:loading.remove wire:target="save">Simpan</span>
+                        <span wire:loading wire:target="save">Menyimpan...</span>
+                    </button>
                 </div>
             </div>
         </div>

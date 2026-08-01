@@ -6,10 +6,29 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ $title ?? 'Dashboard - Bakso Malang POS' }}</title>
     
-    <!-- Google Fonts: Poppins -->
+    @php
+        $siteLogo = \App\Models\Setting::get('site_logo', null, 'general');
+        $logoWeb = \App\Models\Setting::get('logo_web', null, 'general');
+        $fontFamilyWeb = \App\Models\Setting::get('font_family_web', 'Poppins', 'general');
+    @endphp
+
+    <!-- Google Fonts: Dynamic -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family={{ str_replace(' ', '+', $fontFamilyWeb) }}:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <style id="base-font-style">
+        :root {
+            --font-sans: '{{ $fontFamilyWeb }}';
+        }
+        body {
+            font-family: var(--font-sans), sans-serif !important;
+        }
+    </style>
+
+    @if ($siteLogo)
+        <link rel="icon" type="image/webp" href="{{ asset('storage/' . $siteLogo) }}">
+    @endif
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -37,7 +56,7 @@
                         }
                     },
                     fontFamily: {
-                        sans: ['Poppins', 'sans-serif'],
+                        sans: ['var(--font-sans)', 'sans-serif'],
                     }
                 }
             }
@@ -52,6 +71,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/airbnb.css">
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/id.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/plugins/rangePlugin.js"></script>
     
     <!-- Livewire Styles (includes Alpine.js) -->
     @livewireStyles
@@ -73,43 +93,122 @@
         .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
         .custom-scroll::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
         
-        /* Flatpickr Custom Styling */
+        /* Flatpickr Custom Styling - Modern Aesthetic */
         .flatpickr-calendar {
-            border-radius: 12px !important;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.15) !important;
-            border: 1px solid #e5e7eb !important;
+            border-radius: 16px !important;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05) !important;
+            border: 1px solid #e2e8f0 !important;
+            padding: 12px !important;
+            background: #ffffff !important;
+            font-family: inherit !important;
+        }
+        .flatpickr-months {
+            align-items: center !important;
+            margin-bottom: 8px !important;
+        }
+        .flatpickr-months .flatpickr-month {
+            background: transparent !important;
+            color: #0f172a !important;
+            height: 38px !important;
+        }
+        .flatpickr-current-month {
+            font-size: 0.95rem !important;
+            font-weight: 700 !important;
+            padding-top: 4px !important;
+            color: #0f172a !important;
+        }
+        .flatpickr-current-month .flatpickr-monthDropdown-months {
+            font-weight: 700 !important;
+            color: #0f172a !important;
+            border-radius: 6px !important;
+            padding: 2px 4px !important;
+        }
+        .flatpickr-current-month input.cur-year {
+            font-weight: 700 !important;
+            color: #0f172a !important;
+        }
+        .flatpickr-months .flatpickr-prev-month, 
+        .flatpickr-months .flatpickr-next-month {
+            fill: #475569 !important;
+            color: #475569 !important;
+            padding: 6px !important;
+            border-radius: 8px !important;
+            transition: all 0.2s ease !important;
+        }
+        .flatpickr-months .flatpickr-prev-month:hover, 
+        .flatpickr-months .flatpickr-next-month:hover {
+            background: #f1f5f9 !important;
+            color: #0f172a !important;
+            fill: #0f172a !important;
+        }
+        .flatpickr-weekdays {
+            margin-bottom: 4px !important;
+        }
+        .flatpickr-weekday {
+            color: #94a3b8 !important;
+            font-weight: 600 !important;
+            font-size: 0.75rem !important;
+            text-transform: uppercase !important;
+        }
+        .dayContainer {
+            gap: 2px !important;
+        }
+        .flatpickr-day {
+            border-radius: 8px !important;
+            border: none !important;
+            color: #334155 !important;
+            font-weight: 500 !important;
+            font-size: 0.85rem !important;
+            height: 36px !important;
+            line-height: 36px !important;
+            max-width: 36px !important;
+            margin: 1px 0 !important;
+            transition: all 0.15s ease !important;
+        }
+        .flatpickr-day.prevMonthDay, 
+        .flatpickr-day.nextMonthDay {
+            color: #cbd5e1 !important;
+        }
+        .flatpickr-day:hover, 
+        .flatpickr-day:focus {
+            background: #f1f5f9 !important;
+            color: #0f172a !important;
+        }
+        .flatpickr-day.today {
+            border: 2px solid #2563eb !important;
+            color: #2563eb !important;
+            font-weight: 700 !important;
+            background: transparent !important;
         }
         .flatpickr-day.selected, 
         .flatpickr-day.startRange, 
         .flatpickr-day.endRange {
             background: #2563eb !important;
-            border-color: #2563eb !important;
+            color: #ffffff !important;
+            font-weight: 700 !important;
+            border-radius: 8px !important;
+            box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.3) !important;
+        }
+        .flatpickr-day.startRange {
+            border-top-right-radius: 0 !important;
+            border-bottom-right-radius: 0 !important;
+        }
+        .flatpickr-day.endRange {
+            border-top-left-radius: 0 !important;
+            border-bottom-left-radius: 0 !important;
         }
         .flatpickr-day.inRange {
-            background: #dbeafe !important;
-            border-color: #dbeafe !important;
-            box-shadow: none !important;
-        }
-        .flatpickr-day:hover {
             background: #eff6ff !important;
-            border-color: #eff6ff !important;
+            color: #1d4ed8 !important;
+            border-radius: 0 !important;
+            box-shadow: -5px 0 0 #eff6ff, 5px 0 0 #eff6ff !important;
         }
-        .flatpickr-months .flatpickr-month {
-            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important;
-            color: white !important;
-            border-radius: 10px 10px 0 0 !important;
-        }
-        .flatpickr-current-month .flatpickr-monthDropdown-months,
-        .flatpickr-current-month input.cur-year {
-            color: white !important;
-        }
-        .flatpickr-weekday {
-            color: #6b7280 !important;
-            font-weight: 600 !important;
+        .flatpickr-day.startRange.endRange {
+            border-radius: 8px !important;
         }
     </style>
 </head>
-<body class="h-full bg-gray-100 antialiased">
+<body class="h-full bg-gray-100 antialiased" data-font-web="{{ $fontFamilyWeb }}">
     <div 
         x-data="{ 
             sidebarOpen: false, 
@@ -160,11 +259,17 @@
         >
             <!-- Logo -->
             <div class="p-5 border-b border-sidebar-light flex items-center gap-3 whitespace-nowrap overflow-hidden h-20">
-                <div class="flex-shrink-0 w-10 h-10 bg-white rounded-lg flex items-center justify-center">
-                    <x-lucide name="soup" class="w-6 h-6 text-sidebar" />
+                <div class="flex-shrink-0 w-10 h-10 bg-white rounded-lg flex items-center justify-center overflow-hidden">
+                    @if ($logoWeb)
+                        <img id="sidebar-logo-img" src="{{ asset('storage/' . $logoWeb) }}" class="w-full h-full object-cover">
+                    @else
+                        <div id="sidebar-logo-placeholder" class="w-full h-full flex items-center justify-center">
+                            <x-lucide name="soup" class="w-6 h-6 text-sidebar" />
+                        </div>
+                    @endif
                 </div>
                 <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-40 opacity-100'">
-                    <h1 class="text-white font-bold text-lg leading-tight">BAKSO MALANG</h1>
+                    <h1 id="sidebar-store-name" class="text-white font-bold text-lg leading-tight">{{ \App\Models\Setting::get('store_name', 'BAKSO MALANG', 'general') }}</h1>
                     <p class="text-blue-200 text-xs">Point of Sales</p>
                 </div>
                 <!-- Close Button (Mobile Only) -->
@@ -179,6 +284,13 @@
                     <div class="flex-shrink-0 w-6 flex justify-center"><x-lucide name="layout-dashboard" class="w-5 h-5" /></div>
                      <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'">
                         <span>Dashboard</span>
+                    </div>
+                </a>
+
+                <a href="{{ route('admin.menu.index') }}" wire:navigate class="flex items-center gap-3 px-3 py-3 rounded-lg whitespace-nowrap {{ request()->routeIs('admin.menu.*') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
+                    <div class="flex-shrink-0 w-6 flex justify-center"><x-lucide name="utensils" class="w-5 h-5" /></div>
+                     <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'">
+                        <span>Katalog Menu</span>
                     </div>
                 </a>
 
@@ -199,14 +311,16 @@
                                 <span>Master Data</span>
                             </div>
                         </div>
-                        <x-lucide name="chevron-down" class="w-4 h-4 transition-transform duration-200 flex-shrink-0" ::class="[open ? 'rotate-180' : '', isCompact ? 'hidden' : 'block']" />
+                        <span class="transform transition-transform duration-200 flex-shrink-0" :class="[open ? 'rotate-90' : '', isCompact ? 'hidden' : 'block']">
+                            <x-lucide name="chevron-right" class="w-4 h-4" />
+                        </span>
                     </button>
                     <!-- Force hidden if compact to avoid popup artifacts, rely on hover to expand first -->
-                    <div x-show="open && !isCompact" 
+                    <div x-show="open && !isCompact" x-cloak 
                          x-transition:enter="transition ease-out duration-200"
                          x-transition:enter-start="opacity-0 -translate-y-2"
                          x-transition:enter-end="opacity-100 translate-y-0"
-                         class="space-y-1 mt-1">
+                         class="ml-6 pl-3 border-l border-sidebar-light/40 space-y-1 mt-1">
                         @can('view_categories')
                         <a href="{{ route('admin.categories.index') }}" wire:navigate class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.categories.*') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
                             <div class="flex-shrink-0 w-6 flex justify-center"><x-lucide name="folder" class="w-4 h-4" /></div>
@@ -245,6 +359,60 @@
                 </div>
                 @endcanany
 
+                <!-- Group: Inventori & Stok -->
+                @php
+                    $isInventoryActive = request()->routeIs('admin.ingredients.*') || 
+                                         request()->routeIs('admin.purchases.*') || 
+                                         request()->routeIs('admin.productions.*') ||
+                                         request()->routeIs('admin.hpp-calculator.*');
+                @endphp
+                @canany(['view_ingredients', 'view_purchases', 'view_productions'])
+                <div x-data="{ open: {{ $isInventoryActive ? 'true' : 'false' }} }" class="mt-2">
+                    <button @click="open = !open" class="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-blue-300 uppercase tracking-wider hover:text-white transition-colors group whitespace-nowrap text-left">
+                        <div class="flex items-center gap-3">
+                            <div class="flex-shrink-0 w-6 flex justify-center"><x-lucide name="boxes" class="w-5 h-5 text-blue-300 group-hover:text-white" /></div>
+                            <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'">
+                                <span>Inventori & Stok</span>
+                            </div>
+                        </div>
+                        <span class="transform transition-transform duration-200 flex-shrink-0" :class="[open ? 'rotate-90' : '', isCompact ? 'hidden' : 'block']">
+                            <x-lucide name="chevron-right" class="w-4 h-4" />
+                        </span>
+                    </button>
+                    <div x-show="open && !isCompact" x-cloak 
+                         x-transition:enter="transition ease-out duration-200"
+                         x-transition:enter-start="opacity-0 -translate-y-2"
+                         x-transition:enter-end="opacity-100 translate-y-0"
+                         class="ml-6 pl-3 border-l border-sidebar-light/40 space-y-1 mt-1">
+                        <a href="{{ route('admin.hpp-calculator.index') }}" wire:navigate class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.hpp-calculator.*') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
+                            <div class="flex-shrink-0 w-6 flex justify-center"><x-lucide name="calculator" class="w-4 h-4 text-emerald-400" /></div>
+                            <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Kalkulator HPP</span></div>
+                        </a>
+
+                        @can('view_ingredients')
+                        <a href="{{ route('admin.ingredients.index') }}" wire:navigate class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.ingredients.*') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
+                            <div class="flex-shrink-0 w-6 flex justify-center"><x-lucide name="leaf" class="w-4 h-4" /></div>
+                            <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Bahan Baku</span></div>
+                        </a>
+                        @endcan
+                        
+                        @can('view_purchases')
+                        <a href="{{ route('admin.purchases.index') }}" wire:navigate class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.purchases.*') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
+                            <div class="flex-shrink-0 w-6 flex justify-center"><x-lucide name="shopping-cart" class="w-4 h-4" /></div>
+                            <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Pembelian Stok</span></div>
+                        </a>
+                        @endcan
+
+                        @can('view_productions')
+                        <a href="{{ route('admin.productions.index') }}" wire:navigate class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.productions.*') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
+                            <div class="flex-shrink-0 w-6 flex justify-center"><x-lucide name="utensils-crossed" class="w-4 h-4" /></div>
+                            <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Repacking / Produksi</span></div>
+                        </a>
+                        @endcan
+                    </div>
+                </div>
+                @endcanany
+
                 <!-- Group: Transaksi -->
                 @php
                     $isTransActive = request()->routeIs('pos') || request()->routeIs('admin.shifts.*');
@@ -258,13 +426,15 @@
                                 <span>Transaksi</span>
                             </div>
                         </div>
-                        <x-lucide name="chevron-down" class="w-4 h-4 transition-transform duration-200 flex-shrink-0" ::class="[open ? 'rotate-180' : '', isCompact ? 'hidden' : 'block']" />
+                        <span class="transform transition-transform duration-200 flex-shrink-0" :class="[open ? 'rotate-90' : '', isCompact ? 'hidden' : 'block']">
+                            <x-lucide name="chevron-right" class="w-4 h-4" />
+                        </span>
                     </button>
-                    <div x-show="open && !isCompact" 
+                    <div x-show="open && !isCompact" x-cloak 
                          x-transition:enter="transition ease-out duration-200"
                          x-transition:enter-start="opacity-0 -translate-y-2"
                          x-transition:enter-end="opacity-100 translate-y-0"
-                         class="space-y-1 mt-1">
+                         class="ml-6 pl-3 border-l border-sidebar-light/40 space-y-1 mt-1">
                         @can('access_pos')
                         <a href="{{ route('pos') }}" wire:navigate class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-blue-200 hover:bg-sidebar-light hover:text-white transition-colors">
                              <div class="flex-shrink-0 w-6 flex justify-center"><x-lucide name="monitor" class="w-4 h-4" /></div>
@@ -302,13 +472,15 @@
                                 <span>Laporan</span>
                             </div>
                         </div>
-                        <x-lucide name="chevron-down" class="w-4 h-4 transition-transform duration-200 flex-shrink-0" ::class="[open ? 'rotate-180' : '', isCompact ? 'hidden' : 'block']" />
+                        <span class="transform transition-transform duration-200 flex-shrink-0" :class="[open ? 'rotate-90' : '', isCompact ? 'hidden' : 'block']">
+                            <x-lucide name="chevron-right" class="w-4 h-4" />
+                        </span>
                     </button>
-                    <div x-show="open && !isCompact" 
+                    <div x-show="open && !isCompact" x-cloak 
                          x-transition:enter="transition ease-out duration-200"
                          x-transition:enter-start="opacity-0 -translate-y-2"
                          x-transition:enter-end="opacity-100 translate-y-0"
-                         class="space-y-1 mt-1">
+                         class="ml-6 pl-3 border-l border-sidebar-light/40 space-y-1 mt-1">
                         @can('view_transactions')
                         <a href="{{ route('admin.reports.transactions') }}" wire:navigate class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.reports.transactions') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
                             <div class="flex-shrink-0 w-6 flex justify-center"><x-lucide name="receipt" class="w-4 h-4" /></div>
@@ -327,6 +499,13 @@
                         <a href="{{ route('admin.reports.shifts') }}" wire:navigate class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.reports.shifts') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
                             <div class="flex-shrink-0 w-6 flex justify-center"><x-lucide name="file-clock" class="w-4 h-4" /></div>
                             <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Laporan Shift</span></div>
+                        </a>
+                        @endcan
+
+                        @can('view_inventory_reports')
+                        <a href="{{ route('admin.reports.inventory') }}" wire:navigate class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.reports.inventory') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
+                            <div class="flex-shrink-0 w-6 flex justify-center"><x-lucide name="boxes" class="w-4 h-4" /></div>
+                            <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Laporan Inventori</span></div>
                         </a>
                         @endcan
 
@@ -355,13 +534,15 @@
                                 <span>Pengaturan</span>
                             </div>
                         </div>
-                        <x-lucide name="chevron-down" class="w-4 h-4 transition-transform duration-200 flex-shrink-0" ::class="[open ? 'rotate-180' : '', isCompact ? 'hidden' : 'block']" />
+                        <span class="transform transition-transform duration-200 flex-shrink-0" :class="[open ? 'rotate-90' : '', isCompact ? 'hidden' : 'block']">
+                            <x-lucide name="chevron-right" class="w-4 h-4" />
+                        </span>
                     </button>
-                    <div x-show="open && !isCompact" 
+                    <div x-show="open && !isCompact" x-cloak 
                          x-transition:enter="transition ease-out duration-200"
                          x-transition:enter-start="opacity-0 -translate-y-2"
                          x-transition:enter-end="opacity-100 translate-y-0"
-                         class="space-y-1 mt-1">
+                         class="ml-6 pl-3 border-l border-sidebar-light/40 space-y-1 mt-1">
                         @can('view_users')
                         <a href="{{ route('admin.users.index') }}" wire:navigate class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.users.*') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
                             <div class="flex-shrink-0 w-6 flex justify-center"><x-lucide name="users" class="w-4 h-4" /></div>
@@ -397,7 +578,7 @@
         </aside>
 
         <!-- Main Content -->
-        <main class="flex-1 flex flex-col overflow-hidden transition-all duration-300 lg:transition-none lg:ml-64" :class="isSidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'">
+        <main class="flex-1 flex flex-col overflow-hidden transition-[margin] duration-300 lg:transition-none lg:ml-64" :class="isSidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'">
             <!-- Header -->
             <header class="bg-white border-b px-6 py-4">
                 <div class="flex items-center justify-between">
@@ -643,17 +824,125 @@
     @livewireScripts
     
     <script>
-        // Initialize Lucide icons
-        lucide.createIcons();
+        document.addEventListener('livewire:init', () => {
+            if (typeof Livewire.onPageExpired === 'function') {
+                Livewire.onPageExpired((response, message) => {
+                    window.location.href = "{{ route('login') }}?expired=1";
+                    return false;
+                });
+            } else if (Livewire.hook) {
+                Livewire.hook('request', ({ fail }) => {
+                    fail(({ status, preventDefault }) => {
+                        if (status === 419) {
+                            preventDefault();
+                            window.location.href = "{{ route('login') }}?expired=1";
+                        }
+                    });
+                });
+            }
+        });
+
+        // Dynamic Font Applier
+        function applyDynamicFont(fontFamily) {
+            if (!fontFamily) return;
+            try {
+                let fontLink = document.getElementById('dynamic-font-link');
+                const href = `https://fonts.googleapis.com/css2?family=${fontFamily.replace(/ /g, '+')}:wght@300;400;500;600;700;800&display=swap`;
+                
+                if (!fontLink) {
+                    fontLink = document.createElement('link');
+                    fontLink.id = 'dynamic-font-link';
+                    fontLink.rel = 'stylesheet';
+                    document.head.appendChild(fontLink);
+                }
+                if (fontLink.href !== href) {
+                    fontLink.href = href;
+                }
+
+                // Instantly update the CSS variable on the document root
+                document.documentElement.style.setProperty('--font-sans', `'${fontFamily}'`);
+            } catch (e) {
+                console.error("Error applying font:", e);
+            }
+        }
+
+        function initLayoutTheme() {
+            try {
+                if (typeof lucide !== 'undefined') {
+                    lucide.createIcons();
+                }
+                if (document.body) {
+                    const currentFont = document.body.getAttribute('data-font-web');
+                    if (currentFont) {
+                        applyDynamicFont(currentFont);
+                    }
+                }
+            } catch (e) {
+                console.error("Error initializing layout theme:", e);
+            }
+        }
+
+        // Initialize on DOMContentLoaded (hard refresh)
+        document.addEventListener('DOMContentLoaded', initLayoutTheme);
         
         // Re-initialize on Livewire navigation
-        document.addEventListener('livewire:navigated', () => {
-            lucide.createIcons();
+        document.addEventListener('livewire:navigated', initLayoutTheme);
+
+        // Handle Real-Time Settings Updates for SPA/wire:navigate
+        window.addEventListener('settings-updated', event => {
+            const data = event.detail;
+            const storeName = data.store_name;
+            const logoWeb = data.logo_web;
+            const siteLogo = data.site_logo;
+            const fontFamilyWeb = data.font_family_web;
+
+            // Update Store Name in sidebar
+            const storeNameEl = document.getElementById('sidebar-store-name');
+            if (storeNameEl) {
+                storeNameEl.textContent = storeName;
+            }
+
+            // Update Logo Web in sidebar
+            const logoImg = document.getElementById('sidebar-logo-img');
+            const logoPlaceholder = document.getElementById('sidebar-logo-placeholder');
+            const logoContainer = logoImg ? logoImg.parentElement : (logoPlaceholder ? logoPlaceholder.parentElement : null);
+            
+            if (logoContainer) {
+                if (logoWeb) {
+                    logoContainer.innerHTML = `<img id="sidebar-logo-img" src="${logoWeb}" class="w-full h-full object-cover">`;
+                } else {
+                    logoContainer.innerHTML = `<div id="sidebar-logo-placeholder" class="w-full h-full flex items-center justify-center"><i data-lucide="soup" class="w-6 h-6 text-sidebar"></i></div>`;
+                    if (window.lucide) window.lucide.createIcons({ nodes: logoContainer.querySelectorAll('[data-lucide]') });
+                }
+            }
+
+            // Update Favicon (site logo)
+            let favicon = document.querySelector('link[rel="icon"]');
+            if (siteLogo) {
+                if (!favicon) {
+                    favicon = document.createElement('link');
+                    favicon.rel = 'icon';
+                    favicon.type = 'image/webp';
+                    document.head.appendChild(favicon);
+                }
+                favicon.href = siteLogo;
+            } else {
+                if (favicon) {
+                    favicon.remove();
+                }
+            }
+
+            // Update Font Family in real-time
+            if (fontFamilyWeb) {
+                document.body.setAttribute('data-font-web', fontFamilyWeb);
+                applyDynamicFont(fontFamilyWeb);
+            }
         });
         
         // Global Alpine.js Money Input Component
         // Usage: x-data="moneyInput(initialValue, wireModel)"
-        document.addEventListener('alpine:init', () => {
+        function initAlpineComponents() {
+            // Global Alpine.js Money Input Component
             Alpine.data('moneyInput', (initialValue = 0, wireModel = null) => ({
                 rawValue: initialValue,
                 formatted: '',
@@ -675,14 +964,8 @@
                     const input = e.target;
                     const cursorPos = input.selectionStart;
                     const value = input.value;
-                    const oldLen = value.length; // Use current value length as reference or approximation? No, we need old length of FORMATTED before edit? 
-                    // Actually, cursor logic depends on old formatted length.
-                    // But accessing this.formatted is safe for "old length" (previous state).
-                    // accessing input.value is safe for "new characters".
-                    
                     const oldFormattedLen = this.formatted.length;
                     
-                    // Get raw digits only from CURRENT INPUT
                     const digits = value.replace(/\D/g, '');
                     if (digits === '') {
                         this.rawValue = 0;
@@ -692,46 +975,12 @@
                         this.formatted = this.formatNumber(this.rawValue);
                     }
                     
-                    // Adjust cursor position
-                    // We need to compare old formatted length vs new formatted length
-                    // And adjust cursor based on that?
-                    // The standard cursor logic:
-                    // newPos = oldPos + (newLen - oldLen)
-                    // But here oldPos is cursorPos (post-edit position).
-                    // This logic is tricky. 
-                    // Let's stick to the existing logic but FIX the source of 'digits'.
-                    
-                    // Re-calculate cursor position
                     const newLen = this.formatted.length;
                     
                     this.$nextTick(() => {
                         const diff = newLen - oldFormattedLen; 
-                        // If new length is bigger, cursor usually moves forward effectively by diff? 
-                        // Or if we just added a digit.
-                        // Simple heuristic: 
-                        // If appending digit, move forward. 
-                        // If deleting digit, move back (diff is negative).
-                        // Be careful about formatting chars (dots) appearing/disappearing.
-                        
-                        // Heuristic: Maintain relative distance from end? No.
-                        // Maintain relative distance from start.
-                        let newPos = cursorPos;
-                        
-                        // If formatting changed length (e.g. 1000 -> 1.000), diff is 1. 
-                        // If cursor was at 2 (after 0), newPos should be 3 (after 0).
-                        // So newPos = cursorPos + diff?
-                        // If diff is due to formatting occurring BEFORE cursor?
-                        // For money input, thousands separator usually appears to the left.
-                        // So usually we just add diff.
-                        
-                        // But what if we deleted? diff is negative. 
-                        // Cursor moves back.
-                        
-                        newPos = Math.max(0, cursorPos + diff);
-                        
-                        // Special case: if value is empty/0, ensure we are inside.
+                        let newPos = Math.max(0, cursorPos + diff);
                         if (newLen === 0) newPos = 0;
-                        
                         input.setSelectionRange(newPos, newPos);
                     });
                 },
@@ -807,7 +1056,6 @@
                 
                 confirm() {
                     if (this.action) {
-                        // Dispatch Livewire action
                         const wire = Livewire.find(this.action.componentId);
                         if (wire) {
                             if (this.actionParams !== null) {
@@ -847,7 +1095,7 @@
                     }
                 }
             }));
-        });
+
             // Notification Handler
             Alpine.data('notificationHandler', () => ({
                 notifications: [],
@@ -862,7 +1110,7 @@
                     const id = Date.now();
                     this.notifications.push({
                         id: id,
-                        type: notification.type || 'info', // success, error, info
+                        type: notification.type || 'info',
                         message: notification.message,
                         show: true,
                     });
@@ -878,22 +1126,55 @@
                         this.notifications[index].show = false;
                         setTimeout(() => {
                             this.notifications = this.notifications.filter(n => n.id !== id);
-                        }, 300); // Wait for transition
+                        }, 300);
                     }
                 }
             }));
-        });
+        }
+
+        if (window.Alpine) {
+            initAlpineComponents();
+        } else {
+            document.addEventListener('alpine:init', initAlpineComponents);
+        }
 
         // Global Lucide Icon re-creation for Livewire SPA navigation and updates
-        document.addEventListener('livewire:init', () => {
-            Livewire.hook('request', ({ respond }) => {
-                respond(() => {
-                    queueMicrotask(() => {
-                        if (window.lucide) {
-                            lucide.createIcons();
+        let lucideDebounce;
+        const lucideObserver = new MutationObserver((mutations) => {
+            let needsRebuild = false;
+            for (const mutation of mutations) {
+                if (mutation.addedNodes.length) {
+                    for (const node of mutation.addedNodes) {
+                        if (node.nodeType === 1) { // ELEMENT_NODE
+                            if (node.hasAttribute('data-lucide') || node.querySelector('[data-lucide]')) {
+                                needsRebuild = true;
+                                break;
+                            }
                         }
-                    });
-                });
+                    }
+                }
+                if (needsRebuild) break;
+            }
+            if (needsRebuild) {
+                clearTimeout(lucideDebounce);
+                lucideDebounce = setTimeout(() => {
+                    if (window.lucide) lucide.createIcons();
+                }, 10);
+            }
+        });
+        lucideObserver.observe(document.body, { childList: true, subtree: true });
+
+        document.addEventListener('livewire:navigated', () => {
+            if (window.lucide) lucide.createIcons();
+        });
+
+        // Tangani update in-place Livewire (seperti pengetikan pada input pencarian)
+        document.addEventListener('livewire:init', () => {
+            Livewire.hook('morph.updated', () => {
+                clearTimeout(lucideDebounce);
+                lucideDebounce = setTimeout(() => {
+                    if (window.lucide) lucide.createIcons();
+                }, 15);
             });
         });
     </script>

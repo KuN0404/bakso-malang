@@ -3,12 +3,12 @@
 namespace App\Livewire\Admin;
 
 use App\Models\Shift;
+use App\Models\User;
 use Carbon\Carbon;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
-
 use Livewire\Attributes\Title;
 
 #[Layout('layouts.admin')]
@@ -213,7 +213,7 @@ class ShiftReport extends Component
 
     public function viewDetail(int $id): void
     {
-        $this->selectedShift = Shift::with(['user', 'transactions', 'expenses'])->findOrFail($id);
+        $this->selectedShift = Shift::getForDetail($id);
         $this->showDetailModal = true;
     }
 
@@ -222,31 +222,14 @@ class ShiftReport extends Component
         $start = Carbon::parse($this->startDate)->startOfDay();
         $end = Carbon::parse($this->endDate)->endOfDay();
 
-        $shifts = Shift::with('user')
-            ->withSum(['transactions' => fn($q) => $q->where('status', 'completed')], 'total')
-            ->withSum('expenses', 'amount')
-            ->whereBetween('started_at', [$start, $end])
-            ->when($this->filterUserId, fn($q) => $q->where('user_id', $this->filterUserId))
-            ->latest('started_at')
-            ->paginate(15);
+        $shifts = Shift::getShiftReport($start, $end, $this->filterUserId, 15);
+        $summary = Shift::getShiftSummary($start, $end, $this->filterUserId);
+        
+        $totalSales = $summary['total_sales'];
+        $totalExpenses = $summary['total_expenses'];
+        $totalDifference = $summary['total_difference'];
 
-        // Summary stats - Optimized to avoid N+1 and heavy model hydration
-        $summaryQuery = Shift::whereBetween('started_at', [$start, $end])
-             ->when($this->filterUserId, fn($q) => $q->where('user_id', $this->filterUserId));
-
-        $totalSales = (clone $summaryQuery)
-            ->withSum(['transactions' => fn($q) => $q->where('status', 'completed')], 'total')
-            ->get()
-            ->sum('transactions_sum_total');
-
-        $totalExpenses = (clone $summaryQuery)
-            ->withSum('expenses', 'amount')
-            ->get()
-            ->sum('expenses_sum_amount');
-
-        $totalDifference = (clone $summaryQuery)->sum('cash_difference');
-
-        $users = \App\Models\User::orderBy('name')->get();
+        $users = User::getAllSortedByName();
 
         $months = [
             1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',

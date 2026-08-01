@@ -25,8 +25,6 @@ class TransactionHistory extends Component
     #[Url(except: '')]
     public string $search = '';
 
-
-
     #[Url(except: '')]
     public ?int $filterCashier = null;
 
@@ -79,8 +77,6 @@ class TransactionHistory extends Component
         $this->resetPage();
     }
 
-
-
     public function updatingFilterCashier(): void
     {
         $this->resetPage();
@@ -124,8 +120,6 @@ class TransactionHistory extends Component
 
     private function applyPeriod(): void
     {
-        $now = now();
-
         switch ($this->periodType) {
             case 'weekly':
                 $start = Carbon::now()->setISODate($this->selectedWeekYear, $this->selectedWeek)->startOfWeek();
@@ -182,7 +176,7 @@ class TransactionHistory extends Component
 
     public function showDetail(int $id): void
     {
-        $this->selectedTransaction = Transaction::with(['user', 'details.modifiers', 'paymentSource'])->findOrFail($id);
+        $this->selectedTransaction = Transaction::getForDetail($id);
         $this->showDetailModal = true;
     }
 
@@ -194,7 +188,7 @@ class TransactionHistory extends Component
 
     public function printReceipt(int $id): void
     {
-        $this->lastTransaction = Transaction::with(['details.product.category', 'details.modifiers', 'paymentSource', 'user'])->find($id);
+        $this->lastTransaction = Transaction::getForDetail($id);
         if ($this->lastTransaction) {
             $this->showReceiptModal = true;
             $this->dispatch('print-receipt');
@@ -204,7 +198,7 @@ class TransactionHistory extends Component
     public function closeReceiptModal(): void
     {
         if ($this->lastTransaction) {
-            Transaction::where('id', $this->lastTransaction->id)->increment('print_count');
+            Transaction::incrementPrintCount($this->lastTransaction->id);
         }
         $this->showReceiptModal = false;
         $this->lastTransaction = null;
@@ -287,39 +281,16 @@ class TransactionHistory extends Component
         $start = Carbon::parse($this->startDate)->startOfDay();
         $end = Carbon::parse($this->endDate)->endOfDay();
 
-        $transactions = Transaction::with(['user', 'paymentSource'])
-            ->whereBetween('created_at', [$start, $end])
-            ->where('status', 'completed')
-            ->when($this->search, fn($q) => $q->where('invoice_number', 'like', "%{$this->search}%"))
-            ->when($this->filterCashier, fn($q) => $q->where('user_id', $this->filterCashier))
-            ->latest()
-            ->paginate(15);
+        $transactions = Transaction::getPaginatedHistory($start, $end, $this->search ?: null, $this->filterCashier, 15);
 
         // Smart pagination
         if ($transactions->lastPage() < $this->getPage() && $transactions->lastPage() > 0) {
             $this->setPage($transactions->lastPage());
-            $transactions = Transaction::with(['user', 'paymentSource'])
-                ->whereBetween('created_at', [$start, $end])
-                ->where('status', 'completed')
-                ->when($this->search, fn($q) => $q->where('invoice_number', 'like', "%{$this->search}%"))
-                ->when($this->filterCashier, fn($q) => $q->where('user_id', $this->filterCashier))
-                ->latest()
-                ->paginate(15);
+            $transactions = Transaction::getPaginatedHistory($start, $end, $this->search ?: null, $this->filterCashier, 15);
         }
 
-        // Summary stats
-        $summary = [
-            'total_transactions' => Transaction::whereBetween('created_at', [$start, $end])
-                ->where('status', 'completed')
-                ->when($this->filterCashier, fn($q) => $q->where('user_id', $this->filterCashier))
-                ->count(),
-            'total_revenue' => Transaction::whereBetween('created_at', [$start, $end])
-                ->where('status', 'completed')
-                ->when($this->filterCashier, fn($q) => $q->where('user_id', $this->filterCashier))
-                ->sum('total'),
-        ];
-
-        $cashiers = User::whereHas('transactions')->orderBy('name')->get(['id', 'name']);
+        $summary = Transaction::getSummaryStats($start, $end, $this->filterCashier);
+        $cashiers = User::getCashiersWithTransactions();
 
         $months = [
             1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',

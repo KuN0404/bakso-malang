@@ -21,7 +21,7 @@ class Transactions extends Component
 
     public function view(int $id): void
     {
-        $this->selectedTransaction = Transaction::with(['user', 'details.modifiers', 'paymentSource'])->findOrFail($id);
+        $this->selectedTransaction = Transaction::getForDetail($id);
         $this->showModal = true;
     }
 
@@ -34,18 +34,18 @@ class Transactions extends Component
             return;
         }
 
-        $transaction->cancel('Dibatalkan oleh admin');
+        $transaction->cancel(0, 'Dibatalkan oleh admin');
         $this->dispatch('notify', type: 'success', message: 'Transaksi berhasil dibatalkan');
     }
 
     public function render()
     {
-        $transactions = Transaction::with(['user', 'paymentSource'])
-            ->when($this->search, fn($q) => $q->where('invoice_number', 'like', "%{$this->search}%")->orWhere('customer_name', 'like', "%{$this->search}%"))
-            ->when($this->filterStatus, fn($q) => $q->where('status', $this->filterStatus))
-            ->when($this->filterDate, fn($q) => $q->whereDate('created_at', $this->filterDate))
-            ->latest()
-            ->paginate(15);
+        $transactions = Transaction::getPaginatedForAdminList(
+            $this->search,
+            $this->filterStatus,
+            $this->filterDate,
+            15
+        );
 
         return view('livewire.admin.transactions', compact('transactions'))
             ->title('Transaksi');

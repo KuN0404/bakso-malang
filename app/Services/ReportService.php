@@ -108,15 +108,18 @@ class ReportService
      */
     public function getPeakHoursReport(Carbon $date): Collection
     {
+        $isMySQL = in_array(config('database.default'), ['mysql', 'mariadb']);
+        $hourExpr = $isMySQL ? 'HOUR(created_at)' : "CAST(strftime('%H', created_at) AS INTEGER)";
+
         return Transaction::query()
             ->where('status', 'completed')
             ->whereDate('created_at', $date)
-            ->selectRaw('
-                HOUR(created_at) as hour, 
+            ->selectRaw("
+                {$hourExpr} as hour, 
                 COUNT(*) as transaction_count, 
                 SUM(total) as total_sales,
                 AVG(total) as average_transaction
-            ')
+            ")
             ->groupBy('hour')
             ->orderBy('hour')
             ->get()
@@ -131,15 +134,18 @@ class ReportService
      */
     public function getPeakHoursRangeReport(Carbon $startDate, Carbon $endDate): Collection
     {
+        $isMySQL = in_array(config('database.default'), ['mysql', 'mariadb']);
+        $hourExpr = $isMySQL ? 'HOUR(created_at)' : "CAST(strftime('%H', created_at) AS INTEGER)";
+
         return Transaction::query()
             ->where('status', 'completed')
             ->whereBetween('created_at', [$startDate, $endDate])
-            ->selectRaw('
-                HOUR(created_at) as hour, 
+            ->selectRaw("
+                {$hourExpr} as hour, 
                 COUNT(*) as transaction_count, 
                 SUM(total) as total_sales,
                 AVG(total) as average_transaction
-            ')
+            ")
             ->groupBy('hour')
             ->orderByDesc('transaction_count')
             ->get()

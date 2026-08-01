@@ -30,7 +30,9 @@ return new class extends Migration
             $table->index('is_active');
             $table->index('name');
             $table->index(['is_active', 'category_id']);
-            $table->fullText(['name', 'description']);
+            if (config('database.default') !== 'sqlite') {
+                $table->fullText(['name', 'description']);
+            }
         });
     }
 

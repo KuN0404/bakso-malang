@@ -5,8 +5,12 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+use App\Traits\SyncsToReport;
+
 class Modifier extends Model
 {
+    use SyncsToReport;
+
     protected $fillable = [
         'modifier_group_id',
         'name',
@@ -39,5 +43,13 @@ class Modifier extends Model
 
         $prefix = $this->price_adjustment > 0 ? '+' : '';
         return $prefix . 'Rp ' . number_format($this->price_adjustment, 0, ',', '.');
+    }
+
+    /**
+     * Get all modifiers for a specific modifier group.
+     */
+    public static function getByGroup(int $groupId): \Illuminate\Database\Eloquent\Collection
+    {
+        return static::where('modifier_group_id', $groupId)->get();
     }
 }
