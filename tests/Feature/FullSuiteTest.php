@@ -54,6 +54,8 @@ function createBaseData(): array
         'username' => 'admin_test',
         'email'    => 'admin@example.com',
     ]);
+    \Spatie\Permission\Models\Role::firstOrCreate(['name' => 'Super Admin', 'guard_name' => 'web']);
+    $admin->assignRole('Super Admin');
 
     $cashier = User::factory()->create([
         'name'     => 'Kasir Satu',
@@ -468,6 +470,8 @@ test('[POS] Category filter in POS displays correct products', function () {
 
 test('[Admin] Categories: create and update category', function () {
     $admin = User::factory()->create(['email' => 'cat@example.com', 'username' => 'cat_admin']);
+    \Spatie\Permission\Models\Role::firstOrCreate(['name' => 'Super Admin', 'guard_name' => 'web']);
+    $admin->assignRole('Super Admin');
 
     Livewire::actingAs($admin)
         ->test(Categories::class)
@@ -482,6 +486,8 @@ test('[Admin] Categories: create and update category', function () {
 
 test('[Admin] Categories: delete category', function () {
     $admin    = User::factory()->create(['email' => 'cat2@example.com', 'username' => 'cat2_admin']);
+    \Spatie\Permission\Models\Role::firstOrCreate(['name' => 'Super Admin', 'guard_name' => 'web']);
+    $admin->assignRole('Super Admin');
     $category = Category::create(['name' => 'Delete Me', 'slug' => 'delete-me', 'is_active' => true, 'sort_order' => 1]);
 
     Livewire::actingAs($admin)
@@ -579,6 +585,8 @@ test('[Admin] PaymentSources: create and delete payment source', function () {
 
 test('[Admin] Users: create new user', function () {
     $admin = User::factory()->create(['email' => 'superadmin@example.com', 'username' => 'superadmin']);
+    \Spatie\Permission\Models\Role::firstOrCreate(['name' => 'Super Admin', 'guard_name' => 'web']);
+    $admin->assignRole('Super Admin');
 
     // Create a Cashier role so selectedRoles can be validated
     \Spatie\Permission\Models\Role::firstOrCreate(['name' => 'Kasir', 'guard_name' => 'web']);

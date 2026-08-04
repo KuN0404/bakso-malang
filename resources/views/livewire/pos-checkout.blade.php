@@ -15,6 +15,7 @@
         modifierTotal: 0,
         isThrottled: false,
         showConfirmCloseShift: false,
+        showSelfOrderModal: false,
         
         openModifierModal(product) {
             this.modifierProduct = product;
@@ -116,7 +117,7 @@
     @keydown.f3.window.prevent="if(confirm('Hapus semua item?')) $wire.clearCart()"
     @keydown.f4.window.prevent="$wire.openCloseShiftModal()"
     @keydown.f5.window.prevent="$wire.openPendingModal()"
-    @keydown.escape.window="$wire.closePaymentModal(); $wire.closeReceiptModal(); $wire.set('showCloseShiftModal', false); $wire.set('showShiftReceiptModal', false); $wire.closePendingModal(); showModifierModal = false; showMobileMenu = false">
+    @keydown.escape.window="$wire.closePaymentModal(); $wire.closeReceiptModal(); $wire.set('showCloseShiftModal', false); $wire.set('showShiftReceiptModal', false); $wire.closePendingModal(); showModifierModal = false; showMobileMenu = false; showSelfOrderModal = false">
     
     <!-- Unclosed Previous Shift Blocking Modal -->
     @if($this->unclosedPreviousShift && !$showUnclosedShiftModal)
@@ -367,8 +368,10 @@
                 </div>
             </div>
  
-            <!-- Desktop Action Buttons -->
-            <div class="hidden lg:flex items-center gap-3 justify-end select-none">
+            <!-- Desktop Action Buttons (mulai dari xl: 1280px — di bawah itu, termasuk tablet
+                 landscape seperti iPad yang persis 1024px, semua tombol ini tidak muat dan
+                 bikin header berantakan; pakai menu ringkas ala mobile sampai layar benar-benar lega) -->
+            <div class="hidden xl:flex items-center gap-3 justify-end select-none" wire:poll.10000ms.visible="checkForNewSelfOrders">
                 <button onclick="window.open('{{ route('pos.display') }}', 'CustomerDisplay', 'width=1280,height=800,menubar=no,toolbar=no,location=no,status=no')" 
                         class="flex-shrink-0 flex items-center gap-2 px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg transition-colors border border-indigo-200" 
                         title="Buka Layar Pelanggan">
@@ -383,6 +386,25 @@
                         {{ count($this->pendingCarts) }}
                     </span>
                 </button>
+
+                <!-- Pesan Mandiri Modal Button -->
+                @can('view_self_orders')
+                <button @click="showSelfOrderModal = true"
+                    class="flex-shrink-0 flex items-center gap-2 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg transition-colors border border-emerald-200"
+                    title="Pesanan Mandiri Pelanggan">
+                    <x-lucide name="smartphone" class="w-4 h-4 text-emerald-600" />
+                    <span class="text-xs font-bold hidden xl:inline">Pesan Mandiri</span>
+                    @if($this->selfOrdersCount > 0)
+                        <span class="bg-emerald-600 text-white text-xs py-0.5 px-2 rounded-full font-bold animate-pulse">
+                            {{ $this->selfOrdersCount }}
+                        </span>
+                    @else
+                        <span class="bg-emerald-200 text-emerald-800 text-xs py-0.5 px-2 rounded-full font-bold">
+                            0
+                        </span>
+                    @endif
+                </button>
+                @endcan
 
                 <!-- History Buttons Group -->
                 <div class="flex items-center flex-shrink-0">
@@ -420,51 +442,71 @@
                     <x-lucide name="layout-dashboard" class="w-5 h-5" />
                 </a>
  
-                <div class="flex-shrink-0 flex items-center gap-2 bg-gray-50 px-3 py-1 rounded-lg border border-gray-100 select-none">
+                @php
+                    $todayShift = $this->todayShift;
+                    $shiftCount = $this->shiftsTodayCount;
+                    $shiftIsOpen = $todayShift && $todayShift->status === 'open';
+                @endphp
+                <button type="button"
+                    @if(!$shiftIsOpen) wire:click="openShiftPrompt" @endif
+                    title="{{ $shiftIsOpen ? auth()->user()->name : 'Klik untuk membuka shift' }}"
+                    class="flex-shrink-0 flex items-center gap-2 bg-gray-50 px-3 py-1 rounded-lg border border-gray-100 select-none text-left {{ $shiftIsOpen ? 'cursor-default' : 'hover:bg-amber-50 hover:border-amber-200 transition-colors cursor-pointer' }}">
                     <div class="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 font-bold text-sm shrink-0">
                         {{ strtoupper(substr(auth()->user()->name, 0, 1)) }}
                     </div>
                     <div class="flex flex-col text-left">
-                        <span class="font-bold text-gray-800 text-sm leading-tight truncate max-w-[120px]" title="{{ auth()->user()->name }}">
+                        <span class="font-bold text-gray-800 text-sm leading-tight truncate max-w-[120px]">
                             {{ auth()->user()->name }}
                         </span>
-                        @php
-                            $todayShift = $this->todayShift;
-                            $shiftCount = $this->shiftsTodayCount;
-                        @endphp
-                        @if($todayShift && $todayShift->status === 'open')
+                        @if($shiftIsOpen)
                             <span class="text-[10px] text-green-600 font-semibold flex items-center gap-0.5">
                                 <span class="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse shrink-0"></span>
                                 Shift Aktif (Ke-{{ $shiftCount }})
                             </span>
                         @elseif($shiftCount > 0)
-                            <span class="text-[10px] text-red-500 font-medium flex items-center gap-0.5">
-                                <span class="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0"></span>
-                                Shift Selesai ({{ $shiftCount }}x)
+                            <span class="text-[10px] text-amber-600 font-semibold flex items-center gap-0.5">
+                                <span class="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0"></span>
+                                Shift Selesai · Klik buka shift baru
                             </span>
                         @else
-                            <span class="text-[10px] text-gray-400 font-medium flex items-center gap-0.5">
-                                <span class="w-1.5 h-1.5 rounded-full bg-gray-300 shrink-0"></span>
-                                Belum Mulai Shift
+                            <span class="text-[10px] text-amber-600 font-semibold flex items-center gap-0.5">
+                                <span class="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0"></span>
+                                Klik untuk mulai shift
                             </span>
                         @endif
                     </div>
-                </div>
+                </button>
             </div>
 
-            <!-- Mobile Menu Trigger -->
-            <div class="lg:hidden flex items-center gap-2 select-none">
+            <!-- Mobile & Tablet Menu Trigger & Pesan Mandiri Button -->
+            <div class="xl:hidden flex items-center gap-2 select-none">
+                @can('view_self_orders')
+                <button @click="showSelfOrderModal = true"
+                    class="relative p-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl transition-all shadow-xs border border-emerald-200 flex items-center justify-center"
+                    title="Pesanan Mandiri">
+                    <x-lucide name="smartphone" class="w-5 h-5 text-emerald-600" />
+                    @if($this->selfOrdersCount > 0)
+                        <span class="absolute -top-1.5 -right-1.5 bg-emerald-600 text-white text-[10px] font-extrabold px-1.5 py-0.5 rounded-full shadow animate-pulse min-w-[18px] text-center">
+                            {{ $this->selfOrdersCount }}
+                        </span>
+                    @endif
+                </button>
+                @endcan
+
                 <button @click="showMobileMenu = true" class="p-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl transition-all shadow-sm flex items-center justify-center" title="Menu POS" aria-label="Buka Menu POS">
                     <x-lucide name="more-vertical" class="w-5 h-5" />
                 </button>
             </div>
         </header>
 
-        <!-- Mobile Menu Modal Overlay -->
-        <div 
-            x-show="showMobileMenu" 
-            x-cloak 
-            class="fixed inset-0 z-50 lg:hidden"
+        <!-- Mobile & Tablet Menu Modal Overlay.
+             z-[70] (bukan z-50) — panel keranjang di kanan (baris ~963) juga z-50 dan tampil
+             lebih akhir di DOM, jadi kalau sama-sama z-50 dia menang tumpang tindih dan menutupi
+             menu ini di lebar tablet (dimana keranjang jadi sidebar statis, bukan drawer). -->
+        <div
+            x-show="showMobileMenu"
+            x-cloak
+            class="fixed inset-0 z-[70] xl:hidden"
             x-transition:enter="transition ease-out duration-300"
             x-transition:enter-start="opacity-0"
             x-transition:enter-end="opacity-100"
@@ -497,8 +539,18 @@
                 </div>
 
                 <div class="grid grid-cols-1 gap-3 py-2">
-                    <button 
-                        onclick="window.open('{{ route('pos.display') }}', 'CustomerDisplay', 'width=1280,height=800,menubar=no,toolbar=no,location=no,status=no'); showMobileMenu = false" 
+                    @unless($shiftIsOpen)
+                    <button
+                        wire:click="openShiftPrompt(); showMobileMenu = false"
+                        class="w-full flex items-center gap-3 px-4 py-3.5 bg-green-50 hover:bg-green-100 text-green-700 rounded-xl transition-colors font-medium border border-green-100"
+                    >
+                        <x-lucide name="power" class="w-5 h-5" />
+                        <span>Buka Shift</span>
+                    </button>
+                    @endunless
+
+                    <button
+                        onclick="window.open('{{ route('pos.display') }}', 'CustomerDisplay', 'width=1280,height=800,menubar=no,toolbar=no,location=no,status=no'); showMobileMenu = false"
                         class="w-full flex items-center gap-3 px-4 py-3.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl transition-colors font-medium border border-indigo-100"
                     >
                         <x-lucide name="monitor" class="w-5 h-5" />
@@ -517,6 +569,21 @@
                             {{ count($this->pendingCarts) }}
                         </span>
                     </button>
+
+                    @can('view_self_orders')
+                    <button 
+                        @click="showSelfOrderModal = true; showMobileMenu = false" 
+                        class="w-full flex items-center justify-between px-4 py-3.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl transition-colors font-medium border border-emerald-100"
+                    >
+                        <div class="flex items-center gap-3">
+                            <x-lucide name="smartphone" class="w-5 h-5 text-emerald-600" />
+                            <span>Pesanan Mandiri (QR)</span>
+                        </div>
+                        <span class="bg-emerald-600 text-white text-xs py-0.5 px-2.5 rounded-full font-bold">
+                            {{ $this->selfOrdersCount }}
+                        </span>
+                    </button>
+                    @endcan
 
                     <button 
                         wire:click="openHistoryModal(); showMobileMenu = false" 
@@ -1289,9 +1356,10 @@
                 </div>
 
                 <div class="p-6 border-t bg-gray-50 rounded-b-2xl flex-none">
-                    <button 
-                        wire:click="processPayment"
+                    <button
+                        wire:click.debounce.500ms="processPayment"
                         wire:loading.attr="disabled"
+                        wire:target="processPayment"
                         class="w-full py-4 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
                     >
                         <span wire:loading.remove wire:target="processPayment">
@@ -1312,6 +1380,7 @@
         <div
             x-data="{
                 eventSource: null,
+                expiresAtMs: {{ $qrisExpiresAtMs ?? 'Date.now() + ' . ($qrisExpiresIn * 1000) }},
                 countdown: {{ $qrisExpiresIn }},
                 timer: null,
                 posChannel: null,
@@ -1335,14 +1404,15 @@
                 },
                 startCountdown() {
                     if (this.timer) clearInterval(this.timer);
-                    this.timer = setInterval(() => {
-                        if (this.countdown > 0) {
-                            this.countdown--;
-                        } else {
+                    const tick = () => {
+                        this.countdown = Math.max(0, Math.round((this.expiresAtMs - Date.now()) / 1000));
+                        if (this.countdown <= 0) {
                             clearInterval(this.timer);
                             $wire.onQrisExpired();
                         }
-                    }, 1000);
+                    };
+                    tick();
+                    this.timer = setInterval(() => tick(), 1000);
                 },
                 startSse() {
                     if (!'{{ $qrisOrderId }}') return;
@@ -1373,7 +1443,7 @@
                 },
                 manualCheck() {
                     this.isChecking = true;
-                    $wire.checkQrisStatus().then(() => {
+                    $wire.checkQrisStatus(false).then(() => {
                         this.isChecking = false;
                     });
                 },
@@ -1401,7 +1471,7 @@
             @unmount="cleanup()"
             class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
         >
-            <div class="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden border border-gray-100 relative">
+            <div class="bg-white rounded-2xl w-full max-w-md shadow-xl overflow-hidden border border-gray-100 relative">
                 <!-- Custom Security Cancel Confirmation Modal Overlay -->
                 <div 
                     x-show="showCancelConfirm" 
@@ -1445,63 +1515,57 @@
                 </div>
 
                 <!-- Header -->
-                <div class="bg-gradient-to-r from-blue-600 to-indigo-700 p-6 text-white text-center relative">
-                    <button 
+                <div class="bg-primary-600 p-5 text-white text-center relative">
+                    <button
                         @click="cleanup(); $wire.hideQrisModal()"
-                        class="absolute top-4 right-4 text-white/80 hover:text-white bg-white/10 hover:bg-white/20 p-2 rounded-full transition-colors"
+                        class="absolute top-3.5 right-3.5 text-white/70 hover:text-white p-1.5 rounded-lg hover:bg-white/10 transition-colors"
                         title="Sembunyikan QRIS (Tetap Aktif)"
                     >
                         <x-lucide name="x" class="w-5 h-5" />
                     </button>
-                    <div class="inline-flex items-center justify-center w-12 h-12 bg-white/20 rounded-2xl mb-2 backdrop-blur-md">
-                        <x-lucide name="qr-code" class="w-7 h-7 text-white" />
-                    </div>
-                    <h3 class="text-xl font-bold">Pembayaran QRIS</h3>
-                    <p class="text-xs text-blue-100 mt-1">Scan kode QRIS menggunakan aplikasi E-Wallet atau M-Banking</p>
+                    <h3 class="text-base font-bold">Pembayaran QRIS</h3>
+                    <p class="text-xs text-white/70 mt-0.5">Scan dengan aplikasi e-Wallet atau m-Banking</p>
                 </div>
 
                 <!-- Body -->
                 <div class="p-6 text-center space-y-5">
                     <!-- Total Bill -->
-                    <div class="bg-blue-50/70 border border-blue-100 rounded-2xl p-3.5">
-                        <span class="text-xs font-semibold text-gray-500 block">Total Pembayaran</span>
-                        <span class="text-2xl font-black text-blue-700">Rp {{ number_format($this->total, 0, ',', '.') }}</span>
+                    <div>
+                        <span class="text-xs font-semibold text-gray-400 uppercase tracking-wide block">Total Pembayaran</span>
+                        <span class="text-2xl font-extrabold text-gray-900">Rp {{ number_format($this->total, 0, ',', '.') }}</span>
                         <span class="text-[11px] text-gray-400 block mt-0.5">Inv: {{ $qrisInvoiceNumber }}</span>
                     </div>
 
                     <!-- QR Code Image & Loader -->
-                    <div class="relative inline-block bg-white p-4 rounded-2xl border-2 border-dashed border-gray-200 shadow-inner">
+                    <div class="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm mx-auto w-fit">
                         @if($qrisCodeUrl)
-                            <img src="{{ $qrisCodeUrl }}" alt="QRIS Code" class="w-56 h-56 mx-auto object-contain rounded-lg">
+                            <img src="{{ $qrisCodeUrl }}" alt="QRIS Code" class="w-52 h-52 mx-auto object-contain rounded-lg">
                         @else
-                            <div class="w-56 h-56 flex items-center justify-center bg-gray-50 rounded-lg">
-                                <div class="text-center space-y-2">
-                                    <div class="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
-                                    <p class="text-xs text-gray-500">Memuat QR Code...</p>
-                                </div>
+                            <div class="w-52 h-52 flex items-center justify-center bg-gray-50 rounded-lg">
+                                <div class="animate-spin w-7 h-7 border-[3px] border-gray-200 border-t-primary-600 rounded-full"></div>
                             </div>
                         @endif
+                    </div>
 
-                        <!-- Live Status Badge -->
-                        <div class="mt-3 inline-flex items-center gap-2 px-3 py-1 bg-yellow-50 border border-yellow-200 text-yellow-700 text-xs font-semibold rounded-full animate-pulse">
-                            <span class="w-2 h-2 rounded-full bg-yellow-500"></span>
-                            <span>Menunggu Pembayaran...</span>
-                        </div>
+                    <!-- Live Status -->
+                    <div class="inline-flex items-center gap-1.5 bg-blue-50 text-primary-600 text-xs font-semibold px-3 py-1.5 rounded-full">
+                        <span class="w-1.5 h-1.5 rounded-full bg-primary-600"></span>
+                        <span>Menunggu pembayaran</span>
                     </div>
 
                     <!-- Countdown Timer -->
                     <div class="text-xs text-gray-500">
-                        <span>Berlaku hingga: </span>
-                        <span class="font-mono font-bold text-red-600 text-sm" x-text="formatTime(countdown)"></span>
+                        <span>Berlaku hingga </span>
+                        <span class="font-mono font-bold text-gray-900 text-sm" x-text="formatTime(countdown)"></span>
                     </div>
 
                     <!-- Action Buttons -->
                     <div class="space-y-2 pt-2">
                         <!-- Manual Check Status Button (Case 3) -->
-                        <button 
+                        <button
                             @click="manualCheck()"
                             :disabled="isChecking"
-                            class="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 transition-all shadow-md shadow-blue-600/20 cursor-pointer"
+                            class="w-full py-3 bg-primary-600 hover:bg-primary-700 disabled:opacity-60 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
                         >
                             <template x-if="!isChecking">
                                 <span class="flex items-center gap-1.5">
@@ -1519,28 +1583,27 @@
 
                         <div class="grid grid-cols-2 gap-2">
                             <!-- Hide Modal (Keep Active) -->
-                            <button 
+                            <button
                                 @click="cleanup(); $wire.hideQrisModal()"
-                                class="py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl text-xs transition-colors cursor-pointer"
+                                class="py-2.5 border border-gray-200 hover:bg-gray-50 text-gray-600 font-semibold rounded-xl text-xs transition-colors cursor-pointer"
                             >
-                                Sembunyikan QRIS
+                                Sembunyikan
                             </button>
 
                             <!-- Cancel / Change Method Button with Security Validation -->
-                            <button 
+                            <button
                                 @click="showCancelConfirm = true"
-                                class="py-2.5 bg-red-50 hover:bg-red-100 text-red-600 font-bold rounded-xl text-xs transition-colors cursor-pointer flex items-center justify-center gap-1"
+                                class="py-2.5 border border-red-200 hover:bg-red-50 text-red-600 font-semibold rounded-xl text-xs transition-colors cursor-pointer"
                             >
-                                <x-lucide name="x-circle" class="w-3.5 h-3.5" />
-                                <span>Batalkan QRIS</span>
+                                Batalkan QRIS
                             </button>
                         </div>
 
                         <!-- Regenerate QRIS (Case 5) -->
                         <template x-if="countdown <= 0">
-                            <button 
+                            <button
                                 @click="cleanup(); $wire.regenerateQris()"
-                                class="w-full py-3 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-colors shadow-md cursor-pointer"
+                                class="w-full py-3 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                             >
                                 <x-lucide name="rotate-cw" class="w-4 h-4" />
                                 <span>Buat QRIS Baru</span>
@@ -1872,7 +1935,7 @@
                     <button wire:click="$set('showReturnModal', false)" class="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl">Batal</button>
                     @if($returnTransaction)
                         <button
-                            wire:click="processReturn"
+                            wire:click.debounce.500ms="processReturn"
                             wire:loading.attr="disabled"
                             wire:target="processReturn"
                             class="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white font-medium rounded-xl flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -2195,6 +2258,45 @@
         </div>
     @endif
 
+    <!-- Custom Open Shift Confirmation Modal (bukan window.confirm() bawaan browser) -->
+    @if($showOpenShiftModal)
+        <div class="fixed inset-0 bg-black/60 backdrop-blur-xs z-[150] flex items-center justify-center p-4">
+            <div class="bg-white rounded-2xl max-w-sm w-full p-6 text-center shadow-2xl animate-fade-in space-y-4">
+                <div class="w-14 h-14 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto shadow-inner">
+                    <x-lucide name="power" class="w-7 h-7" />
+                </div>
+
+                <div>
+                    <h3 class="text-lg font-bold text-gray-800">Buka Shift Sekarang?</h3>
+                    <p class="text-xs text-gray-500 mt-1">
+                        Shift baru akan dimulai atas nama <span class="font-semibold text-gray-700">{{ auth()->user()->name }}</span>.
+                        Anda bisa langsung mulai bertransaksi setelah ini.
+                    </p>
+                </div>
+
+                <div class="flex gap-3 pt-2">
+                    <button
+                        wire:click="closeOpenShiftPrompt"
+                        class="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl transition-colors text-xs"
+                    >
+                        Batal
+                    </button>
+                    <button
+                        wire:click="confirmOpenShift"
+                        wire:loading.attr="disabled"
+                        wire:loading.class="opacity-60"
+                        wire:target="confirmOpenShift"
+                        class="flex-1 py-2.5 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl shadow-md shadow-green-600/30 transition-colors text-xs flex items-center justify-center gap-1.5"
+                    >
+                        <x-lucide name="power" class="w-4 h-4" />
+                        <span wire:loading.remove wire:target="confirmOpenShift">Ya, Buka Shift</span>
+                        <span wire:loading wire:target="confirmOpenShift">Membuka...</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
+
     <!-- Custom Delete Pending Confirmation Modal (Theme-Matched) -->
     @if($confirmDeletePendingId)
         <div class="fixed inset-0 bg-black/60 backdrop-blur-xs z-[150] flex items-center justify-center p-4">
@@ -2228,22 +2330,41 @@
             </div>
         </div>
     @endif
+
+    <!-- Self Order Popup Modal di dalam POS -->
+    @can('view_self_orders')
+    <div x-show="showSelfOrderModal" x-cloak class="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-2 sm:p-4">
+        <div @click.away="showSelfOrderModal = false" class="bg-white rounded-2xl w-full max-w-4xl max-h-[85vh] shadow-2xl flex flex-col overflow-hidden border border-emerald-100">
+            <div class="p-4 bg-emerald-600 text-white flex justify-between items-center flex-none">
+                <div class="flex items-center gap-2 font-bold text-lg">
+                    <x-lucide name="smartphone" class="w-6 h-6" />
+                    <span>Pesanan Mandiri Pelanggan (QR Order)</span>
+                </div>
+                <button @click="showSelfOrderModal = false" class="text-white/80 hover:text-white p-1 rounded-lg hover:bg-white/10 transition">
+                    <x-lucide name="x" class="w-6 h-6" />
+                </button>
+            </div>
+            <div class="flex-1 overflow-y-auto custom-scroll">
+                @livewire('admin.self-order-dashboard')
+            </div>
+        </div>
+    </div>
+    @endcan
 </div>
 
 @script
 <script>
-    // Broadcast Channel for Customer Display (Instant Update, isolated by cashier user ID)
-    const posChannel = new BroadcastChannel('pos_channel_' + {{ auth()->id() }});
-
-
-
-    Livewire.hook('commit', ({ component, succeed }) => {
-        succeed(() => {
-            posChannel.postMessage('update');
-        });
-    });
-
-
+    // Catatan: broadcast ke Customer Display TIDAK lagi memakai catch-all "kirim update di setiap
+    // commit Livewire apapun di halaman ini" (dulu lewat Livewire.hook('commit') + BroadcastChannel
+    // di sini). Hook itu ikut kepicu oleh commit yang sama sekali tidak berhubungan dengan cart/QRIS
+    // (mis. wire:poll notifikasi pesanan mandiri tiap 10 detik, atau commit dari komponen Livewire
+    // lain di halaman ini), memaksa Customer Display melakukan $refresh() async berulang-ulang yang
+    // jadi sumber beberapa race condition (gambar QRIS sempat tidak tampil, timer countdown sempat
+    // "lompat" balik, tombol cek status sempat terduplikasi). Sekarang setiap perubahan state yang
+    // relevan untuk Customer Display memanggil broadcastCartState() secara eksplisit (lihat
+    // PosCheckout::broadcastCartState() & seluruh pemanggilnya, termasuk @cart-updated.window di
+    // atas), dan Customer Display juga melakukan self-heal poll ringan setiap 5 detik di sisinya
+    // sendiri sebagai jaring pengaman terakhir.
 
     // Open new window (For Shift Detail & Returns)
     const handleOpenNewWindow = (url) => {

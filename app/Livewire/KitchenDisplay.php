@@ -42,6 +42,8 @@ class KitchenDisplay extends Component
 
     public function markAsDone($detailId)
     {
+        $this->authorize('update_order_status');
+
         $detail = TransactionDetail::find($detailId);
         if ($detail) {
             $detail->markAsDone();

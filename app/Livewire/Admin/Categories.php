@@ -73,6 +73,8 @@ class Categories extends Component
 
     public function save(): void
     {
+        $this->authorize($this->editingId ? 'edit_categories' : 'create_categories');
+
         // Custom validation for unique sort_order
         $rules = [
             'name' => 'required|min:2|max:100',
@@ -115,8 +117,10 @@ class Categories extends Component
 
     public function delete(int $id): void
     {
+        $this->authorize('delete_categories');
+
         $category = Category::findOrFail($id);
-        
+
         if ($category->products()->count() > 0) {
             $this->dispatch('notify', type: 'error', message: 'Kategori tidak dapat dihapus karena memiliki produk');
             return;

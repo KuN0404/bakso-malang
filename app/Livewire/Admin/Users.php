@@ -56,6 +56,8 @@ class Users extends Component
 
     public function save(): void
     {
+        $this->authorize($this->editingId ? 'edit_users' : 'create_users');
+
         // Logic khusus Super Admin
         if ($this->isEditingSuperAdmin) {
             $this->validate([
@@ -118,6 +120,8 @@ class Users extends Component
 
     public function delete(int $id): void
     {
+        $this->authorize('delete_users');
+
         if ($id === auth()->id()) {
             $this->dispatch('notify', type: 'error', message: 'Tidak dapat menghapus akun sendiri');
             return;

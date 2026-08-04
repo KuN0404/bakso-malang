@@ -39,69 +39,75 @@ Route::middleware('auth')->group(function () {
 });
 
 // Admin Routes
+// PENTING: setiap halaman admin WAJIB punya middleware can:xxx yang sesuai — sebelumnya
+// hanya dilindungi 'auth', jadi role apa pun (termasuk Kasir/Kitchen) yang login bisa buka
+// /admin/users, /admin/roles, /admin/settings, laporan keuangan, dll langsung lewat URL,
+// menembus sistem permission yang sebenarnya sudah didesain granular di RolesAndPermissionsSeeder.
 Route::middleware(['auth', 'throttle:admin'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/', Dashboard::class)->name('dashboard');
-    Route::get('/menu', App\Livewire\Admin\MenuCatalog::class)->name('menu.index');
-    Route::get('/hpp-calculator', HppCalculator::class)->name('hpp-calculator.index');
-    
+    Route::get('/menu', App\Livewire\Admin\MenuCatalog::class)->name('menu.index')->middleware('can:view_menu_catalog');
+    Route::get('/hpp-calculator', HppCalculator::class)->name('hpp-calculator.index')->middleware('can:view_hpp_calculator');
+
     // Master Data
-    Route::get('/categories', Categories::class)->name('categories.index');
-    Route::get('/products', Products::class)->name('products.index');
-    Route::get('/products/{product}', App\Livewire\Admin\ProductDetail::class)->name('products.show');
-    Route::get('/modifiers', Modifiers::class)->name('modifiers.index');
-    Route::get('/payment-sources', PaymentSources::class)->name('payment-sources.index');
-    Route::get('/service-areas', App\Livewire\Admin\ServiceAreas::class)->name('service-areas.index');
-    
+    Route::get('/categories', Categories::class)->name('categories.index')->middleware('can:view_categories');
+    Route::get('/products', Products::class)->name('products.index')->middleware('can:view_products');
+    Route::get('/products/{product}', App\Livewire\Admin\ProductDetail::class)->name('products.show')->middleware('can:view_products');
+    Route::get('/modifiers', Modifiers::class)->name('modifiers.index')->middleware('can:view_modifiers');
+    Route::get('/payment-sources', PaymentSources::class)->name('payment-sources.index')->middleware('can:manage_payment_sources');
+    Route::get('/service-areas', App\Livewire\Admin\ServiceAreas::class)->name('service-areas.index')->middleware('can:manage_service_areas');
+
     // Inventory & Production
-    Route::get('/ingredients', Ingredients::class)->name('ingredients.index');
-    Route::get('/components', Components::class)->name('components.index');
-    Route::get('/purchases', Purchases::class)->name('purchases.index');
-    Route::get('/productions', Productions::class)->name('productions.index');
-    
+    Route::get('/ingredients', Ingredients::class)->name('ingredients.index')->middleware('can:view_ingredients');
+    Route::get('/components', Components::class)->name('components.index')->middleware('can:view_components');
+    Route::get('/purchases', Purchases::class)->name('purchases.index')->middleware('can:view_purchases');
+    Route::get('/productions', Productions::class)->name('productions.index')->middleware('can:view_productions');
+
     // Transactions & Shifts
-    Route::get('/shifts', Shifts::class)->name('shifts.index');
-    Route::get('/returns', App\Livewire\Admin\Returns::class)->name('returns');
-    
+    Route::get('/shifts', Shifts::class)->name('shifts.index')->middleware('can:view_own_shifts');
+    Route::get('/returns', App\Livewire\Admin\Returns::class)->name('returns')->middleware('can:view_returns');
+
     // Reports
-    Route::get('/reports/transactions', TransactionHistory::class)->name('reports.transactions');
-    Route::get('/reports/sales', SalesReport::class)->name('reports.sales');
-    Route::get('/reports/products', ProductSalesReport::class)->name('reports.products');
-    Route::get('/reports/inventory', InventoryReport::class)->name('reports.inventory');
-    Route::get('/reports/shifts', ShiftReport::class)->name('reports.shifts');
-    
+    Route::get('/reports/transactions', TransactionHistory::class)->name('reports.transactions')->middleware('can:view_transactions');
+    Route::get('/reports/sales', SalesReport::class)->name('reports.sales')->middleware('can:view_sales_reports');
+    Route::get('/reports/products', ProductSalesReport::class)->name('reports.products')->middleware('can:view_sales_reports');
+    Route::get('/reports/inventory', InventoryReport::class)->name('reports.inventory')->middleware('can:view_inventory_reports');
+    Route::get('/reports/shifts', ShiftReport::class)->name('reports.shifts')->middleware('can:view_all_shifts');
+
     // Settings
-    Route::get('/users', Users::class)->name('users.index');
-    Route::get('/roles', Roles::class)->name('roles.index');
-    Route::get('/settings', Settings::class)->name('settings.index');
+    Route::get('/users', Users::class)->name('users.index')->middleware('can:view_users');
+    Route::get('/roles', Roles::class)->name('roles.index')->middleware('can:manage_roles');
+    Route::get('/settings', Settings::class)->name('settings.index')->middleware('can:manage_settings');
 });
 
 // Print Routes
+// Sama seperti halaman admin di atas — dulu cuma 'auth', jadi siapa pun yang login bisa akses
+// URL print langsung tanpa pernah melewati halaman laporan yang (sekarang) di-gate izinnya.
 Route::middleware(['auth'])->prefix('print')->name('print.')->group(function () {
-    Route::get('/transactions/table', [App\Http\Controllers\PrintController::class, 'transactionsTable'])->name('transactions.table');
-    Route::get('/transactions/detail', [App\Http\Controllers\PrintController::class, 'transactionsDetail'])->name('transactions.detail');
-    Route::get('/returns-report', [App\Http\Controllers\PrintController::class, 'returnsReport'])->name('returns-report');
-    Route::get('/return-detail/{id}', [App\Http\Controllers\PrintController::class, 'returnDetail'])->name('return-detail');
-    Route::get('/sales-report', [App\Http\Controllers\PrintController::class, 'salesReport'])->name('sales-report');
-    Route::get('/inventory-report', [App\Http\Controllers\PrintController::class, 'inventoryReport'])->name('inventory-report');
-    Route::get('/transaction/{transaction}', [App\Http\Controllers\PrintController::class, 'transactionSingle'])->name('transaction.single');
-    Route::get('/shifts/table', [App\Http\Controllers\PrintController::class, 'shiftsTable'])->name('shifts.table');
-    Route::get('/shift/{shift}', [App\Http\Controllers\PrintController::class, 'shiftDetail'])->name('shift.detail');
-    Route::get('/shift/{shift}/custom', [App\Http\Controllers\PrintController::class, 'shiftCustom'])->name('shift.custom');
+    Route::get('/transactions/table', [App\Http\Controllers\PrintController::class, 'transactionsTable'])->name('transactions.table')->middleware('can:view_transactions');
+    Route::get('/transactions/detail', [App\Http\Controllers\PrintController::class, 'transactionsDetail'])->name('transactions.detail')->middleware('can:view_transactions');
+    Route::get('/returns-report', [App\Http\Controllers\PrintController::class, 'returnsReport'])->name('returns-report')->middleware('can:view_returns');
+    Route::get('/return-detail/{id}', [App\Http\Controllers\PrintController::class, 'returnDetail'])->name('return-detail')->middleware('can:view_returns');
+    Route::get('/sales-report', [App\Http\Controllers\PrintController::class, 'salesReport'])->name('sales-report')->middleware('can:view_sales_reports');
+    Route::get('/inventory-report', [App\Http\Controllers\PrintController::class, 'inventoryReport'])->name('inventory-report')->middleware('can:view_inventory_reports');
+    Route::get('/transaction/{transaction}', [App\Http\Controllers\PrintController::class, 'transactionSingle'])->name('transaction.single')->middleware('can:view_transactions');
+    Route::get('/shifts/table', [App\Http\Controllers\PrintController::class, 'shiftsTable'])->name('shifts.table')->middleware('can:view_all_shifts');
+    Route::get('/shift/{shift}', [App\Http\Controllers\PrintController::class, 'shiftDetail'])->name('shift.detail')->middleware('can:view_all_shifts');
+    Route::get('/shift/{shift}/custom', [App\Http\Controllers\PrintController::class, 'shiftCustom'])->name('shift.custom')->middleware('can:view_all_shifts');
 });
 
 // Export Routes (separate for streaming)
 Route::middleware(['auth', 'throttle:5,1'])->name('export.')->prefix('export')->group(function () {
-    Route::get('/transactions', [ExportController::class, 'transactions'])->name('transactions');
-    Route::get('/transactions-detail', [ExportController::class, 'transactionsDetail'])->name('transactions.detail');
-    Route::get('/product-sales', [ExportController::class, 'productSales'])->name('product-sales');
-    Route::get('/sales-by-category', [ExportController::class, 'salesByCategory'])->name('sales-by-category');
-    Route::get('/sales-by-payment-method', [ExportController::class, 'salesByPaymentMethod'])->name('sales-by-payment-method');
-    Route::get('/product-returns', [App\Http\Controllers\ExportController::class, 'productReturns'])->name('product-returns');
-    Route::get('/shifts', [ExportController::class, 'shifts'])->name('shifts');
+    Route::get('/transactions', [ExportController::class, 'transactions'])->name('transactions')->middleware('can:view_transactions');
+    Route::get('/transactions-detail', [ExportController::class, 'transactionsDetail'])->name('transactions.detail')->middleware('can:view_transactions');
+    Route::get('/product-sales', [ExportController::class, 'productSales'])->name('product-sales')->middleware('can:view_sales_reports');
+    Route::get('/sales-by-category', [ExportController::class, 'salesByCategory'])->name('sales-by-category')->middleware('can:view_sales_reports');
+    Route::get('/sales-by-payment-method', [ExportController::class, 'salesByPaymentMethod'])->name('sales-by-payment-method')->middleware('can:view_sales_reports');
+    Route::get('/product-returns', [App\Http\Controllers\ExportController::class, 'productReturns'])->name('product-returns')->middleware('can:view_returns');
+    Route::get('/shifts', [ExportController::class, 'shifts'])->name('shifts')->middleware('can:view_all_shifts');
 });
 
 Route::middleware(['auth'])->group(function () {
-    Route::get('/returns/{return}/print', [App\Http\Controllers\ExportController::class, 'printReturn'])->name('returns.print');
+    Route::get('/returns/{return}/print', [App\Http\Controllers\ExportController::class, 'printReturn'])->name('returns.print')->middleware('can:view_returns');
 });
 
 // POS Routes
@@ -119,7 +125,7 @@ Route::middleware(['auth', 'can:view_kitchen_display'])->group(function () {
 
 // Midtrans Webhook (no auth, CSRF excluded in bootstrap/app.php, signature verified by middleware)
 Route::post('/api/webhook/midtrans', App\Http\Controllers\Payment\MidtransWebhookController::class)
-    ->middleware('midtrans.signature')
+    ->middleware(['midtrans.signature', 'throttle:midtrans-webhook'])
     ->name('payment.webhook.midtrans');
 
 // QRIS Status SSE — auth required, polling database status setiap 2 detik
@@ -178,3 +184,50 @@ Route::middleware(['throttle:30,1'])->get('/api/payment/qris-check/{orderId}', f
     ]);
 })->name('payment.qris.check');
 
+// ─── Self Order: Public Routes (tanpa auth) ────────────────────────────────
+
+Route::prefix('self-order')
+    ->name('self-order.')
+    ->middleware(['throttle:self-order-page'])
+    ->group(function () {
+        Route::get('/', App\Livewire\SelfOrder\SelfOrderPage::class)->name('index');
+        Route::get('/payment/{token}', App\Livewire\SelfOrder\SelfOrderPayment::class)->name('payment');
+        Route::get('/track/{token}', App\Livewire\SelfOrder\SelfOrderTracking::class)->name('tracking');
+    });
+
+// Self Order API (tanpa auth, token-based)
+Route::prefix('api/self-order')
+    ->name('api.self-order.')
+    ->group(function () {
+        Route::get('/payment-sse/{token}', App\Http\Controllers\SelfOrder\SelfOrderPaymentSseController::class)
+            ->name('payment.sse')
+            ->middleware('throttle:self-order-api');
+
+        Route::get('/payment-status/{token}', App\Http\Controllers\SelfOrder\SelfOrderPaymentStatusController::class)
+            ->name('payment.status')
+            ->middleware('throttle:self-order-api');
+
+        Route::get('/stock', App\Http\Controllers\SelfOrder\SelfOrderStockController::class)
+            ->name('stock')
+            ->middleware('throttle:self-order-stock');
+    });
+
+// Webhook Midtrans Self Order (CSRF excluded, signature verified)
+Route::post('/api/webhook/midtrans/self-order', App\Http\Controllers\Payment\SelfOrderMidtransWebhookController::class)
+    ->middleware(['midtrans.signature', 'throttle:midtrans-webhook'])
+    ->name('payment.webhook.midtrans.self-order');
+
+// Self Order: Admin Dashboard & Print (auth required)
+Route::middleware(['auth'])->group(function () {
+    Route::get('/admin/self-orders', App\Livewire\Admin\SelfOrderDashboard::class)
+        ->name('admin.self-orders.index')
+        ->middleware('can:view_self_orders');
+
+    Route::get('/admin/self-orders/{id}/print', function (int $id) {
+        $selfOrder = \App\Models\SelfOrder::getForPrint($id);
+        abort_if(!$selfOrder, 404);
+        return view('print.self-order-receipt', compact('selfOrder'));
+    })
+        ->name('admin.self-orders.print')
+        ->middleware('can:print_self_order_receipt');
+});

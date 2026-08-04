@@ -85,6 +85,8 @@ class Components extends Component
 
     public function save(): void
     {
+        $this->authorize($this->editingId ? 'edit_components' : 'create_components');
+
         $this->validate([
             'code'         => 'required|max:50|unique:components,code' . ($this->editingId ? ",{$this->editingId}" : ''),
             'name'         => 'required|min:2|max:150',
@@ -107,10 +109,13 @@ class Components extends Component
         ];
 
         if ($this->editingId) {
-            ComponentModel::find($this->editingId)->update($data);
+            $comp = ComponentModel::find($this->editingId);
+            $comp->update($data);
+            app(\App\Services\ReportSyncService::class)->syncComponent($comp);
             $this->dispatch('notify', type: 'success', message: 'Komponen berhasil diperbarui.');
         } else {
-            ComponentModel::create($data);
+            $comp = ComponentModel::create($data);
+            app(\App\Services\ReportSyncService::class)->syncComponent($comp);
             $this->dispatch('notify', type: 'success', message: 'Komponen berhasil ditambahkan.');
         }
 
@@ -119,6 +124,8 @@ class Components extends Component
 
     public function delete(int $id): void
     {
+        $this->authorize('delete_components');
+
         $component = ComponentModel::findOrFail($id);
 
         // Cek apakah komponen masih dipakai BOM
@@ -146,6 +153,8 @@ class Components extends Component
 
     public function saveStock(): void
     {
+        $this->authorize('adjust_component_stock');
+
         $rules = [
             'stockAdjustmentAmount' => 'required|numeric|min:0.001',
         ];

@@ -32,7 +32,7 @@ class StockLog extends Model
      */
     public static function record(
         int $productId,
-        int $userId,
+        ?int $userId,
         string $type,
         int $amount,
         int $finalStock,

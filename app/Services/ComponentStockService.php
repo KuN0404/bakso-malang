@@ -136,6 +136,119 @@ class ComponentStockService
     }
 
     // -----------------------------------------------------------------
+    // Best-Effort Variants (khusus settlement webhook Midtrans)
+    // -----------------------------------------------------------------
+
+    /**
+     * Versi best-effort dari deductForBom() — KHUSUS dipakai saat memproses settlement
+     * webhook Midtrans (POS QRIS), bukan checkout kasir biasa.
+     *
+     * Bedanya: uang customer di jalur ini SUDAH PASTI masuk sebelum method ini dipanggil,
+     * jadi TIDAK BOLEH sampai melempar exception yang membatalkan (rollback) seluruh
+     * pencatatan pembayaran hanya karena stok komponen kurang — itu akan membuat transaksi
+     * yang sudah dibayar hilang dari sistem tanpa jejak. Sebagai gantinya: kurangi stok
+     * yang TERSEDIA SEKARANG (floor di 0, tidak pernah minus), dan catat CRITICAL kalau
+     * ternyata kurang supaya staf tahu ada potensi oversold yang perlu ditindaklanjuti manual.
+     */
+    public function deductForBomBestEffort(
+        int $productId,
+        int $productQty,
+        int $transactionId,
+        int $userId
+    ): void {
+        $bomItems = ProductBom::where('product_id', $productId)->with('component')->get();
+
+        foreach ($bomItems as $bom) {
+            $needed    = $bom->quantity * $productQty;
+            $component = Component::lockForUpdate()->find($bom->component_id);
+
+            if (!$component) {
+                Log::error("BOM best-effort: Komponen ID [{$bom->component_id}] tidak ditemukan untuk produk ID [{$productId}], Transaksi #{$transactionId}.");
+                continue;
+            }
+
+            $current = (float) $component->stock;
+            $deduct  = min($needed, max(0, $current));
+
+            if ($deduct < $needed) {
+                Log::critical(
+                    "OVERSOLD (settlement QRIS): Komponen '{$component->name}' butuh {$needed} {$component->unit} untuk BOM Transaksi #{$transactionId}, " .
+                    "tersisa hanya {$current} {$component->unit}. Barang tetap harus dibuatkan, cek ketersediaan fisik secara manual."
+                );
+            }
+
+            $newStock = $current - $deduct;
+            $component->update(['stock' => $newStock]);
+
+            ComponentStockLog::record(
+                componentId:   $component->id,
+                userId:        $userId,
+                type:          'bom_deduct',
+                amount:        -$deduct,
+                finalStock:    $newStock,
+                note:          "BOM Deduct (settlement QRIS): Transaksi #{$transactionId}",
+                referenceId:   $transactionId,
+                referenceType: 'transaction',
+            );
+
+            if ($component->fresh()->isLowStock()) {
+                Log::warning("⚠ Stok komponen '{$component->name}' menipis: {$newStock} {$component->unit} (min: {$component->minimum_stock})");
+            }
+        }
+    }
+
+    /**
+     * Versi best-effort dari deductForModifier() — lihat catatan di deductForBomBestEffort().
+     */
+    public function deductForModifierBestEffort(
+        int $modifierId,
+        float $totalQty,
+        int $transactionId,
+        int $userId
+    ): void {
+        $modifier = Modifier::find($modifierId);
+
+        if (!$modifier || !$modifier->component_id) {
+            return; // Modifier tidak terhubung ke komponen, skip
+        }
+
+        $component = Component::lockForUpdate()->find($modifier->component_id);
+
+        if (!$component) {
+            Log::warning("Modifier [{$modifierId}] mereferensikan component_id [{$modifier->component_id}] yang tidak ditemukan.");
+            return;
+        }
+
+        $current = (float) $component->stock;
+        $deduct  = min($totalQty, max(0, $current));
+
+        if ($deduct < $totalQty) {
+            Log::critical(
+                "OVERSOLD (settlement QRIS): Komponen '{$component->name}' butuh {$totalQty} {$component->unit} untuk modifier '{$modifier->name}' Transaksi #{$transactionId}, " .
+                "tersisa hanya {$current} {$component->unit}. Barang tetap harus dibuatkan, cek ketersediaan fisik secara manual."
+            );
+        }
+
+        $newStock = $current - $deduct;
+        $component->update(['stock' => $newStock]);
+
+        ComponentStockLog::record(
+            componentId:   $component->id,
+            userId:        $userId,
+            type:          'modifier_deduct',
+            amount:        -$deduct,
+            finalStock:    $newStock,
+            note:          "Modifier '{$modifier->name}' × {$totalQty} (settlement QRIS): Transaksi #{$transactionId}",
+            referenceId:   $transactionId,
+            referenceType: 'transaction',
+        );
+
+        if ($component->fresh()->isLowStock()) {
+            Log::warning("⚠ Stok komponen '{$component->name}' menipis: {$newStock} {$component->unit} (min: {$component->minimum_stock})");
+        }
+    }
+
+    // -----------------------------------------------------------------
     // Availability Check (bukan modifikasi stok)
     // -----------------------------------------------------------------
 

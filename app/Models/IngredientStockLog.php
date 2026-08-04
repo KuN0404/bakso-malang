@@ -6,6 +6,13 @@ use Illuminate\Database\Eloquent\Model;
 
 class IngredientStockLog extends Model
 {
+    protected static function booted(): void
+    {
+        static::created(function ($log) {
+            app(\App\Services\ReportSyncService::class)->syncIngredientStockLog($log);
+        });
+    }
+
     protected $fillable = [
         'ingredient_id',
         'user_id',

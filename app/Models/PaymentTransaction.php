@@ -11,12 +11,14 @@ class PaymentTransaction extends Model
 {
     protected $fillable = [
         'transaction_id',
+        'self_order_id',
         'invoice_number',
         'midtrans_order_id',
         'qr_code_url',
         'payment_method',
         'amount',
         'status',
+        'source',
         'midtrans_response',
         'webhook_received_at',
         'paid_at',
@@ -51,6 +53,11 @@ class PaymentTransaction extends Model
     public function statusLogs(): HasMany
     {
         return $this->hasMany(PaymentStatusLog::class)->orderBy('created_at');
+    }
+
+    public function selfOrder(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(SelfOrder::class);
     }
 
     // -----------------------------------------------------------------

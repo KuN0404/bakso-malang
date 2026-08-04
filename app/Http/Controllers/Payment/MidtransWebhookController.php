@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Payment;
 
 use App\Actions\Payment\HandleMidtransWebhookAction;
 use App\DTOs\Payment\MidtransWebhookPayload;
+use App\Services\MidtransService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -14,15 +15,28 @@ use Illuminate\Support\Facades\Log;
  */
 class MidtransWebhookController
 {
+    public function __construct(
+        private readonly MidtransService $midtransService,
+    ) {}
+
     public function __invoke(Request $request, HandleMidtransWebhookAction $action): JsonResponse
     {
-        $payload = MidtransWebhookPayload::fromArray($request->all());
+        $data    = $request->all();
+        $payload = MidtransWebhookPayload::fromArray($data);
 
         Log::info('Midtrans Webhook diterima', [
             'order_id'  => $payload->orderId,
             'status'    => $payload->transactionStatus,
             'amount'    => $payload->grossAmount,
         ]);
+
+        // -- Validasi gross_amount terhadap PaymentTransaction di DB (signature saja tidak cukup) --
+        try {
+            $this->midtransService->validateWebhookPayload($data);
+        } catch (\InvalidArgumentException $e) {
+            Log::error("Webhook Midtrans DITOLAK: {$e->getMessage()}", ['payload' => $data]);
+            return response()->json(['message' => 'Validation failed'], 400);
+        }
 
         try {
             $transaction = $action->execute($payload);

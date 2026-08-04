@@ -23,7 +23,9 @@ class CustomerDisplay extends Component
     public ?string $qrisOrderId = null;
     public ?string $qrisCodeUrl = null;
     public int $qrisExpiresIn = 0;
+    public ?int $qrisExpiresAtMs = null;
     public bool $showQris = false;
+    public int $lastUpdatedAt = 0;
 
     // Polling interval
     protected $listeners = ['refreshDisplay' => '$refresh'];
@@ -67,8 +69,10 @@ class CustomerDisplay extends Component
                 $this->cashierName   = $data['cashier_name'] ?? '';
                 $this->qrisOrderId   = $data['qris_order_id'] ?? null;
                 $this->qrisCodeUrl   = $data['qris_code_url'] ?? null;
-                $this->qrisExpiresIn = $data['qris_expires_in'] ?? 0;
-                $this->showQris      = $data['show_qris'] ?? false;
+                $this->qrisExpiresIn   = $data['qris_expires_in'] ?? 0;
+                $this->qrisExpiresAtMs = $data['qris_expires_at_ms'] ?? null;
+                $this->showQris        = $data['show_qris'] ?? false;
+                $this->lastUpdatedAt   = $data['updated_at'] ?? 0;
             } else {
                 $this->resetState();
             }
@@ -86,7 +90,8 @@ class CustomerDisplay extends Component
         $this->customerName  = '';
         $this->qrisOrderId   = null;
         $this->qrisCodeUrl   = null;
-        $this->qrisExpiresIn = 0;
-        $this->showQris      = false;
+        $this->qrisExpiresIn   = 0;
+        $this->qrisExpiresAtMs = null;
+        $this->showQris        = false;
     }
 }

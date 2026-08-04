@@ -8,9 +8,11 @@ use App\Models\DailyQueueNumber;
 use App\Models\PaymentSource;
 use App\Models\PaymentTransaction;
 use App\Models\Product;
+use App\Models\Setting;
 use App\Models\Shift;
 use App\Models\StockLog;
 use App\Models\Transaction;
+use App\Services\CartValidationService;
 use App\Services\ComponentStockService;
 use App\Services\ReportSyncService;
 use Illuminate\Support\Facades\DB;
@@ -23,6 +25,7 @@ class InitiateCashPaymentAction
     public function __construct(
         private readonly ReportSyncService $reportSyncService,
         private readonly ComponentStockService $componentStockService,
+        private readonly CartValidationService $cartValidationService,
     ) {}
 
     /**
@@ -31,21 +34,46 @@ class InitiateCashPaymentAction
     public function execute(CartPayload $payload, int $cashierId): Transaction
     {
         return DB::transaction(function () use ($payload, $cashierId) {
-            // -- Validasi stok (lock for update) --
-            $productQuantities = $this->aggregateQuantities($payload->cart);
+            // -- Hitung ulang harga dari DB — JANGAN percaya unit_price/subtotal dari client --
+            $validated = $this->cartValidationService->validateAndPrice($payload->cart);
+            $items     = $validated['items'];
+            $subtotal  = $validated['subtotal'];
+
+            $taxRate   = (float) Setting::get('tax_percentage', 0, 'general');
+            $taxAmount = round($subtotal * ($taxRate / 100), 2);
+            $total     = $subtotal + $taxAmount;
+
+            $paymentSource = PaymentSource::findOrFail($payload->paymentSourceId);
+            $isCash        = $paymentSource->type === 'cash';
+
+            $paidAmount = $isCash ? $payload->paidAmount : $total;
+
+            if ($isCash && $paidAmount < $total) {
+                throw new \RuntimeException('Jumlah pembayaran kurang dari total transaksi.');
+            }
+
+            $changeAmount = $isCash ? max(0, $paidAmount - $total) : 0;
+
+            // -- Validasi stok dengan reservation awareness (Opsi A: sinkron POS ↔ Self Order) --
+            $productQuantities = $this->aggregateQuantities($items);
             $productIds        = array_keys($productQuantities);
             $products          = Product::getForCheckout($productIds)->keyBy('id');
 
             foreach ($productQuantities as $productId => $totalQty) {
                 $product = $products->get($productId);
-                if ($product && $product->track_stock && $totalQty > $product->stock) {
-                    throw new \RuntimeException(
-                        "Stok {$product->name} tidak cukup (Total: {$totalQty}, Sisa: {$product->stock})"
-                    );
+                if ($product && $product->track_stock) {
+                    // Gunakan available stock (stock fisik - active reservations Self Order)
+                    $availableStock = $product->getAvailableStock();
+                    if ($totalQty > $availableStock) {
+                        throw new \RuntimeException(
+                            "Stok {$product->name} tidak cukup. " .
+                            "Tersedia: {$availableStock} (Fisik: {$product->stock}, Reserved: " .
+                            ($product->stock - $availableStock) . "), Dibutuhkan: {$totalQty}."
+                        );
+                    }
                 }
             }
 
-            $paymentSource = PaymentSource::findOrFail($payload->paymentSourceId);
             $shift         = Shift::getOrCreateTodayShift($cashierId);
             $queueNumber   = DailyQueueNumber::getNextNumber();
             $invoiceNumber = Transaction::generateInvoiceNumber();
@@ -55,7 +83,7 @@ class InitiateCashPaymentAction
                 'invoice_number'   => $invoiceNumber,
                 'midtrans_order_id'=> strtoupper($paymentSource->type) . '-' . $invoiceNumber,
                 'payment_method'   => $paymentSource->type,
-                'amount'           => $payload->total,
+                'amount'           => $total,
                 'status'           => PaymentTransactionStatus::Paid->value,
                 'paid_at'          => now(),
                 'created_by'       => $cashierId,
@@ -78,12 +106,12 @@ class InitiateCashPaymentAction
                 'service_area_id'        => $payload->orderType === 'dine_in' ? $payload->serviceAreaId : null,
                 'invoice_number'         => $invoiceNumber,
                 'queue_number'           => $queueNumber,
-                'subtotal'               => $payload->subtotal,
+                'subtotal'               => $subtotal,
                 'discount_amount'        => 0,
-                'tax_amount'             => $payload->taxAmount,
-                'total'                  => $payload->total,
-                'paid_amount'            => $payload->paidAmount,
-                'change_amount'          => $payload->changeAmount,
+                'tax_amount'             => $taxAmount,
+                'total'                  => $total,
+                'paid_amount'            => $paidAmount,
+                'change_amount'          => $changeAmount,
                 'payment_method'         => $paymentSource->type,
                 'payment_gateway_status' => null,
                 'status'                 => 'completed',
@@ -95,8 +123,8 @@ class InitiateCashPaymentAction
             // Update payment_tx dengan transaction_id
             $paymentTx->update(['transaction_id' => $transaction->id]);
 
-            // -- Detail + Stok --
-            $this->createDetailsAndDeductStock($transaction, $payload->cart, $products, $cashierId);
+            // -- Detail + Stok (pakai $items yang sudah divalidasi ulang dari DB) --
+            $this->createDetailsAndDeductStock($transaction, $items, $products, $cashierId);
 
             $transaction->load(['details.modifiers', 'user', 'paymentSource', 'serviceArea']);
 

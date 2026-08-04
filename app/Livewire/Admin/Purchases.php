@@ -116,6 +116,8 @@ class Purchases extends Component
 
     public function save(): void
     {
+        $this->authorize('create_purchases');
+
         $this->validate([
             'invoice_number' => 'required|string|max:50|unique:purchases,invoice_number',
             'purchase_date' => 'required|date',
@@ -143,7 +145,8 @@ class Purchases extends Component
             }
         }
 
-        DB::transaction(function () {
+        $purchase = null;
+        DB::transaction(function () use (&$purchase) {
             $totalAmount = $this->totalAmount;
 
             $purchase = Purchase::create([

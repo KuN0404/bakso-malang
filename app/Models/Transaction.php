@@ -18,6 +18,7 @@ class Transaction extends Model
         'payment_source_id',
         'payment_transaction_id',
         'service_area_id',
+        'self_order_id',
         'invoice_number',
         'queue_number',
         'subtotal',
@@ -28,6 +29,7 @@ class Transaction extends Model
         'change_amount',
         'payment_method',
         'payment_gateway_status',
+        'source',
         'status',
         'cancelled_reason',
         'cancelled_by',
@@ -90,6 +92,11 @@ class Transaction extends Model
     public function paymentTransaction(): BelongsTo
     {
         return $this->belongsTo(PaymentTransaction::class);
+    }
+
+    public function selfOrder(): BelongsTo
+    {
+        return $this->belongsTo(SelfOrder::class);
     }
 
     // -----------------------------------------------------------------
@@ -334,13 +341,20 @@ class Transaction extends Model
     }
 
     /**
-     * Get today's completed transactions for a user.
+     * Get today's completed transactions for a user (termasuk self-order).
      */
     public static function getTodayUserTransactions(int $userId): Collection
     {
-        return static::where('user_id', $userId)
+        return static::where(function ($q) use ($userId) {
+            $q->where('user_id', $userId)
+              ->orWhere(function ($sub) {
+                  $sub->whereNull('user_id')
+                      ->where('source', 'self_order');
+              });
+        })
             ->whereDate('created_at', today())
             ->where('status', 'completed')
+            ->latest()
             ->get();
     }
 

@@ -202,6 +202,46 @@ class Product extends Model
         return true;
     }
 
+    /**
+     * Hitung stok yang tersedia setelah dikurangi active reservations (Self Order).
+     * Digunakan oleh Self Order untuk menampilkan stok yang sebenarnya tersedia.
+     * POS juga menggunakan ini (Opsi A: sinkronisasi penuh).
+     */
+    public function getAvailableStock(): int
+    {
+        if (!$this->track_stock) {
+            return PHP_INT_MAX; // Unlimited
+        }
+
+        $reserved = StockReservation::getTotalActiveForProduct($this->id);
+
+        return max(0, $this->stock - (int) $reserved);
+    }
+
+    /**
+     * Cek apakah stok tersedia untuk sejumlah unit (reservation-aware).
+     * Digunakan oleh Self Order checkout dan POS checkout (Opsi A).
+     */
+    public function hasAvailableStock(int $qty = 1): bool
+    {
+        if (!$this->track_stock) {
+            return true;
+        }
+
+        return $this->getAvailableStock() >= $qty;
+    }
+
+    /**
+     * Scope untuk Self Order: produk aktif dengan available stock > 0.
+     */
+    public function scopeAvailableForSelfOrder($query)
+    {
+        return $query->where('is_active', true)->where(function ($q) {
+            $q->where('track_stock', false)
+              ->orWhere('stock', '>', 0);
+        });
+    }
+
     public function decrementStock(int $quantity = 1): bool
     {
         if (!$this->track_stock) {
@@ -256,10 +296,43 @@ class Product extends Model
 
     /**
      * Get products by IDs with pessimistic locking for order processing.
+     * Digunakan oleh POS checkout (backward compat) dan Self Order settlement.
      */
     public static function getForCheckout(array $productIds): \Illuminate\Database\Eloquent\Collection
     {
         return static::whereIn('id', $productIds)->lockForUpdate()->get();
+    }
+
+    /**
+     * Ambil stok tersedia untuk tampilan Self Order (tanpa lock, untuk UI).
+     * Return: [product_id => available_stock]
+     */
+    public static function getAvailableStockMap(array $productIds): array
+    {
+        $products = static::whereIn('id', $productIds)->get(['id', 'track_stock', 'stock']);
+        $result   = [];
+
+        foreach ($products as $product) {
+            $result[$product->id] = $product->getAvailableStock();
+        }
+
+        return $result;
+    }
+
+    /**
+     * Ambil produk aktif untuk tampilan Self Order (dengan BOM).
+     */
+    public static function getForSelfOrderDisplay(?int $categoryId = null, ?string $search = null): \Illuminate\Database\Eloquent\Collection
+    {
+        return static::with(['category', 'modifierGroups.activeModifiers', 'bom.component'])
+            ->availableForSelfOrder()
+            ->when($categoryId, fn($q) => $q->where('category_id', $categoryId))
+            ->when($search, fn($q) => $q->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('sku', 'like', "%{$search}%");
+            }))
+            ->orderBy('name')
+            ->get();
     }
 
     /**

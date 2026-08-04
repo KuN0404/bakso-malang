@@ -147,6 +147,8 @@ class Productions extends Component
 
     public function save(): void
     {
+        $this->authorize('create_productions');
+
         $this->validate([
             'production_code'                 => 'required|string|max:50|unique:productions,production_code',
             'production_date'                 => 'required|date',
@@ -175,8 +177,9 @@ class Productions extends Component
             }
         }
 
+        $production = null;
         try {
-            DB::transaction(function () {
+            DB::transaction(function () use (&$production) {
                 $this->recalculateOutputs();
                 $totalCost = $this->totalInputCost;
 
@@ -249,6 +252,10 @@ class Productions extends Component
                     );
                 }
             });
+
+            if ($production) {
+                app(\App\Services\ReportSyncService::class)->syncProduction($production->load(['inputs', 'outputs']));
+            }
 
             $this->showModal = false;
             $this->dispatch('notify', type: 'success', message: 'Batch Repacking berhasil diproses. Stok komponen telah ditambahkan.');

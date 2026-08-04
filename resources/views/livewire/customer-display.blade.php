@@ -15,22 +15,39 @@
          qrisOrderId: @js($qrisOrderId),
          qrisCodeUrl: @js($qrisCodeUrl),
          qrisExpiresIn: @js($qrisExpiresIn),
+         qrisExpiresAtMs: @js($qrisExpiresAtMs),
          showQris: @js($showQris),
+         lastUpdatedAt: @js($lastUpdatedAt),
          qrisCountdown: @js($qrisExpiresIn),
          isCheckingQris: false,
          qrisStatusText: '',
          qrisTimer: null,
+         // ID order QRIS yang sudah pernah kita nyatakan kadaluarsa DI SISI CLIENT. Halaman ini
+         // menerima banyak sumber update yang tumpang tindih (broadcast langsung, $refresh()
+         // async, dan wire:poll di halaman kasir yang otomatis memicu re-sync tiap beberapa
+         // detik walau kasir tidak klik apapun). Tanpa penanda ini, salah satu sumber yang
+         // membawa qris_expires_at_ms lama bisa memicu initQrisTimer() lagi setelah countdown
+         // sempat mencapai 00:00, sehingga angkanya lompat balik ke durasi awal (mis. 4:59)
+         // lalu diam karena tick() berikutnya langsung menganggapnya sudah kadaluarsa lagi.
+         qrisExpiredOrderId: null,
          initQrisTimer() {
              if (this.qrisTimer) clearInterval(this.qrisTimer);
-             if (this.showQris && this.qrisCountdown > 0) {
-                 this.qrisTimer = setInterval(() => {
-                     if (this.qrisCountdown > 0) {
-                         this.qrisCountdown--;
-                     } else {
-                         clearInterval(this.qrisTimer);
-                     }
-                 }, 1000);
+             if (!this.showQris || !this.qrisExpiresAtMs) return;
+             if (this.qrisOrderId && this.qrisOrderId === this.qrisExpiredOrderId) {
+                 // Order QRIS yang sama sudah dinyatakan kadaluarsa sebelumnya — kunci di 00:00,
+                 // jangan hitung ulang dari qrisExpiresAtMs walau data itu datang lagi.
+                 this.qrisCountdown = 0;
+                 return;
              }
+             const tick = () => {
+                 this.qrisCountdown = Math.max(0, Math.round((this.qrisExpiresAtMs - Date.now()) / 1000));
+                 if (this.qrisCountdown <= 0) {
+                     this.qrisExpiredOrderId = this.qrisOrderId;
+                     clearInterval(this.qrisTimer);
+                 }
+             };
+             tick();
+             this.qrisTimer = setInterval(() => tick(), 1000);
          },
          formatCountdown(seconds) {
              if (!seconds || seconds <= 0) return '00:00';
@@ -93,6 +110,13 @@
      }"
      x-init="initQrisTimer()"
      @cart-data-broadcast.window="
+         if (($event.detail.updated_at || 0) < lastUpdatedAt) {
+             // Pesan ini lebih lama dari state yang sudah diterapkan (bisa datang belakangan
+             // karena race antar-pesan BroadcastChannel, mis. saat QRIS baru dibuat) — abaikan
+             // agar tidak menimpa data yang lebih baru (mis. gambar QRIS jadi hilang lagi).
+             return;
+         }
+         lastUpdatedAt = $event.detail.updated_at || lastUpdatedAt;
          cart = $event.detail.cart || [];
          subtotal = $event.detail.subtotal || 0;
          taxAmount = $event.detail.tax_amount || 0;
@@ -104,10 +128,10 @@
          qrisOrderId = $event.detail.qris_order_id || null;
          qrisCodeUrl = $event.detail.qris_code_url || null;
          qrisExpiresIn = $event.detail.qris_expires_in || 0;
+         qrisExpiresAtMs = $event.detail.qris_expires_at_ms || null;
          showQris = !!$event.detail.show_qris;
          qrisStatusText = '';
-         if (showQris && qrisExpiresIn > 0) {
-             qrisCountdown = qrisExpiresIn;
+         if (showQris && qrisExpiresAtMs) {
              initQrisTimer();
          }
          $nextTick(() => {
@@ -260,9 +284,9 @@
     </div>
 
     <!-- CUSTOMER QRIS PAYMENT MODAL OVERLAY -->
-    <div 
-        x-show="showQris && qrisCodeUrl" 
-        x-cloak 
+    <div
+        x-show="showQris && qrisCodeUrl"
+        x-cloak
         class="fixed inset-0 z-40 overflow-y-auto flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md"
         x-transition:enter="transition ease-out duration-300"
         x-transition:enter-start="opacity-0 scale-95"
@@ -271,56 +295,55 @@
         x-transition:leave-start="opacity-100 scale-100"
         x-transition:leave-end="opacity-0 scale-95"
     >
-        <div class="bg-white rounded-3xl shadow-2xl border border-gray-100 w-full max-w-md overflow-hidden transform transition-all">
-            <!-- Header Gradient -->
-            <div class="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 p-6 text-white text-center relative">
-                <div class="inline-flex items-center justify-center w-14 h-14 bg-white/20 rounded-2xl mb-2 backdrop-blur-md shadow-inner">
-                    <x-lucide name="qr-code" class="w-8 h-8 text-white" />
-                </div>
-                <h2 class="text-2xl font-black tracking-tight">Pembayaran QRIS</h2>
-                <p class="text-xs text-blue-100 mt-1">Scan kode QR menggunakan aplikasi e-Wallet atau m-Banking Anda</p>
+        <div class="bg-white rounded-2xl shadow-xl border border-gray-100 w-full max-w-md overflow-hidden">
+            <!-- Header -->
+            <div class="bg-primary-600 p-5 text-white text-center">
+                <h2 class="text-lg font-bold">Pembayaran QRIS</h2>
+                <p class="text-xs text-white/70 mt-0.5">Scan dengan aplikasi e-Wallet atau m-Banking</p>
             </div>
 
             <!-- Body -->
             <div class="p-6 text-center space-y-5">
-                <!-- Total Tagihan Card -->
-                <div class="bg-blue-50/80 border border-blue-100 rounded-2xl p-4 shadow-xs">
-                    <span class="text-xs font-semibold text-gray-500 block uppercase tracking-wider">Total Pembayaran</span>
-                    <span class="text-3xl font-black text-blue-700 tracking-tight" x-text="'Rp ' + formatNumber(total)"></span>
+                <!-- Total Tagihan -->
+                <div>
+                    <span class="text-xs font-semibold text-gray-400 uppercase tracking-wide block">Total Pembayaran</span>
+                    <span class="text-3xl font-extrabold text-gray-900" x-text="'Rp ' + formatNumber(total)"></span>
                 </div>
 
                 <!-- QR Code Box -->
-                <div class="relative inline-block bg-white p-4 rounded-2xl border-2 border-dashed border-gray-200 shadow-md">
+                <div class="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm mx-auto w-fit">
                     <template x-if="qrisCodeUrl">
-                        <img :src="qrisCodeUrl" alt="Kode QRIS Pembayaran" class="w-60 h-60 mx-auto object-contain rounded-xl">
+                        <img :src="qrisCodeUrl" alt="Kode QRIS Pembayaran" class="w-56 h-56 mx-auto object-contain rounded-lg">
                     </template>
+                </div>
 
-                    <!-- Live Status Badge -->
-                    <div class="mt-3 inline-flex items-center gap-2 px-4 py-1.5 bg-yellow-50 border border-yellow-200 text-yellow-800 text-xs font-bold rounded-full animate-pulse">
-                        <span class="w-2.5 h-2.5 rounded-full bg-yellow-500"></span>
-                        <span>Menunggu Scan & Pembayaran...</span>
-                    </div>
+                <!-- Live Status -->
+                <div x-show="qrisCountdown > 0 && !qrisStatusText" class="inline-flex items-center gap-1.5 bg-blue-50 text-primary-600 text-xs font-semibold px-3 py-1.5 rounded-full">
+                    <span class="w-1.5 h-1.5 rounded-full bg-primary-600"></span>
+                    <span>Menunggu scan &amp; pembayaran</span>
                 </div>
 
                 <!-- Timer & Feedback -->
-                <div class="space-y-1">
-                    <div class="text-xs font-medium text-gray-500">
-                        Masa Berlaku Kode QR: 
-                        <span class="font-mono font-bold text-red-600 text-sm" x-text="formatCountdown(qrisCountdown)"></span>
+                <div class="space-y-1.5">
+                    <div class="text-xs text-gray-500">
+                        Berlaku hingga
+                        <span class="font-mono font-bold text-gray-900 text-sm" x-text="formatCountdown(qrisCountdown)"></span>
                     </div>
-                    <div x-show="qrisCountdown <= 0" class="text-xs font-bold text-red-500">
+                    <!-- Hanya salah satu pesan status yang tampil sekaligus (kadaluarsa statis ATAU
+                         hasil pengecekan), supaya tidak muncul dua badge status yang tumpang tindih. -->
+                    <div x-show="qrisCountdown <= 0 && !qrisStatusText" class="text-xs font-semibold text-red-500">
                         Kode QR kadaluarsa. Silakan minta kasir membuat QRIS baru.
                     </div>
-                    <div x-show="qrisStatusText" class="text-xs font-semibold text-indigo-700 bg-indigo-50 p-2.5 rounded-xl mt-2" x-text="qrisStatusText">
+                    <div x-show="qrisStatusText" class="text-xs font-semibold text-primary-600 bg-blue-50 p-2.5 rounded-xl mt-2" x-text="qrisStatusText">
                     </div>
                 </div>
 
                 <!-- Tombol HANYA Cek Status Pembayaran (Tanpa Tombol Batal) -->
                 <div class="pt-2">
-                    <button 
+                    <button
                         @click="checkQrisStatus()"
                         :disabled="isCheckingQris"
-                        class="w-full py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 text-white font-bold rounded-2xl text-sm flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/25 transition-all transform hover:scale-[1.01] active:scale-95 cursor-pointer"
+                        class="w-full py-3.5 bg-primary-600 hover:bg-primary-700 disabled:opacity-60 text-white font-bold rounded-xl text-sm flex items-center justify-center gap-2 transition-all cursor-pointer"
                     >
                         <template x-if="!isCheckingQris">
                             <span class="flex items-center gap-2">
@@ -529,31 +552,74 @@
     <script>
         document.addEventListener('livewire:initialized', () => {
              const channel = new BroadcastChannel('pos_channel_' + {{ auth()->id() }});
+
+             const syncFromServer = () => {
+                 @this.$refresh().then(() => {
+                     const root = document.querySelector('[x-data]');
+                     if (root && root.__x) {
+                         // Sama seperti guard di handler cart-data-broadcast: request $refresh()
+                         // ini async (roundtrip network), jadi bisa saja RESOLVE BELAKANGAN
+                         // setelah pesan BroadcastChannel yang lebih baru sudah diterapkan
+                         // (mis. QRIS baru dibuat tepat setelah $refresh() ini dikirim). Tanpa
+                         // guard ini, hasil fetch yang basi bisa menimpa gambar QRIS yang baru
+                         // saja tampil sehingga terlihat "hilang" sampai browser di-refresh manual.
+                         if ((@this.lastUpdatedAt || 0) < root.__x.$data.lastUpdatedAt) {
+                             return;
+                         }
+                         root.__x.$data.lastUpdatedAt = @this.lastUpdatedAt;
+                         root.__x.$data.cart = @this.cart;
+                         root.__x.$data.subtotal = @this.subtotal;
+                         root.__x.$data.taxAmount = @this.taxAmount;
+                         root.__x.$data.total = @this.total;
+                         root.__x.$data.paidAmount = @this.paidAmount;
+                         root.__x.$data.changeAmount = @this.changeAmount;
+                         root.__x.$data.customerName = @this.customerName;
+                         root.__x.$data.cashierName = @this.cashierName;
+                         root.__x.$data.qrisOrderId = @this.qrisOrderId;
+                         root.__x.$data.qrisCodeUrl = @this.qrisCodeUrl;
+                         root.__x.$data.qrisExpiresIn = @this.qrisExpiresIn;
+                         root.__x.$data.qrisExpiresAtMs = @this.qrisExpiresAtMs;
+                         root.__x.$data.showQris = @this.showQris;
+                         if (@this.showQris && @this.qrisExpiresAtMs) {
+                             root.__x.$data.initQrisTimer();
+                         }
+                     }
+                 });
+             };
+
+             // Tarik state terkini SEKALI saat display baru terbuka/reload. Ini menutup celah
+             // race condition di mana kasir sudah membuat QRIS SEBELUM layar display ini selesai
+             // memuat & mendaftarkan listener BroadcastChannel-nya — pesan broadcast pertama
+             // (mis. gambar QR) bisa terlewat karena channel di sisi display belum "ada" saat
+             // pesan itu dikirim. Bukan polling berkala, hanya sinkronisasi satu kali di awal.
+             syncFromServer();
+
              channel.onmessage = (e) => {
                   if (e.data && e.data.type === 'heartbeat') return;
                   
                   if (e.data && typeof e.data === 'object' && e.data.cart) {
                       window.dispatchEvent(new CustomEvent('cart-data-broadcast', { detail: e.data }));
                   } else {
-                      @this.$refresh().then(() => {
-                          const root = document.querySelector('[x-data]');
-                          if (root && root.__x) {
-                              root.__x.$data.cart = @this.cart;
-                              root.__x.$data.subtotal = @this.subtotal;
-                              root.__x.$data.taxAmount = @this.taxAmount;
-                              root.__x.$data.total = @this.total;
-                              root.__x.$data.paidAmount = @this.paidAmount;
-                              root.__x.$data.changeAmount = @this.changeAmount;
-                              root.__x.$data.customerName = @this.customerName;
-                              root.__x.$data.cashierName = @this.cashierName;
-                              root.__x.$data.qrisOrderId = @this.qrisOrderId;
-                              root.__x.$data.qrisCodeUrl = @this.qrisCodeUrl;
-                              root.__x.$data.qrisExpiresIn = @this.qrisExpiresIn;
-                              root.__x.$data.showQris = @this.showQris;
-                          }
-                      });
+                      syncFromServer();
                   }
              };
+
+             // Jaring pengaman tambahan: kalau display sempat di-minimize/background lalu
+             // kembali aktif (visibilitychange) atau window di-focus lagi, tarik state terkini
+             // sekali — bukan interval berkala, hanya re-sync saat display benar-benar kembali dilihat.
+             document.addEventListener('visibilitychange', () => {
+                 if (document.visibilityState === 'visible') syncFromServer();
+             });
+             window.addEventListener('focus', syncFromServer);
+
+             // Self-heal berkala: BroadcastChannel seharusnya real-time, tapi tetap bisa ada
+             // pesan yang terlewat (mis. sinyal "tutup/sembunyikan QRIS" yang bersamaan dengan
+             // pesan lain di channel yang sama) sehingga display kadang nyangkut di state lama
+             // walau kasir sudah menutup/mengubahnya. Poll ringan tiap 5 detik ini menjamin
+             // display otomatis kembali sinkron paling lambat dalam beberapa detik, terlepas
+             // dari race di jalur broadcast manapun. Guard lastUpdatedAt di syncFromServer()
+             // tetap mencegah hasil fetch yang basi menimpa data yang lebih baru.
+             setInterval(syncFromServer, 5000);
         });
     </script>
     

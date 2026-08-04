@@ -75,6 +75,13 @@ return [
         'view_hpp_calculator' => 'Lihat & Gunakan Kalkulator HPP',
         'apply_hpp_calculator' => 'Terapkan HPP ke Produk',
         'view_menu_catalog' => 'Lihat Katalog Menu',
+
+        // Self Order
+        'view_self_orders'           => 'Lihat Dashboard Self Order',
+        'manage_self_orders'         => 'Kelola Self Order (Proses/Status)',
+        'accept_self_order_payment'  => 'Konfirmasi Pembayaran Self Order',
+        'cancel_self_order'          => 'Batalkan Self Order',
+        'print_self_order_receipt'   => 'Cetak Struk Self Order',
     ],
     
     /**
@@ -147,6 +154,13 @@ return [
             'edit_users',
             'delete_users',
             'manage_roles',
+        ],
+        'Self Order' => [
+            'view_self_orders',
+            'manage_self_orders',
+            'accept_self_order_payment',
+            'cancel_self_order',
+            'print_self_order_receipt',
         ],
     ],
 ];

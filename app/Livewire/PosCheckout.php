@@ -21,18 +21,22 @@ use App\Models\ShiftExpense;
 use App\Models\StockLog;
 use App\Models\Transaction;
 use App\Models\TransactionDetail;
+use App\Services\MidtransService;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
 #[Layout('layouts.pos')]
 class PosCheckout extends Component
 {
-    // Cart state
+    // Cart state — dilindungi #[Locked] dari manipulasi request langsung (mis. tampering harga via devtools).
+    // Harga tetap divalidasi ulang dari DB di Action pembayaran sebagai lapisan pertahanan utama.
+    #[Locked]
     public array $cart = [];
 
     // Lifecycle hooks
@@ -71,6 +75,8 @@ class PosCheckout extends Component
     public function updatedPaymentMethod() { $this->broadcastCartState(); }
     public function updatedPaymentSourceId() { $this->broadcastCartState(); }
     public function updatedNotes() { $this->broadcastCartState(); }
+    public function updatedOrderType() { $this->broadcastCartState(); }
+    public function updatedSelectedServiceAreaId() { $this->broadcastCartState(); }
 
     // Payment state
     public ?int $paymentSourceId = null;
@@ -108,6 +114,7 @@ class PosCheckout extends Component
     public ?string $qrisCodeUrl = null;       // URL QR code image dari Midtrans
     public ?string $qrisInvoiceNumber = null; // Invoice number yang sedang menunggu QRIS
     public int $qrisExpiresIn = 0;            // Countdown dalam detik (diupdate oleh SSE)
+    public ?int $qrisExpiresAtMs = null;      // Target waktu absolut (epoch ms) — sumber tunggal agar POS & Display singkron
     public bool $qrisGenerating = false;      // Loading state saat generate QR
 
     // History & Reprint
@@ -353,12 +360,20 @@ class PosCheckout extends Component
         $this->reset(['returnTransaction', 'returnInvoiceSearch', 'returnItems', 'returnReason', 'returnNotes']);
     }
 
+    // Baseline count Self Order untuk deteksi pesanan baru masuk (lihat selfOrdersCount()).
+    // Diisi via query langsung di mount() (bukan lewat computed) agar TIDAK memicu toast
+    // untuk pesanan yang sudah ada sebelum kasir membuka halaman ini.
+    public int $notifiedSelfOrdersCount = 0;
+
     public function mount(): void
     {
         $this->paymentSourceId = PaymentSource::getDefaultCash()?->id;
 
         $userId = auth()->id();
         if ($userId) {
+            $this->notifiedSelfOrdersCount = \App\Models\SelfOrder::countWaitingToday($userId)
+                + \App\Models\SelfOrder::countPaidToday($userId);
+
             $cachedCart = Cache::get('pos_active_cart_' . $userId);
             if (!empty($cachedCart) && is_array($cachedCart)) {
                 $this->cart                  = $cachedCart['cart'] ?? [];
@@ -381,6 +396,7 @@ class PosCheckout extends Component
                 $this->qrisCodeUrl       = $activeTx->qr_code_url;
                 $this->qrisInvoiceNumber = $activeTx->invoice_number;
                 $this->qrisExpiresIn     = (int) max(0, now()->diffInSeconds($activeTx->expired_at, false));
+                $this->qrisExpiresAtMs   = $activeTx->expired_at?->valueOf();
 
                 // Jika di cache show_qris bernilai true, buka kembali modal QRIS di kasir
                 if (!empty($cachedCart['show_qris'])) {
@@ -452,6 +468,37 @@ class PosCheckout extends Component
     public function todayTransactions()
     {
         return Transaction::getTodayUserTransactions(auth()->id());
+    }
+
+    #[Computed]
+    public function selfOrdersCount(): int
+    {
+        return \App\Models\SelfOrder::countWaitingToday(auth()->id()) + \App\Models\SelfOrder::countPaidToday(auth()->id());
+    }
+
+    /**
+     * Dipanggil oleh wire:poll setiap 10 detik pada header POS. Membandingkan jumlah
+     * Self Order terhadap polling sebelumnya — kalau bertambah, tampilkan toast (tanpa suara).
+     */
+    public function checkForNewSelfOrders(): void
+    {
+        $count = $this->selfOrdersCount;
+
+        if ($count > $this->notifiedSelfOrdersCount) {
+            $diff = $count - $this->notifiedSelfOrdersCount;
+            $this->dispatch('notify', type: 'info', message: $diff === 1
+                ? 'Ada 1 pesanan mandiri baru masuk.'
+                : "Ada {$diff} pesanan mandiri baru masuk.");
+        }
+
+        $this->notifiedSelfOrdersCount = $count;
+    }
+
+    #[On('selfOrderUpdated')]
+    public function handleSelfOrderUpdated(): void
+    {
+        unset($this->selfOrdersCount);
+        unset($this->todayTransactions);
     }
 
     #[Computed]
@@ -752,25 +799,26 @@ class PosCheckout extends Component
                 $this->qrisInvoiceNumber = Transaction::generateInvoiceNumber();
             }
 
+            // Setiap percobaan QRIS (pertama kali, atau ulang setelah kadaluarsa/dibatalkan via
+            // regenerateQris()) membuat BARIS PaymentTransaction baru — idempotency_key harus unik
+            // per percobaan. paymentIdempotencyKey sebelumnya hanya di-generate sekali saat modal
+            // pembayaran dibuka (openPaymentModal) dan tidak pernah diperbarui untuk percobaan QRIS
+            // berikutnya, sehingga insert kedua menabrak unique constraint idempotency_key di DB.
+            $this->paymentIdempotencyKey = (string) \Illuminate\Support\Str::uuid();
+
             $payload = $this->buildCartPayload('qris');
 
-            // Simpan cart ke cache agar HandleMidtransWebhookAction bisa rekonstruksi
+            // Harga dihitung ulang & cart snapshot di-cache di dalam Action (dari data tervalidasi DB)
             $paymentTx = app(InitiateQrisPaymentAction::class)->execute(
                 payload:       $payload,
                 invoiceNumber: $this->qrisInvoiceNumber,
                 cashierId:     auth()->id(),
             );
 
-            // Cache cart data untuk webhook handler
-            Cache::put(
-                "qris_cart_{$paymentTx->midtrans_order_id}",
-                array_merge($payload->toArray(), ['invoice_number' => $this->qrisInvoiceNumber]),
-                now()->addMinutes(30)
-            );
-
             $this->qrisOrderId   = $paymentTx->midtrans_order_id;
             $this->qrisCodeUrl   = $paymentTx->qr_code_url;
-            $this->qrisExpiresIn = $paymentTx->expired_at ? (int) now()->diffInSeconds($paymentTx->expired_at, false) : 300;
+            $this->qrisExpiresIn   = $paymentTx->expired_at ? (int) now()->diffInSeconds($paymentTx->expired_at, false) : 300;
+            $this->qrisExpiresAtMs = $paymentTx->expired_at?->valueOf();
             $this->showPaymentModal = false;
             $this->showQrisModal    = true;
 
@@ -884,6 +932,7 @@ class PosCheckout extends Component
             $paymentTx = PaymentTransaction::where('midtrans_order_id', $this->qrisOrderId)->first();
             if ($paymentTx && $paymentTx->isPending() && !$paymentTx->isQrisExpiredByTime()) {
                 $this->qrisExpiresIn    = (int) max(0, now()->diffInSeconds($paymentTx->expired_at, false));
+                $this->qrisExpiresAtMs  = $paymentTx->expired_at?->valueOf();
                 $this->showPaymentModal = false;
                 $this->showQrisModal    = true;
                 $this->broadcastCartState();
@@ -910,9 +959,12 @@ class PosCheckout extends Component
     }
 
     /**
-     * Cek status QRIS secara manual (fallback jika SSE terputus).
+     * Cek status QRIS ke Midtrans secara aktif — dipanggil manual oleh kasir (klik tombol)
+     * maupun otomatis secara berkala oleh frontend sebagai cadangan jika webhook/SSE
+     * tidak sampai. $silent=true menekan toast "belum diterima" untuk polling otomatis
+     * agar kasir tidak dispam notifikasi setiap beberapa detik.
      */
-    public function checkQrisStatus(): void
+    public function checkQrisStatus(bool $silent = false): void
     {
         if (!$this->qrisOrderId) {
             return;
@@ -940,7 +992,7 @@ class PosCheckout extends Component
             $this->onQrisPaid($paymentTx->transaction_id);
         } elseif ($paymentTx->isExpired() || $paymentTx->isQrisExpiredByTime()) {
             $this->onQrisExpired();
-        } else {
+        } elseif (!$silent) {
             $this->dispatch('notify', type: 'info', message: 'Pembayaran belum diterima. Silakan selesaikan transaksi.');
         }
     }
@@ -983,6 +1035,56 @@ class PosCheckout extends Component
     // Shift Actions
     // -----------------------------------------------------------------
 
+    // Modal konfirmasi buka shift manual (klik username) — pengganti window.confirm() bawaan browser.
+    public bool $showOpenShiftModal = false;
+
+    /**
+     * Dipicu oleh komponen anak (SelfOrderDashboard) saat kasir mencoba klaim/proses/bayar
+     * pesanan mandiri tapi belum punya shift terbuka — langsung tawarkan modal buka shift
+     * di sini alih-alih kasir harus keluar dari modal Pesanan Mandiri terlebih dahulu.
+     */
+    #[On('open-shift-requested')]
+    public function handleOpenShiftRequested(): void
+    {
+        $this->openShiftPrompt();
+    }
+
+    /**
+     * Tampilkan modal konfirmasi buka shift. Dipanggil dari klik username/avatar di header,
+     * agar kasir bisa membuka shift tanpa harus menjalankan transaksi terlebih dahulu
+     * (sebelumnya shift baru otomatis terbuat diam-diam saat transaksi pertama diproses).
+     */
+    public function openShiftPrompt(): void
+    {
+        if ($this->todayShift && $this->todayShift->status === 'open') {
+            // Sudah ada shift aktif — tidak perlu modal, cukup info.
+            $this->dispatch('notify', type: 'info', message: 'Shift Anda sudah aktif.');
+            return;
+        }
+
+        $this->showOpenShiftModal = true;
+    }
+
+    public function closeOpenShiftPrompt(): void
+    {
+        $this->showOpenShiftModal = false;
+    }
+
+    /**
+     * Eksekusi pembukaan shift setelah kasir konfirmasi di modal custom (bukan browser confirm()).
+     */
+    public function confirmOpenShift(): void
+    {
+        // getOrCreateTodayShift() sudah idempotent (defense-in-depth kalau modal sempat ter-double-click).
+        Shift::getOrCreateTodayShift(auth()->id());
+
+        // Bersihkan cache computed properties supaya header langsung mencerminkan shift baru.
+        unset($this->todayShift, $this->shiftsTodayCount);
+
+        $this->showOpenShiftModal = false;
+        $this->dispatch('notify', type: 'success', message: 'Shift berhasil dibuka. Selamat bertugas!');
+    }
+
     public function openCloseShiftModal(): void
     {
         $shift = $this->todayShift;
@@ -1008,6 +1110,13 @@ class PosCheckout extends Component
         // Keamanan 3: Cek Keranjang Aktif di Layar POS
         if (!empty($this->cart)) {
             $this->dispatch('notify', type: 'error', message: "Tidak dapat menutup shift: Keranjang aktif POS masih terisi item. Kosongkan atau selesaikan transaksi terlebih dahulu.");
+            return;
+        }
+
+        // Keamanan 4: Cek Self Order aktif yang terikat ke shift ini (belum Completed/Cancelled/Expired)
+        $activeSelfOrders = $this->countActiveSelfOrdersForShift($shift->id);
+        if ($activeSelfOrders > 0) {
+            $this->dispatch('notify', type: 'error', message: "Tidak dapat menutup shift: Masih ada {$activeSelfOrders} pesanan mandiri yang belum selesai diproses. Selesaikan, alihkan ke kasir lain, atau tunggu sampai selesai terlebih dahulu.");
             return;
         }
 
@@ -1059,6 +1168,11 @@ class PosCheckout extends Component
         }
         if (!empty($this->qrisOrderId)) {
             $this->dispatch('notify', type: 'error', message: 'Gagal menutup shift: Transaksi QRIS masih aktif.');
+            return;
+        }
+        $activeSelfOrders = $this->countActiveSelfOrdersForShift($shift->id);
+        if ($activeSelfOrders > 0) {
+            $this->dispatch('notify', type: 'error', message: "Gagal menutup shift: Masih ada {$activeSelfOrders} pesanan mandiri yang belum selesai diproses.");
             return;
         }
 
@@ -1140,6 +1254,11 @@ class PosCheckout extends Component
             return;
         }
 
+        $activeSelfOrders = $this->countActiveSelfOrdersForShift($shift->id);
+        if ($activeSelfOrders > 0) {
+            $this->dispatch('notify', type: 'error', message: "Tidak dapat menutup shift: Masih ada {$activeSelfOrders} pesanan mandiri yang belum selesai diproses pada shift ini.");
+            return;
+        }
 
         if (!is_numeric($this->openingCash) || $this->openingCash < 0) {
             $this->dispatch('notify', type: 'error', message: 'Modal Awal harus diisi dengan valid (minimal 0)');
@@ -1191,6 +1310,16 @@ class PosCheckout extends Component
     // Helper Methods
     // -----------------------------------------------------------------
 
+    /**
+     * Hitung Self Order yang masih aktif (belum Completed/Cancelled/Expired) dan
+     * terikat ke shift tertentu. Dipakai untuk mencegah shift ditutup selagi masih
+     * ada pesanan mandiri yang belum selesai diproses/diambil pelanggan.
+     */
+    protected function countActiveSelfOrdersForShift(int $shiftId): int
+    {
+        return \App\Models\SelfOrder::where('shift_id', $shiftId)->active()->count();
+    }
+
     protected function generateCartKey(int $productId, array $modifiers): string
     {
         $modifierIds = array_keys($modifiers);
@@ -1236,8 +1365,12 @@ class PosCheckout extends Component
             'qris_order_id'            => $this->qrisOrderId,
             'qris_code_url'            => $this->qrisCodeUrl,
             'qris_expires_in'          => $this->qrisExpiresIn,
+            'qris_expires_at_ms'       => $this->qrisExpiresAtMs,
             'show_qris'                => $this->showQrisModal,
-            'updated_at'               => now()->timestamp,
+            // Presisi milidetik: dua broadcastCartState() bisa terjadi dalam detik yang sama
+            // (mis. saat initiateQrisPayment), jadi timestamp detik saja tidak cukup untuk
+            // menentukan mana data yang lebih baru di sisi Customer Display.
+            'updated_at'               => (int) round(microtime(true) * 1000),
         ];
 
         \Illuminate\Support\Facades\Cache::put('pos_active_cart_' . auth()->id(), $data, now()->addHours(12));

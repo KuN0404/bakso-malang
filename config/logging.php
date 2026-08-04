@@ -127,6 +127,30 @@ return [
             'path' => storage_path('logs/laravel.log'),
         ],
 
+        // ─── Self Order Channels ─────────────────────────────────────
+        'self_order' => [
+            'driver'               => 'daily',
+            'path'                 => storage_path('logs/self-order/self-order.log'),
+            'level'                => 'info',
+            'days'                 => 30,
+            'replace_placeholders' => true,
+        ],
+
+        'self_order_payment' => [
+            'driver'               => 'daily',
+            'path'                 => storage_path('logs/self-order/payment.log'),
+            'level'                => 'info',
+            'days'                 => 90, // Audit finansial: 90 hari
+            'replace_placeholders' => true,
+        ],
+
+        'self_order_security' => [
+            'driver'               => 'daily',
+            'path'                 => storage_path('logs/self-order/security.log'),
+            'level'                => 'warning',
+            'days'                 => 90,
+            'replace_placeholders' => true,
+        ],
     ],
 
 ];

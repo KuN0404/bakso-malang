@@ -11,6 +11,7 @@ use App\Models\Product;
 use App\Models\Shift;
 use App\Models\StockLog;
 use App\Models\Transaction;
+use App\Services\ComponentStockService;
 use App\Services\ReportSyncService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -224,8 +225,11 @@ class HandleMidtransWebhookAction
                     ]);
 
                     if (!empty($modifierData['component_id'])) {
+                        // Best-effort: uang customer sudah pasti masuk di titik ini (settlement
+                        // webhook), jadi tidak boleh melempar exception yang membatalkan seluruh
+                        // pencatatan pembayaran hanya karena stok komponen kurang.
                         $totalModQty = $modQty * $item['quantity'];
-                        $this->componentStockService->deductForModifier(
+                        $this->componentStockService->deductForModifierBestEffort(
                             $modifierId,
                             $totalModQty,
                             $transaction->id,
@@ -238,20 +242,36 @@ class HandleMidtransWebhookAction
             $product = $products->get($item['product_id']);
 
             if ($product && $product->hasBom()) {
-                $this->componentStockService->deductForBom(
+                $this->componentStockService->deductForBomBestEffort(
                     $item['product_id'],
                     $item['quantity'],
                     $transaction->id,
                     $cashierId
                 );
             } elseif ($product && $product->track_stock) {
-                $product->decrement('stock', $item['quantity']);
+                // Best-effort juga di sini — sebelumnya decrement() polos tanpa pengecekan sama
+                // sekali, jadi stok bisa minus diam-diam kalau kebetulan sudah habis diambil
+                // transaksi lain sebelum QRIS ini settle. Floor di 0, catat CRITICAL kalau kurang.
+                $currentStock = $product->stock;
+                $deduct       = min($item['quantity'], max(0, $currentStock));
+
+                if ($deduct < $item['quantity']) {
+                    \Illuminate\Support\Facades\Log::critical(
+                        "OVERSOLD (settlement QRIS): Produk '{$product->name}' butuh {$item['quantity']}, " .
+                        "tersisa hanya {$currentStock}. Transaksi #{$transaction->id} — barang tetap harus " .
+                        "dibuatkan, cek ketersediaan fisik secara manual."
+                    );
+                }
+
+                $newStock = $currentStock - $deduct;
+                $product->update(['stock' => $newStock]);
+
                 StockLog::record(
                     productId:  $product->id,
                     userId:     $cashierId,
                     type:       'sale',
-                    amount:     -$item['quantity'],
-                    finalStock: $product->fresh()->stock,
+                    amount:     -$deduct,
+                    finalStock: $newStock,
                     note:       "QRIS Inv: {$paymentTx->invoice_number}"
                 );
             }

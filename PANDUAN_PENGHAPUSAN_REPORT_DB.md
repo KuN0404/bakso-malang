@@ -1,6 +1,6 @@
 # Panduan Penghapusan Fitur Laporan Multi-Database (Report DB)
 
-Panduan ini berisi daftar file dan baris kode yang harus dihapus/dikembalikan jika Anda ingin menonaktifkan fitur sinkronisasi database laporan pusat (`mysql_report`) dan mengembalikan aplikasi ke sistem satu database bawaan.
+Panduan ini berisi daftar lengkap file dan baris kode yang harus dihapus/dikembalikan jika Anda ingin menonaktifkan fitur sinkronisasi database laporan pusat (`mysql_report`) dan mengembalikan aplikasi ke sistem satu database bawaan.
 
 ---
 
@@ -54,40 +54,94 @@ Hapus baris penjadwalan pembersihan data otomatis:
 
 ---
 
-## 3. Edit File Code Aplikasi
+## 3. Edit File Code Aplikasi & Livewire
 
 ### A. File POS Checkout Component
 Path: `*\bakso-malang\app\Livewire\PosCheckout.php`
 
-Hapus baris pemanggilan `ReportSyncService` pada 4 method berikut:
+Hapus baris pemanggilan `ReportSyncService` pada method berikut:
 
-1. **Method `processReturn`** (Sekitar baris 333-334):
+1. **Method `processReturn`**:
    ```php
    // Hapus baris ini:
    app(\App\Services\ReportSyncService::class)->syncReturn($return->load('items'));
    ```
 
-2. **Method `processPayment`** (Sekitar baris 699-700):
-   ```php
-   // Hapus baris ini:
-   app(\App\Services\ReportSyncService::class)->syncTransaction($this->lastTransaction);
-   ```
-
-3. **Method `closeShift`** (Sekitar baris 819-820):
+2. **Method `closeShift`**:
    ```php
    // Hapus baris ini:
    app(\App\Services\ReportSyncService::class)->syncShift($shift->load('expenses'));
    ```
 
-4. **Method `closePreviousShift`** (Sekitar baris 883-884):
+3. **Method `closePreviousShift`**:
    ```php
    // Hapus baris ini:
    app(\App\Services\ReportSyncService::class)->syncShift($shift->load('expenses'));
+   ```
+
+### B. Action Pembayaran POS (Cash & Midtrans Webhook)
+1. Path: `*\bakso-malang\app\Actions\Payment\InitiateCashPaymentAction.php`
+   - Hapus import `use App\Services\ReportSyncService;`
+   - Hapus dependency injection `$reportSyncService` di constructor.
+   - Hapus baris pemanggilan `$this->reportSyncService->syncTransaction($transaction);`.
+
+2. Path: `*\bakso-malang\app\Actions\Payment\HandleMidtransWebhookAction.php`
+   - Hapus import `use App\Services\ReportSyncService;`
+   - Hapus dependency injection `$reportSyncService` di constructor.
+   - Hapus baris pemanggilan `$this->reportSyncService->syncTransaction($transaction);`.
+
+### C. Livewire Modul Inventori, Pembelian & Repacking Produksi
+1. Path: `*\bakso-malang\app\Livewire\Admin\Purchases.php`
+   ```php
+   // Hapus baris ini di method save():
+   app(\App\Services\ReportSyncService::class)->syncPurchase($purchase->load('items'));
+   ```
+
+2. Path: `*\bakso-malang\app\Livewire\Admin\Productions.php`
+   ```php
+   // Hapus baris ini di method save():
+   app(\App\Services\ReportSyncService::class)->syncProduction($production->load(['inputs', 'outputs']));
+   ```
+
+3. Path: `*\bakso-malang\app\Livewire\Admin\Ingredients.php`
+   ```php
+   // Hapus baris ini di method save() (ada 2 tempat):
+   app(\App\Services\ReportSyncService::class)->syncIngredient($ingredient);
+   ```
+
+4. Path: `*\bakso-malang\app\Livewire\Admin\Components.php`
+   ```php
+   // Hapus baris ini di method save() (ada 2 tempat):
+   app(\App\Services\ReportSyncService::class)->syncComponent($comp);
+   ```
+
+### D. Model Event Listener (Mutasi Stok Log)
+1. Path: `*\bakso-malang\app\Models\IngredientStockLog.php`
+   Hapus method `booted()`:
+   ```php
+   protected static function booted(): void
+   {
+       static::created(function ($log) {
+           app(\App\Services\ReportSyncService::class)->syncIngredientStockLog($log);
+       });
+   }
+   ```
+
+2. Path: `*\bakso-malang\app\Models\ComponentStockLog.php`
+   Hapus method `booted()`:
+   ```php
+   protected static function booted(): void
+   {
+       static::created(function ($log) {
+           app(\App\Services\ReportSyncService::class)->syncComponentStockLog($log);
+       });
+   }
    ```
 
 ---
 
 ## 4. Hapus Trait pada Model-Model Master
+
 Buka file model berikut, hapus import `use App\Traits\SyncsToReport;` di bagian atas dan deklarasi `use SyncsToReport;` di dalam class modelnya:
 
 1. 📄 `*\bakso-malang\app\Models\User.php`
@@ -97,6 +151,8 @@ Buka file model berikut, hapus import `use App\Traits\SyncsToReport;` di bagian 
 5. 📄 `*\bakso-malang\app\Models\ServiceArea.php`
 6. 📄 `*\bakso-malang\app\Models\ModifierGroup.php`
 7. 📄 `*\bakso-malang\app\Models\Modifier.php`
+8. 📄 `*\bakso-malang\app\Models\Component.php`
 
-*Setelah menghapus semua baris di atas, jalankan perintah `php artisan config:clear` di terminal untuk membersihkan cache konfigurasi.*
+---
 
+*Setelah menghapus semua baris di atas, jalankan perintah `php artisan config:clear` dan `php artisan route:clear` di terminal untuk membersihkan cache konfigurasi.*

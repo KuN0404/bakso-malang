@@ -74,6 +74,8 @@ class Ingredients extends Component
 
     public function save(): void
     {
+        $this->authorize($this->editingId ? 'edit_ingredients' : 'create_ingredients');
+
         $rules = [
             'code' => 'required|max:50|unique:ingredients,code' . ($this->editingId ? ",{$this->editingId}" : ''),
             'name' => 'required|min:2|max:150',
@@ -102,6 +104,7 @@ class Ingredients extends Component
                 'note' => $this->note,
                 'is_active' => $this->is_active,
             ]);
+            app(\App\Services\ReportSyncService::class)->syncIngredient($ingredient);
             $this->dispatch('notify', type: 'success', message: 'Bahan baku berhasil diperbarui.');
         } else {
             $ingredient = Ingredient::create([
@@ -126,6 +129,7 @@ class Ingredients extends Component
                 );
             }
 
+            app(\App\Services\ReportSyncService::class)->syncIngredient($ingredient);
             $this->dispatch('notify', type: 'success', message: 'Bahan baku baru berhasil ditambahkan.');
         }
 
@@ -143,6 +147,10 @@ class Ingredients extends Component
 
     public function saveStock(): void
     {
+        // Tidak ada permission 'adjust_ingredient_stock' terpisah di seeder — pakai edit_ingredients
+        // sebagai yang paling mendekati (setara dengan hak edit data bahan baku).
+        $this->authorize('edit_ingredients');
+
         $rules = [
             'stockAdjustmentAmount' => 'required|numeric|gt:0',
         ];
@@ -209,6 +217,8 @@ class Ingredients extends Component
 
     public function delete(int $id): void
     {
+        $this->authorize('delete_ingredients');
+
         $ingredient = Ingredient::findOrFail($id);
         $ingredient->delete();
         $this->dispatch('notify', type: 'success', message: 'Bahan baku berhasil dihapus.');

@@ -31,7 +31,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->validateCsrfTokens(except: [
             '/logout',
             'logout',
-            '/api/webhook/midtrans', // Midtrans tidak bisa kirim CSRF token
+            '/api/webhook/midtrans',          // Midtrans POS webhook
+            '/api/webhook/midtrans/self-order', // Midtrans Self Order webhook
         ]);
 
         // Alias untuk Midtrans signature middleware

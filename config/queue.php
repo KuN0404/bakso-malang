@@ -65,11 +65,16 @@ return [
         ],
 
         'redis' => [
-            'driver' => 'redis',
-            'connection' => env('REDIS_QUEUE_CONNECTION', 'default'),
-            'queue' => env('REDIS_QUEUE', 'default'),
+            'driver'      => 'redis',
+            // Gunakan dedicated Redis DB 2 khusus queue (bukan cache/default)
+            'connection'  => env('REDIS_QUEUE_CONNECTION', 'queue'),
+            'queue'       => env('REDIS_QUEUE', 'default'),
+            // Waktu sebelum job yang tidak selesai dianggap gagal dan dikembalikan ke queue
+            // 90 detik cukup untuk proses Midtrans API + DB transaction
             'retry_after' => (int) env('REDIS_QUEUE_RETRY_AFTER', 90),
-            'block_for' => null,
+            // block_for: Worker menunggu job baru selama N detik sebelum polling ulang
+            // Mengurangi CPU usage vs. busy-looping
+            'block_for'   => 2,
             'after_commit' => false,
         ],
 

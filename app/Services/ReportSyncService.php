@@ -452,6 +452,251 @@ class ReportSyncService
         }
     }
 
+    // -----------------------------------------------------------------------
+    // Inventory & Production Sync
+    // -----------------------------------------------------------------------
+
+    public function syncIngredient(\App\Models\Ingredient $ingredient): void
+    {
+        try {
+            DB::connection(self::REPORT_CONNECTION)->table('ingredients')->upsert(
+                [[
+                    'id'            => $ingredient->id,
+                    'code'          => $ingredient->code,
+                    'name'          => $ingredient->name,
+                    'unit'          => $ingredient->unit,
+                    'stock'         => $ingredient->stock,
+                    'minimum_stock' => $ingredient->minimum_stock,
+                    'cost_price'    => $ingredient->cost_price,
+                    'note'          => $ingredient->note,
+                    'is_active'     => $ingredient->is_active,
+                    'created_at'    => $ingredient->created_at,
+                    'updated_at'    => $ingredient->updated_at,
+                ]],
+                ['id'],
+                ['code', 'name', 'unit', 'stock', 'minimum_stock', 'cost_price', 'note', 'is_active', 'updated_at']
+            );
+        } catch (\Throwable $e) {
+            Log::error('[ReportSync] Gagal sync ingredient ID ' . $ingredient->id . ': ' . $e->getMessage());
+        }
+    }
+
+    public function syncComponent(\App\Models\Component $component): void
+    {
+        try {
+            DB::connection(self::REPORT_CONNECTION)->table('components')->upsert(
+                [[
+                    'id'            => $component->id,
+                    'code'          => $component->code,
+                    'name'          => $component->name,
+                    'unit'          => $component->unit,
+                    'stock'         => $component->stock,
+                    'minimum_stock' => $component->minimum_stock,
+                    'cost_price'    => $component->cost_price,
+                    'note'          => $component->note,
+                    'is_active'     => $component->is_active,
+                    'created_at'    => $component->created_at,
+                    'updated_at'    => $component->updated_at,
+                ]],
+                ['id'],
+                ['code', 'name', 'unit', 'stock', 'minimum_stock', 'cost_price', 'note', 'is_active', 'updated_at']
+            );
+        } catch (\Throwable $e) {
+            Log::error('[ReportSync] Gagal sync component ID ' . $component->id . ': ' . $e->getMessage());
+        }
+    }
+
+    public function syncPurchase(\App\Models\Purchase $purchase): void
+    {
+        try {
+            $rdb = DB::connection(self::REPORT_CONNECTION);
+            if ($purchase->user_id) {
+                $this->ensureUserSynced($purchase->user_id);
+            }
+
+            $rdb->table('purchases')->upsert(
+                [[
+                    'id'             => $purchase->id,
+                    'invoice_number' => $purchase->invoice_number,
+                    'purchase_date'  => $purchase->purchase_date,
+                    'supplier_name'  => $purchase->supplier_name,
+                    'total_amount'   => $purchase->total_amount,
+                    'note'           => $purchase->note,
+                    'status'         => $purchase->status,
+                    'user_id'        => $purchase->user_id,
+                    'created_at'     => $purchase->created_at,
+                    'updated_at'     => $purchase->updated_at,
+                ]],
+                ['id'],
+                ['invoice_number', 'purchase_date', 'supplier_name', 'total_amount', 'note', 'status', 'user_id', 'updated_at']
+            );
+
+            foreach ($purchase->items as $item) {
+                if ($item->ingredient_id) {
+                    $ing = \App\Models\Ingredient::find($item->ingredient_id);
+                    if ($ing) $this->syncIngredient($ing);
+                }
+                if ($item->product_id) {
+                    $this->ensureProductSynced($item->product_id);
+                }
+
+                $rdb->table('purchase_items')->upsert(
+                    [[
+                        'id'            => $item->id,
+                        'purchase_id'   => $item->purchase_id,
+                        'item_type'     => $item->item_type,
+                        'ingredient_id' => $item->ingredient_id,
+                        'product_id'    => $item->product_id,
+                        'quantity'      => $item->quantity,
+                        'unit_price'    => $item->unit_price,
+                        'subtotal'      => $item->subtotal,
+                        'created_at'    => $item->created_at,
+                        'updated_at'    => $item->updated_at,
+                    ]],
+                    ['id'],
+                    ['purchase_id', 'item_type', 'ingredient_id', 'product_id', 'quantity', 'unit_price', 'subtotal', 'updated_at']
+                );
+            }
+        } catch (\Throwable $e) {
+            Log::error('[ReportSync] Gagal sync purchase ID ' . $purchase->id . ': ' . $e->getMessage());
+        }
+    }
+
+    public function syncProduction(\App\Models\Production $production): void
+    {
+        try {
+            $rdb = DB::connection(self::REPORT_CONNECTION);
+            if ($production->user_id) {
+                $this->ensureUserSynced($production->user_id);
+            }
+
+            $rdb->table('productions')->upsert(
+                [[
+                    'id'              => $production->id,
+                    'production_code' => $production->production_code,
+                    'production_date' => $production->production_date,
+                    'total_cost'      => $production->total_cost,
+                    'note'            => $production->note,
+                    'status'          => $production->status,
+                    'user_id'         => $production->user_id,
+                    'created_at'      => $production->created_at,
+                    'updated_at'      => $production->updated_at,
+                ]],
+                ['id'],
+                ['production_code', 'production_date', 'total_cost', 'note', 'status', 'user_id', 'updated_at']
+            );
+
+            foreach ($production->inputs as $in) {
+                if ($in->ingredient_id) {
+                    $ing = \App\Models\Ingredient::find($in->ingredient_id);
+                    if ($ing) $this->syncIngredient($ing);
+                }
+
+                $rdb->table('production_inputs')->upsert(
+                    [[
+                        'id'            => $in->id,
+                        'production_id' => $in->production_id,
+                        'ingredient_id' => $in->ingredient_id,
+                        'quantity'      => $in->quantity,
+                        'unit_cost'     => $in->unit_cost,
+                        'subtotal'      => $in->subtotal,
+                        'created_at'    => $in->created_at,
+                        'updated_at'    => $in->updated_at,
+                    ]],
+                    ['id'],
+                    ['production_id', 'ingredient_id', 'quantity', 'unit_cost', 'subtotal', 'updated_at']
+                );
+            }
+
+            foreach ($production->outputs as $out) {
+                if ($out->component_id) {
+                    $comp = \App\Models\Component::find($out->component_id);
+                    if ($comp) $this->syncComponent($comp);
+                }
+                if ($out->product_id) {
+                    $this->ensureProductSynced($out->product_id);
+                }
+
+                $rdb->table('production_outputs')->upsert(
+                    [[
+                        'id'            => $out->id,
+                        'production_id' => $out->production_id,
+                        'component_id'  => $out->component_id,
+                        'product_id'    => $out->product_id,
+                        'quantity'      => $out->quantity,
+                        'unit_cost'     => $out->unit_cost,
+                        'subtotal'      => $out->subtotal,
+                        'created_at'    => $out->created_at,
+                        'updated_at'    => $out->updated_at,
+                    ]],
+                    ['id'],
+                    ['production_id', 'component_id', 'product_id', 'quantity', 'unit_cost', 'subtotal', 'updated_at']
+                );
+            }
+        } catch (\Throwable $e) {
+            Log::error('[ReportSync] Gagal sync production ID ' . $production->id . ': ' . $e->getMessage());
+        }
+    }
+
+    public function syncIngredientStockLog(\App\Models\IngredientStockLog $log): void
+    {
+        try {
+            if ($log->ingredient_id) {
+                $ing = \App\Models\Ingredient::find($log->ingredient_id);
+                if ($ing) $this->syncIngredient($ing);
+            }
+
+            DB::connection(self::REPORT_CONNECTION)->table('ingredient_stock_logs')->upsert(
+                [[
+                    'id'            => $log->id,
+                    'ingredient_id' => $log->ingredient_id,
+                    'user_id'       => $log->user_id,
+                    'type'          => $log->type,
+                    'amount'        => $log->amount,
+                    'final_stock'   => $log->final_stock,
+                    'note'          => $log->note,
+                    'reference_id'  => $log->reference_id,
+                    'created_at'    => $log->created_at,
+                    'updated_at'    => $log->updated_at,
+                ]],
+                ['id'],
+                ['ingredient_id', 'user_id', 'type', 'amount', 'final_stock', 'note', 'reference_id', 'updated_at']
+            );
+        } catch (\Throwable $e) {
+            Log::error('[ReportSync] Gagal sync ingredient stock log ID ' . $log->id . ': ' . $e->getMessage());
+        }
+    }
+
+    public function syncComponentStockLog(\App\Models\ComponentStockLog $log): void
+    {
+        try {
+            if ($log->component_id) {
+                $comp = \App\Models\Component::find($log->component_id);
+                if ($comp) $this->syncComponent($comp);
+            }
+
+            DB::connection(self::REPORT_CONNECTION)->table('component_stock_logs')->upsert(
+                [[
+                    'id'             => $log->id,
+                    'component_id'   => $log->component_id,
+                    'user_id'        => $log->user_id,
+                    'type'           => $log->type,
+                    'amount'         => $log->amount,
+                    'final_stock'    => $log->final_stock,
+                    'note'           => $log->note,
+                    'reference_id'   => $log->reference_id,
+                    'reference_type' => $log->reference_type,
+                    'created_at'     => $log->created_at,
+                    'updated_at'     => $log->updated_at,
+                ]],
+                ['id'],
+                ['component_id', 'user_id', 'type', 'amount', 'final_stock', 'note', 'reference_id', 'reference_type', 'updated_at']
+            );
+        } catch (\Throwable $e) {
+            Log::error('[ReportSync] Gagal sync component stock log ID ' . $log->id . ': ' . $e->getMessage());
+        }
+    }
+
     private function ensureModifierSynced(int $modifierId): void
     {
         $mod = \App\Models\Modifier::find($modifierId);
@@ -459,11 +704,16 @@ class ReportSyncService
             if ($mod->modifier_group_id) {
                 $this->ensureModifierGroupSynced($mod->modifier_group_id);
             }
+            if ($mod->component_id) {
+                $comp = \App\Models\Component::find($mod->component_id);
+                if ($comp) $this->syncComponent($comp);
+            }
 
             DB::connection(self::REPORT_CONNECTION)->table('modifiers')->upsert(
                 [[
                     'id'                => $mod->id,
                     'modifier_group_id' => $mod->modifier_group_id,
+                    'component_id'      => $mod->component_id,
                     'name'              => $mod->name,
                     'price_adjustment'  => $mod->price_adjustment,
                     'is_active'         => $mod->is_active,
@@ -472,7 +722,7 @@ class ReportSyncService
                     'updated_at'        => $mod->updated_at,
                 ]],
                 ['id'],
-                ['modifier_group_id', 'name', 'price_adjustment', 'is_active', 'sort_order', 'updated_at']
+                ['modifier_group_id', 'component_id', 'name', 'price_adjustment', 'is_active', 'sort_order', 'updated_at']
             );
         }
     }

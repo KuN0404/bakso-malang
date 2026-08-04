@@ -2,36 +2,84 @@
 
 namespace App\Providers;
 
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
+use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
 {
-    /**
-     * Register any application services.
-     */
-    public function register(): void
-    {
-        //
-    }
+    public function register(): void {}
 
-    /**
-     * Bootstrap any application services.
-     */
     public function boot(): void
     {
-        // Rate Limiter for Admin: Strict (60 per minute)
-        \Illuminate\Support\Facades\RateLimiter::for('admin', function (\Illuminate\Http\Request $request) {
-            return \Illuminate\Cache\RateLimiting\Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
+        // ── Admin Panel: per User ID (bukan IP, karena bisa proxy kantor) ──────
+        // 120 req/menit cukup untuk navigasi dan form submission admin aktif
+        RateLimiter::for('admin', function (Request $request) {
+            return Limit::perMinute(120)
+                ->by('admin|' . ($request->user()?->id ?: $request->ip()))
+                ->response(fn() => response()->json([
+                    'message' => 'Terlalu banyak permintaan. Tunggu sebentar.',
+                ], 429));
         });
 
-        // Rate Limiter for POS: High Performance (500 per minute)
-        // Cashiers scan items fast, so we need a much higher limit.
-        \Illuminate\Support\Facades\RateLimiter::for('pos', function (\Illuminate\Http\Request $request) {
-            return \Illuminate\Cache\RateLimiting\Limit::perMinute(500)->by($request->user()?->id ?: $request->ip());
+        // ── POS Kasir: per User ID, limit tinggi karena scan cepat ───────────
+        // 600 req/menit = 10 req/detik, sangat cukup untuk scan barcode
+        RateLimiter::for('pos', function (Request $request) {
+            return Limit::perMinute(600)
+                ->by('pos|' . ($request->user()?->id ?: $request->ip()));
         });
 
-        // Super Admin gets all permissions implicitly
-        \Illuminate\Support\Facades\Gate::before(function ($user, $ability) {
+        // ── Self Order: Public Pages (menu, checkout wizard) ─────────────────
+        // 120 req/menit per IP — Livewire komponen reload wajar di batas ini
+        // Livewire setiap interaksi = 1 request, bukan polling
+        RateLimiter::for('self-order-page', function (Request $request) {
+            return Limit::perMinute(300)
+                ->by('so-page|' . ($request->user()?->id ?: $request->ip()))
+                ->response(fn() => response(
+                    view('errors.429', ['retryAfter' => 60]),
+                    429,
+                    ['Retry-After' => 60, 'Content-Type' => 'text/html']
+                ));
+        });
+
+        // ── Self Order API: Payment SSE & Status Check ────────────────────────
+        // Strict 20 req/menit per IP — SSE harusnya persistent, bukan polling
+        // Jika SSE disconnect, klien akan reconnect, 20 masih lebih dari cukup
+        RateLimiter::for('self-order-api', function (Request $request) {
+            return Limit::perMinute(20)
+                ->by('so-api|' . $request->ip())
+                ->response(fn() => response()->json([
+                    'message' => 'Terlalu banyak permintaan. Tunggu 60 detik.',
+                    'retry_after' => 60,
+                ], 429, ['Retry-After' => 60]));
+        });
+
+        // ── Self Order Stock API: Polling stok setiap 5 detik ────────────────
+        // Klien poll setiap 5 detik = 12 req/menit. Beri buffer 36 req/menit
+        // (toleransi 3× lipat untuk page reload atau tab ganda)
+        RateLimiter::for('self-order-stock', function (Request $request) {
+            return Limit::perMinute(36)
+                ->by('so-stock|' . $request->ip())
+                ->response(fn() => response()->json([
+                    'message' => 'Stock refresh terlalu sering.',
+                    'retry_after' => 60,
+                ], 429, ['Retry-After' => 60]));
+        });
+
+        // ── Webhook Midtrans: dari IP Midtrans saja ───────────────────────────
+        // Midtrans punya beberapa IP server, beri limit per order_id bukan IP
+        // 10 retry per order_id per menit (Midtrans retry hingga 3x, beri buffer)
+        RateLimiter::for('midtrans-webhook', function (Request $request) {
+            $orderId = $request->input('order_id', $request->ip());
+            return Limit::perMinute(10)
+                ->by('webhook|' . $orderId);
+        });
+
+        // ── Super Admin: bypass semua permission check ────────────────────────
+        Gate::before(function ($user, $ability) {
             return $user->hasRole('Super Admin') ? true : null;
         });
     }

@@ -18,6 +18,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class ComponentStockLog extends Model
 {
+    protected static function booted(): void
+    {
+        static::created(function ($log) {
+            app(\App\Services\ReportSyncService::class)->syncComponentStockLog($log);
+        });
+    }
+
     protected $fillable = [
         'component_id',
         'user_id',
