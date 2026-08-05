@@ -42,6 +42,12 @@ class QrisStatusSseController
             abort(403, 'Forbidden');
         }
 
+        // Lepaskan lock session PHP agar request Livewire/AJAX lain (mis. regenerateQris, cancelQris)
+        // tidak terblokir/delay menunggu koneksi SSE selesai.
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            session_write_close();
+        }
+
         return response()->stream(function () use ($paymentTx, $orderId) {
             $maxDuration       = 300; // 5 menit max SSE connection
             $startTime         = time();

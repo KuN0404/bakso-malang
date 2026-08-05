@@ -27,7 +27,7 @@ return new class extends Migration
             $table->decimal('total', 12, 2)->default(0);
 
             // Metadata Order
-            $table->enum('order_type', ['dine_in', 'take_away', 'pick_up'])->default('dine_in');
+            $table->enum('order_type', ['dine_in', 'take_away'])->default('dine_in');
             $table->text('notes')->nullable();
 
             // Payment

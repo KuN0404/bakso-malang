@@ -18,21 +18,21 @@
         $fontSize   = $printerConfig?->font_size_px ?? 12;
     @endphp
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: {{ $fontFamily }}; font-size: {{ $fontSize }}px; background: #f3f4f6; }
-        #receipt-content { width: {{ $paperWidth }}; margin: 16px auto; background: #fff; padding: 10px; }
+        * { margin: 0; padding: 0; box-sizing: border-box; color: #000 !important; }
+        body { font-family: {{ $fontFamily }}; font-size: {{ $fontSize }}px; background: #f3f4f6; color: #000; }
+        #receipt-content { width: {{ $paperWidth }}; margin: 16px auto; background: #fff; padding: 10px; border: 1px solid #000; }
         .center { text-align: center; }
         .bold { font-weight: bold; }
-        .divider { border-top: 1px dashed #999; margin: 8px 0; }
+        .divider { border-top: 1px dashed #000; margin: 8px 0; }
         .row { display: flex; justify-content: space-between; gap: 8px; }
         .row.indent { padding-left: 10px; }
-        .label { color: #666; font-size: 0.85em; }
+        .label { color: #000; font-size: 0.85em; }
         .store-name { font-size: 1.2em; font-weight: bold; text-transform: uppercase; }
         .queue { font-size: 2.6em; font-weight: 900; line-height: 1; }
         .no-print { text-align: center; margin-top: 16px; }
         @media print {
             body { background: #fff; }
-            #receipt-content { width: {{ $paperWidth }}; margin: 0; padding: 2mm; }
+            #receipt-content { width: {{ $paperWidth }}; margin: 0; padding: 2mm; border: none; }
             .no-print { display: none; }
             @page { size: {{ $paperWidth }} auto; margin: 2mm; }
         }
@@ -62,7 +62,10 @@
         @if($selfOrder->invoice_number)
         <div class="row"><span class="label">Invoice</span><span>{{ $selfOrder->invoice_number }}</span></div>
         @endif
-        <div class="row"><span class="label">Tipe</span><span>{{ ucfirst(str_replace('_', ' ', $selfOrder->order_type)) }}</span></div>
+        <div class="row"><span class="label">Tipe</span><span class="bold">{{ $selfOrder->order_type === 'dine_in' ? 'Makan di Tempat' : 'Bawa Pulang' }}</span></div>
+        @if($selfOrder->service_area_id)
+        <div class="row"><span class="label">Area / Meja</span><span class="bold">{{ $selfOrder->serviceArea->name ?? '-' }}</span></div>
+        @endif
         <div class="row"><span class="label">Bayar</span><span>{{ $selfOrder->payment_method_label }}</span></div>
         <div class="row"><span class="label">Waktu</span><span>{{ $selfOrder->created_at->format('d/m/Y H:i') }}</span></div>
 
@@ -78,9 +81,9 @@
             </div>
             @foreach($item->modifiers as $mod)
             <div class="row indent label">
-                <span>+ {{ $mod->modifier_name }}</span>
+                <span>+ {{ $mod->modifier_name }}{{ ($mod->quantity ?? 1) > 1 ? " ×{$mod->quantity}" : '' }}</span>
                 @if($mod->price_adjustment > 0)
-                <span>Rp {{ number_format($mod->price_adjustment * $mod->quantity, 0, ',', '.') }}</span>
+                <span>Rp {{ number_format($mod->price_adjustment * ($mod->quantity ?? 1), 0, ',', '.') }}</span>
                 @endif
             </div>
             @endforeach

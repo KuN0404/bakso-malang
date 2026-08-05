@@ -6,6 +6,7 @@ use App\Actions\SelfOrder\PlaceSelfOrderAction;
 use App\Enums\SelfOrderStatus;
 use App\Exceptions\InsufficientStockException;
 use App\Models\Category;
+use App\Models\PaymentSource;
 use App\Models\Product;
 use App\Models\Setting;
 use Illuminate\Support\Facades\Cache;
@@ -45,7 +46,7 @@ class SelfOrderPage extends Component
     #[Rule(['required', 'in:qris,cash_on_counter'])]
     public string $paymentMethod = 'qris';
 
-    #[Rule(['required', 'in:dine_in,take_away,pick_up'])]
+    #[Rule(['required', 'in:dine_in,take_away'])]
     public string $orderType = 'dine_in';
 
     #[Rule(['nullable', 'string', 'max:500'])]
@@ -91,6 +92,15 @@ class SelfOrderPage extends Component
     {
         // Idempotency key baru untuk setiap mount
         session()->put('self_order_idempotency_key', (string) Str::uuid());
+
+        // Default payment method berdasarkan metode yang aktif di Self Order
+        if ($this->isQrisAvailable) {
+            $this->paymentMethod = 'qris';
+        } elseif ($this->isCashAvailable) {
+            $this->paymentMethod = 'cash_on_counter';
+        } else {
+            $this->paymentMethod = '';
+        }
     }
 
     // -----------------------------------------------------------------
@@ -154,6 +164,18 @@ class SelfOrderPage extends Component
     public function storeName(): string
     {
         return Cache::remember('setting_store_name', 600, fn() => Setting::get('store_name', 'Resto', 'general'));
+    }
+
+    #[Computed]
+    public function isQrisAvailable(): bool
+    {
+        return PaymentSource::isQrisActiveForSelfOrder();
+    }
+
+    #[Computed]
+    public function isCashAvailable(): bool
+    {
+        return PaymentSource::isCashActiveForSelfOrder();
     }
 
     #[Computed]

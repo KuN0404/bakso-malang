@@ -62,6 +62,19 @@ class User extends Authenticatable
         return $this->shifts()->where('status', 'open')->exists();
     }
 
+    public function isSuperAdmin(): bool
+    {
+        return $this->hasRole('Super Admin');
+    }
+
+    /**
+     * Check if a Super Admin account already exists in the system.
+     */
+    public static function hasSuperAdmin(): bool
+    {
+        return static::role('Super Admin')->exists();
+    }
+
     /**
      * Open a new shift for this user.
      */

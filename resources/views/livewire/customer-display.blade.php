@@ -14,43 +14,58 @@
          detailProduct: null,
          qrisOrderId: @js($qrisOrderId),
          qrisCodeUrl: @js($qrisCodeUrl),
+         qrisAmount: @js($qrisAmount),
          qrisExpiresIn: @js($qrisExpiresIn),
          qrisExpiresAtMs: @js($qrisExpiresAtMs),
          showQris: @js($showQris),
          lastUpdatedAt: @js($lastUpdatedAt),
-         qrisCountdown: @js($qrisExpiresIn),
+         qrisCountdown: null,
          isCheckingQris: false,
          qrisStatusText: '',
          qrisTimer: null,
-         // ID order QRIS yang sudah pernah kita nyatakan kadaluarsa DI SISI CLIENT. Halaman ini
-         // menerima banyak sumber update yang tumpang tindih (broadcast langsung, $refresh()
-         // async, dan wire:poll di halaman kasir yang otomatis memicu re-sync tiap beberapa
-         // detik walau kasir tidak klik apapun). Tanpa penanda ini, salah satu sumber yang
-         // membawa qris_expires_at_ms lama bisa memicu initQrisTimer() lagi setelah countdown
-         // sempat mencapai 00:00, sehingga angkanya lompat balik ke durasi awal (mis. 4:59)
-         // lalu diam karena tick() berikutnya langsung menganggapnya sudah kadaluarsa lagi.
+         currentTimerOrderId: null,
          qrisExpiredOrderId: null,
          initQrisTimer() {
-             if (this.qrisTimer) clearInterval(this.qrisTimer);
-             if (!this.showQris || !this.qrisExpiresAtMs) return;
+             if (!this.showQris || !this.qrisExpiresAtMs) {
+                 if (this.qrisTimer) clearInterval(this.qrisTimer);
+                 this.qrisTimer = null;
+                 this.currentTimerOrderId = null;
+                 return;
+             }
              if (this.qrisOrderId && this.qrisOrderId === this.qrisExpiredOrderId) {
-                 // Order QRIS yang sama sudah dinyatakan kadaluarsa sebelumnya — kunci di 00:00,
-                 // jangan hitung ulang dari qrisExpiresAtMs walau data itu datang lagi.
+                 if (this.qrisTimer) clearInterval(this.qrisTimer);
+                 this.qrisTimer = null;
+                 this.currentTimerOrderId = this.qrisOrderId;
                  this.qrisCountdown = 0;
                  return;
              }
+             if (this.qrisTimer && this.currentTimerOrderId === this.qrisOrderId) {
+                 return;
+             }
+             this.currentTimerOrderId = this.qrisOrderId;
+             if (this.qrisTimer) clearInterval(this.qrisTimer);
              const tick = () => {
                  this.qrisCountdown = Math.max(0, Math.round((this.qrisExpiresAtMs - Date.now()) / 1000));
                  if (this.qrisCountdown <= 0) {
                      this.qrisExpiredOrderId = this.qrisOrderId;
                      clearInterval(this.qrisTimer);
+                     this.qrisTimer = null;
                  }
              };
              tick();
              this.qrisTimer = setInterval(() => tick(), 1000);
          },
          formatCountdown(seconds) {
-             if (!seconds || seconds <= 0) return '00:00';
+             if (seconds === null || seconds === undefined) {
+                 if (this.qrisExpiresAtMs) {
+                     seconds = Math.max(0, Math.round((this.qrisExpiresAtMs - Date.now()) / 1000));
+                 } else if (this.qrisExpiresIn) {
+                     seconds = this.qrisExpiresIn;
+                 } else {
+                     return '00:00';
+                 }
+             }
+             if (seconds <= 0) return '00:00';
              const m = Math.floor(seconds / 60).toString().padStart(2, '0');
              const s = (seconds % 60).toString().padStart(2, '0');
              return `${m}:${s}`;
@@ -307,14 +322,12 @@
                 <!-- Total Tagihan -->
                 <div>
                     <span class="text-xs font-semibold text-gray-400 uppercase tracking-wide block">Total Pembayaran</span>
-                    <span class="text-3xl font-extrabold text-gray-900" x-text="'Rp ' + formatNumber(total)"></span>
+                    <span class="text-3xl font-extrabold text-gray-900" x-text="'Rp ' + formatNumber(qrisAmount || total)"></span>
                 </div>
 
                 <!-- QR Code Box -->
                 <div class="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm mx-auto w-fit">
-                    <template x-if="qrisCodeUrl">
-                        <img :src="qrisCodeUrl" alt="Kode QRIS Pembayaran" class="w-56 h-56 mx-auto object-contain rounded-lg">
-                    </template>
+                    <img x-show="qrisCodeUrl" :src="qrisCodeUrl || ''" alt="Kode QRIS Pembayaran" class="w-56 h-56 mx-auto object-contain rounded-lg">
                 </div>
 
                 <!-- Live Status -->
@@ -345,18 +358,14 @@
                         :disabled="isCheckingQris"
                         class="w-full py-3.5 bg-primary-600 hover:bg-primary-700 disabled:opacity-60 text-white font-bold rounded-xl text-sm flex items-center justify-center gap-2 transition-all cursor-pointer"
                     >
-                        <template x-if="!isCheckingQris">
-                            <span class="flex items-center gap-2">
-                                <x-lucide name="refresh-cw" class="w-4.5 h-4.5" />
-                                <span>Cek Status Pembayaran</span>
-                            </span>
-                        </template>
-                        <template x-if="isCheckingQris">
-                            <span class="flex items-center gap-2">
-                                <div class="animate-spin w-4.5 h-4.5 border-2 border-white border-t-transparent rounded-full"></div>
-                                <span>Mengecek Status...</span>
-                            </span>
-                        </template>
+                        <span x-show="!isCheckingQris" class="flex items-center gap-2">
+                            <x-lucide name="refresh-cw" class="w-4.5 h-4.5" />
+                            <span>Cek Status Pembayaran</span>
+                        </span>
+                        <span x-show="isCheckingQris" x-cloak class="flex items-center gap-2">
+                            <div class="animate-spin w-4.5 h-4.5 border-2 border-white border-t-transparent rounded-full"></div>
+                            <span>Mengecek Status...</span>
+                        </span>
                     </button>
                 </div>
             </div>
@@ -580,9 +589,7 @@
                          root.__x.$data.qrisExpiresIn = @this.qrisExpiresIn;
                          root.__x.$data.qrisExpiresAtMs = @this.qrisExpiresAtMs;
                          root.__x.$data.showQris = @this.showQris;
-                         if (@this.showQris && @this.qrisExpiresAtMs) {
-                             root.__x.$data.initQrisTimer();
-                         }
+                         root.__x.$data.initQrisTimer();
                      }
                  });
              };

@@ -30,6 +30,8 @@ class Categories extends Component
 
     public bool $is_active = true;
 
+    public string $target_kitchen = 'food';
+
     public string $search = '';
 
     // Cache lastSortOrder to avoid repeated queries
@@ -51,9 +53,10 @@ class Categories extends Component
 
     public function create(): void
     {
-        $this->reset(['editingId', 'name', 'description', 'icon', 'sort_order', 'is_active']);
+        $this->reset(['editingId', 'name', 'description', 'icon', 'sort_order', 'is_active', 'target_kitchen']);
         $this->icon = 'folder';
         $this->is_active = true;
+        $this->target_kitchen = 'food';
         // Auto-fill with next sort order
         $this->sort_order = $this->lastSortOrder + 1;
         $this->showModal = true;
@@ -68,6 +71,7 @@ class Categories extends Component
         $this->icon = $category->icon ?? 'folder';
         $this->sort_order = $category->sort_order;
         $this->is_active = $category->is_active;
+        $this->target_kitchen = $category->target_kitchen ? $category->target_kitchen->value : 'food';
         $this->showModal = true;
     }
 
@@ -82,6 +86,7 @@ class Categories extends Component
             'icon' => 'nullable|max:50',
             'sort_order' => 'required|integer|min:0',
             'is_active' => 'boolean',
+            'target_kitchen' => 'required|in:food,drink,none',
         ];
         
         $this->validate($rules);
@@ -100,6 +105,7 @@ class Categories extends Component
             'icon' => $this->icon,
             'sort_order' => $this->sort_order,
             'is_active' => $this->is_active,
+            'target_kitchen' => $this->target_kitchen,
         ];
 
         if ($this->editingId) {
@@ -111,7 +117,7 @@ class Categories extends Component
         }
 
         $this->showModal = false;
-        $this->reset(['editingId', 'name', 'description', 'icon', 'sort_order', 'is_active']);
+        $this->reset(['editingId', 'name', 'description', 'icon', 'sort_order', 'is_active', 'target_kitchen']);
         $this->refreshOrderCache();
     }
 

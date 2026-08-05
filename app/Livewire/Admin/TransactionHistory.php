@@ -28,6 +28,9 @@ class TransactionHistory extends Component
     #[Url(except: '')]
     public ?int $filterCashier = null;
 
+    #[Url(except: '')]
+    public ?string $filterOrderType = null;
+
     // Period type: daily, weekly, monthly, yearly
     #[Url(except: 'daily')]
     public string $periodType = 'daily';
@@ -78,6 +81,11 @@ class TransactionHistory extends Component
     }
 
     public function updatingFilterCashier(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatingFilterOrderType(): void
     {
         $this->resetPage();
     }
@@ -161,6 +169,7 @@ class TransactionHistory extends Component
         $this->search = '';
 
         $this->filterCashier = null;
+        $this->filterOrderType = null;
         $this->periodType = 'daily';
         $this->startDate = $now->format('Y-m-d');
         $this->endDate = $now->format('Y-m-d');
@@ -281,15 +290,15 @@ class TransactionHistory extends Component
         $start = Carbon::parse($this->startDate)->startOfDay();
         $end = Carbon::parse($this->endDate)->endOfDay();
 
-        $transactions = Transaction::getPaginatedHistory($start, $end, $this->search ?: null, $this->filterCashier, 15);
+        $transactions = Transaction::getPaginatedHistory($start, $end, $this->search ?: null, $this->filterCashier, $this->filterOrderType ?: null, 15);
 
         // Smart pagination
         if ($transactions->lastPage() < $this->getPage() && $transactions->lastPage() > 0) {
             $this->setPage($transactions->lastPage());
-            $transactions = Transaction::getPaginatedHistory($start, $end, $this->search ?: null, $this->filterCashier, 15);
+            $transactions = Transaction::getPaginatedHistory($start, $end, $this->search ?: null, $this->filterCashier, $this->filterOrderType ?: null, 15);
         }
 
-        $summary = Transaction::getSummaryStats($start, $end, $this->filterCashier);
+        $summary = Transaction::getSummaryStats($start, $end, $this->filterCashier, $this->filterOrderType ?: null);
         $cashiers = User::getCashiersWithTransactions();
 
         $months = [

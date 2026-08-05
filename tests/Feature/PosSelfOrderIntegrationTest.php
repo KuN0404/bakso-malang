@@ -373,7 +373,7 @@ class PosSelfOrderIntegrationTest extends TestCase
         $this->openShiftFor($cashier);
         $this->actingAs($cashier);
 
-        $order = $this->makeSelfOrder(['status' => SelfOrderStatus::Paid->value]);
+        $order = $this->makeSelfOrder(['status' => SelfOrderStatus::Paid->value, 'order_type' => 'take_away']);
 
         Livewire::test(SelfOrderDashboard::class)
             ->set('activeTab', 'paid')
@@ -396,7 +396,7 @@ class PosSelfOrderIntegrationTest extends TestCase
         $this->grantPermissions($cashier, ['manage_self_orders', 'view_self_orders']);
         $this->actingAs($cashier);
 
-        $order = $this->makeSelfOrder(['status' => SelfOrderStatus::Paid->value]);
+        $order = $this->makeSelfOrder(['status' => SelfOrderStatus::Paid->value, 'order_type' => 'take_away']);
 
         Livewire::test(SelfOrderDashboard::class)
             ->call('claimOrder', $order->id)

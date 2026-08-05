@@ -83,6 +83,18 @@ class PosCheckout extends Component
     public string $paymentMethod = 'cash';
     public float $paidAmount = 0;
     public string $customerName = '';
+    public ?string $qrisOrderId = null;
+    public ?string $qrisCodeUrl = null;
+    public float $qrisAmount = 0;
+    public ?string $qrisInvoiceNumber = null;
+    public int $qrisExpiresIn = 0;
+    public ?int $qrisExpiresAtMs = null;
+    public bool $showQrisModal = false;
+    public bool $qrisGenerating = false;
+    public bool $showCloseShiftModal = false;
+    public bool $showShiftReceiptModal = false;
+    public ?Shift $printShift = null;
+
     public string $orderType = 'dine_in';
     public ?int $selectedServiceAreaId = null;
     public string $notes = '';
@@ -92,9 +104,6 @@ class PosCheckout extends Component
     public string $searchQuery = '';
     public bool $showPaymentModal = false;
     public bool $showReceiptModal = false;
-    public bool $showCloseShiftModal = false;
-    public bool $showShiftReceiptModal = false;
-    public ?Shift $printShift = null;
 
     // Close shift form
     public float $openingCash = 0;
@@ -108,14 +117,7 @@ class PosCheckout extends Component
     public string $paymentIdempotencyKey = '';
     public string $returnIdempotencyKey = '';
 
-    // ── QRIS Payment State ───────────────────────────────────────────────
-    public bool $showQrisModal = false;
-    public ?string $qrisOrderId = null;       // Midtrans order_id untuk SSE
-    public ?string $qrisCodeUrl = null;       // URL QR code image dari Midtrans
-    public ?string $qrisInvoiceNumber = null; // Invoice number yang sedang menunggu QRIS
-    public int $qrisExpiresIn = 0;            // Countdown dalam detik (diupdate oleh SSE)
-    public ?int $qrisExpiresAtMs = null;      // Target waktu absolut (epoch ms) — sumber tunggal agar POS & Display singkron
-    public bool $qrisGenerating = false;      // Loading state saat generate QR
+
 
     // History & Reprint
     public bool $showHistoryModal = false;
@@ -394,6 +396,7 @@ class PosCheckout extends Component
             if ($activeTx && !$activeTx->isQrisExpiredByTime()) {
                 $this->qrisOrderId       = $activeTx->midtrans_order_id;
                 $this->qrisCodeUrl       = $activeTx->qr_code_url;
+                $this->qrisAmount        = (float) $activeTx->amount;
                 $this->qrisInvoiceNumber = $activeTx->invoice_number;
                 $this->qrisExpiresIn     = (int) max(0, now()->diffInSeconds($activeTx->expired_at, false));
                 $this->qrisExpiresAtMs   = $activeTx->expired_at?->valueOf();
@@ -441,7 +444,7 @@ class PosCheckout extends Component
     #[Computed]
     public function paymentSources()
     {
-        return PaymentSource::active()->ordered()->get();
+        return PaymentSource::getForPos();
     }
 
     #[Computed]
@@ -462,6 +465,33 @@ class PosCheckout extends Component
     public function unclosedPreviousShift(): ?Shift
     {
         return Shift::getUnclosedPreviousShift(auth()->id());
+    }
+
+    #[Computed]
+    public function unclosedShiftModalData(): ?Shift
+    {
+        if (!$this->unclosedShiftId) {
+            return null;
+        }
+        return Shift::with('completedTransactions')->find($this->unclosedShiftId);
+    }
+
+    #[Computed]
+    public function logoWeb(): ?string
+    {
+        return Setting::get('logo_web', null, 'general');
+    }
+
+    #[Computed]
+    public function generalSettings(): array
+    {
+        return Setting::getGroup('general');
+    }
+
+    #[Computed]
+    public function receiptSettings(): array
+    {
+        return Setting::getGroup('receipt');
     }
 
     #[Computed]
@@ -618,6 +648,11 @@ class PosCheckout extends Component
             ];
         }
 
+        if ($this->qrisOrderId) {
+            $this->cancelQris();
+            $this->dispatch('notify', type: 'warning', message: 'Keranjang diubah. QRIS sebelumnya dibatalkan.');
+        }
+
         $this->dispatch('notify', type: 'success', message: "{$product->name} ditambahkan");
         $this->broadcastCartState();
     }
@@ -649,6 +684,11 @@ class PosCheckout extends Component
 
             $this->cart[$cartKey]['quantity'] = $quantity;
             $this->recalculateCartItem($cartKey);
+
+            if ($this->qrisOrderId) {
+                $this->cancelQris();
+                $this->dispatch('notify', type: 'warning', message: 'Keranjang diubah. QRIS sebelumnya dibatalkan.');
+            }
         }
     }
 
@@ -666,11 +706,19 @@ class PosCheckout extends Component
     public function removeFromCart(string $cartKey): void
     {
         unset($this->cart[$cartKey]);
-        $this->broadcastCartState();
+        if ($this->qrisOrderId) {
+            $this->cancelQris();
+            $this->dispatch('notify', type: 'warning', message: 'Keranjang diubah. QRIS sebelumnya dibatalkan.');
+        } else {
+            $this->broadcastCartState();
+        }
     }
 
     public function clearCart(): void
     {
+        if ($this->qrisOrderId) {
+            $this->cancelQris();
+        }
         $this->cart                  = [];
         $this->paidAmount            = 0;
         $this->customerName          = '';
@@ -817,6 +865,7 @@ class PosCheckout extends Component
 
             $this->qrisOrderId   = $paymentTx->midtrans_order_id;
             $this->qrisCodeUrl   = $paymentTx->qr_code_url;
+            $this->qrisAmount    = (float) $paymentTx->amount;
             $this->qrisExpiresIn   = $paymentTx->expired_at ? (int) now()->diffInSeconds($paymentTx->expired_at, false) : 300;
             $this->qrisExpiresAtMs = $paymentTx->expired_at?->valueOf();
             $this->showPaymentModal = false;
@@ -849,6 +898,7 @@ class PosCheckout extends Component
         $this->showReceiptModal = true;
         $this->qrisOrderId      = null;
         $this->qrisCodeUrl      = null;
+        $this->qrisAmount       = 0;
         $this->qrisInvoiceNumber = null;
 
         $this->clearCart();
@@ -907,6 +957,7 @@ class PosCheckout extends Component
         $this->showQrisModal      = false;
         $this->qrisOrderId        = null;
         $this->qrisCodeUrl        = null;
+        $this->qrisAmount         = 0;
         $this->qrisInvoiceNumber  = null;
         $this->showPaymentModal   = true; // Kembali ke modal pilih metode
         $this->broadcastCartState();
@@ -924,13 +975,14 @@ class PosCheckout extends Component
     }
 
     /**
-     * Buka kembali modal QRIS yang sedang aktif & pending.
+     * Buka kembali modal QRIS yang sedang dibuat (termasuk jika kadaluarsa agar kasir dapat menekan "Buat QRIS Baru").
      */
     public function reopenQris(): void
     {
         if ($this->qrisOrderId && $this->qrisCodeUrl) {
             $paymentTx = PaymentTransaction::where('midtrans_order_id', $this->qrisOrderId)->first();
-            if ($paymentTx && $paymentTx->isPending() && !$paymentTx->isQrisExpiredByTime()) {
+            if ($paymentTx && !$paymentTx->isPaid() && !$paymentTx->isCancelled()) {
+                $this->qrisAmount       = (float) $paymentTx->amount;
                 $this->qrisExpiresIn    = (int) max(0, now()->diffInSeconds($paymentTx->expired_at, false));
                 $this->qrisExpiresAtMs  = $paymentTx->expired_at?->valueOf();
                 $this->showPaymentModal = false;
@@ -940,7 +992,7 @@ class PosCheckout extends Component
             }
         }
 
-        $this->dispatch('notify', type: 'error', message: 'Tidak ada QRIS aktif yang valid.');
+        $this->dispatch('notify', type: 'error', message: 'Tidak ada QRIS aktif yang dapat dibuka.');
     }
 
     /**
@@ -952,6 +1004,7 @@ class PosCheckout extends Component
         // Invoice number tetap sama
         $this->qrisOrderId = null;
         $this->qrisCodeUrl = null;
+        $this->qrisAmount  = 0;
         $this->showQrisModal = false;
         $this->showPaymentModal = false;
 
@@ -1122,8 +1175,8 @@ class PosCheckout extends Component
 
         $pendingItems = TransactionDetail::getPendingItemsForShift($shift->id);
 
-        $this->pendingFoodCount  = $pendingItems->filter(fn($item) => $item->product->category->slug !== 'minuman')->count();
-        $this->pendingDrinkCount = $pendingItems->filter(fn($item) => $item->product->category->slug === 'minuman')->count();
+        $this->pendingFoodCount  = $pendingItems->filter(fn($item) => $item->product->category->target_kitchen?->value !== 'drink')->count();
+        $this->pendingDrinkCount = $pendingItems->filter(fn($item) => $item->product->category->target_kitchen?->value === 'drink')->count();
 
         $this->openingCash    = 0;
         $this->actualCash     = 0;
@@ -1322,14 +1375,22 @@ class PosCheckout extends Component
 
     protected function generateCartKey(int $productId, array $modifiers): string
     {
-        $modifierIds = array_keys($modifiers);
-        sort($modifierIds);
-        return $productId . '_' . implode('_', $modifierIds);
+        $parts = [];
+        foreach ($modifiers as $modId => $mod) {
+            $qty = (int) ($mod['qty'] ?? 1);
+            $parts[] = $modId . 'x' . $qty;
+        }
+        sort($parts);
+        return $productId . '_' . implode('_', $parts);
     }
 
     protected function calculateModifierTotal(array $modifiers): float
     {
-        return collect($modifiers)->sum('price');
+        return collect($modifiers)->sum(function ($mod) {
+            $price = (float) ($mod['price'] ?? 0);
+            $qty   = (int) ($mod['qty'] ?? 1);
+            return $price * $qty;
+        });
     }
 
     protected function recalculateCartItem(string $cartKey): void
@@ -1364,6 +1425,7 @@ class PosCheckout extends Component
             'cashier_name'             => auth()->user()->name,
             'qris_order_id'            => $this->qrisOrderId,
             'qris_code_url'            => $this->qrisCodeUrl,
+            'qris_amount'              => $this->qrisAmount,
             'qris_expires_in'          => $this->qrisExpiresIn,
             'qris_expires_at_ms'       => $this->qrisExpiresAtMs,
             'show_qris'                => $this->showQrisModal,
@@ -1427,6 +1489,10 @@ class PosCheckout extends Component
         array_unshift($pendingCarts, $pendingData);
         \Illuminate\Support\Facades\Cache::put('pos_pending_carts_' . auth()->id(), $pendingCarts, now()->addHours(12));
 
+        if ($this->qrisOrderId) {
+            $this->cancelQris();
+        }
+
         $this->cart = [];
         $this->customerName = '';
         $this->notes = '';
@@ -1445,6 +1511,10 @@ class PosCheckout extends Component
 
     public function restorePendingCart(string $pendingId): void
     {
+        if ($this->qrisOrderId) {
+            $this->cancelQris();
+        }
+
         $pendingCarts = \Illuminate\Support\Facades\Cache::get('pos_pending_carts_' . auth()->id(), []);
         $targetIndex = null;
         $targetCart = null;

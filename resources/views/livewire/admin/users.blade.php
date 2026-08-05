@@ -48,9 +48,16 @@
                             @endforeach
                         </td>
                         <td class="px-6 py-4 text-right">
-                            <button wire:click="edit({{ $user->id }})" class="p-2 text-gray-400 hover:text-primary-600 rounded-lg hover:bg-gray-100">
-                                <i data-lucide="edit" class="w-4 h-4"></i>
-                            </button>
+                            @if(!$user->hasRole('Super Admin') || auth()->user()->hasRole('Super Admin'))
+                                <button wire:click="edit({{ $user->id }})" class="p-2 text-gray-400 hover:text-primary-600 rounded-lg hover:bg-gray-100" title="Edit User">
+                                    <i data-lucide="edit" class="w-4 h-4"></i>
+                                </button>
+                            @else
+                                <button disabled class="p-2 text-gray-300 rounded-lg cursor-not-allowed" title="Hanya Super Admin yang berhak mengedit Super Admin">
+                                    <i data-lucide="edit" class="w-4 h-4"></i>
+                                </button>
+                            @endif
+
                             @if($user->id !== auth()->id() && !$user->hasRole('Super Admin'))
                                 <button 
                                     @click="$dispatch('confirm-action', {
@@ -62,11 +69,12 @@
                                         params: {{ $user->id }}
                                     })"
                                     class="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-gray-100"
+                                    title="Hapus User"
                                 >
                                     <i data-lucide="trash-2" class="w-4 h-4"></i>
                                 </button>
-                            @elseif($user->hasRole('Super Admin') && $user->id !== auth()->id())
-                                <button disabled class="p-2 text-gray-300 rounded-lg cursor-not-allowed" title="Super Admin tidak dapat dihapus">
+                            @else
+                                <button disabled class="p-2 text-gray-300 rounded-lg cursor-not-allowed" title="{{ $user->hasRole('Super Admin') ? 'User Super Admin tidak dapat dihapus' : 'Tidak dapat menghapus akun sendiri' }}">
                                     <i data-lucide="trash-2" class="w-4 h-4"></i>
                                 </button>
                             @endif
@@ -101,16 +109,12 @@
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Nama Lengkap *</label>
-                        <input type="text" wire:model="name"
-                            class="w-full px-4 py-2 border border-gray-200 rounded-lg {{ $isEditingSuperAdmin ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : '' }}"
-                            {{ $isEditingSuperAdmin ? 'disabled' : '' }}>
+                        <input type="text" wire:model="name" class="w-full px-4 py-2 border border-gray-200 rounded-lg">
                         @error('name') <p class="text-red-500 text-sm mt-1">{{ $message }}</p> @enderror
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Email *</label>
-                        <input type="email" wire:model="email"
-                            class="w-full px-4 py-2 border border-gray-200 rounded-lg {{ $isEditingSuperAdmin ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : '' }}"
-                            {{ $isEditingSuperAdmin ? 'disabled' : '' }}>
+                        <input type="email" wire:model="email" class="w-full px-4 py-2 border border-gray-200 rounded-lg">
                         @error('email') <p class="text-red-500 text-sm mt-1">{{ $message }}</p> @enderror
                     </div>
                     <div>

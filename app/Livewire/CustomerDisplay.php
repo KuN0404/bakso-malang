@@ -22,6 +22,7 @@ class CustomerDisplay extends Component
 
     public ?string $qrisOrderId = null;
     public ?string $qrisCodeUrl = null;
+    public float $qrisAmount = 0;
     public int $qrisExpiresIn = 0;
     public ?int $qrisExpiresAtMs = null;
     public bool $showQris = false;
@@ -69,6 +70,7 @@ class CustomerDisplay extends Component
                 $this->cashierName   = $data['cashier_name'] ?? '';
                 $this->qrisOrderId   = $data['qris_order_id'] ?? null;
                 $this->qrisCodeUrl   = $data['qris_code_url'] ?? null;
+                $this->qrisAmount    = (float) ($data['qris_amount'] ?? 0);
                 $this->qrisExpiresIn   = $data['qris_expires_in'] ?? 0;
                 $this->qrisExpiresAtMs = $data['qris_expires_at_ms'] ?? null;
                 $this->showQris        = $data['show_qris'] ?? false;
@@ -90,6 +92,7 @@ class CustomerDisplay extends Component
         $this->customerName  = '';
         $this->qrisOrderId   = null;
         $this->qrisCodeUrl   = null;
+        $this->qrisAmount    = 0;
         $this->qrisExpiresIn   = 0;
         $this->qrisExpiresAtMs = null;
         $this->showQris        = false;

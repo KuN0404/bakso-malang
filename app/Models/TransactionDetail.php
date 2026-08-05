@@ -200,18 +200,21 @@ class TransactionDetail extends Model
 
     /**
      * Get pending items grouped by transaction for Kitchen Display.
+     * Supports array of shift IDs and KitchenTarget classification.
      */
-    public static function getKitchenQueue(int $shiftId, array $categorySlugs): Collection
+    public static function getKitchenQueue(array $shiftIds, \App\Enums\KitchenTarget|string $target): Collection
     {
+        $targetValue = $target instanceof \App\Enums\KitchenTarget ? $target->value : $target;
+
         return static::query()
             ->with(['transaction.user', 'transaction.serviceArea', 'product.category', 'modifiers'])
-            ->whereHas('transaction', function ($q) use ($shiftId) {
-                $q->where('shift_id', $shiftId)
+            ->whereHas('transaction', function ($q) use ($shiftIds) {
+                $q->when(!empty($shiftIds), fn($sq) => $sq->whereIn('shift_id', $shiftIds))
                   ->whereIn('status', ['pending', 'completed']);
             })
             ->where('status', 'pending')
-            ->whereHas('product.category', function ($q) use ($categorySlugs) {
-                $q->whereIn('slug', $categorySlugs);
+            ->whereHas('product.category', function ($q) use ($targetValue) {
+                $q->where('target_kitchen', $targetValue);
             })
             ->orderBy('created_at', 'asc')
             ->get();
@@ -265,7 +268,7 @@ class TransactionDetail extends Model
     public function getModifierNamesAttribute(): string
     {
         return $this->modifiers->map(function ($m) {
-            $qty = ($m->pivot->quantity ?? 1) > 1 ? " \u00d7{$m->pivot->quantity}" : '';
+            $qty = ($m->pivot->quantity ?? 1) > 1 ? " ×{$m->pivot->quantity}" : '';
             return $m->pivot->modifier_name . $qty;
         })->implode(', ');
     }

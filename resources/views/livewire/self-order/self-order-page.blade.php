@@ -334,8 +334,8 @@
             {{-- Order Type --}}
             <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                 <div class="px-4 py-3 border-b border-gray-100 font-semibold text-gray-700 text-sm">Tipe Order</div>
-                <div class="px-4 py-4 grid grid-cols-3 gap-2">
-                    @foreach(['dine_in' => 'Makan di Sini', 'take_away' => 'Bawa Pulang', 'pick_up' => 'Ambil Sendiri'] as $type => $label)
+                <div class="px-4 py-4 grid grid-cols-2 gap-2">
+                    @foreach(['dine_in' => 'Makan di Sini', 'take_away' => 'Bawa Pulang'] as $type => $label)
                     <button wire:click="$set('orderType', '{{ $type }}')"
                         class="py-2.5 rounded-xl text-xs font-semibold border transition
                             {{ $orderType === $type ? 'bg-brand text-white border-blue-600 shadow-sm' : 'bg-gray-50 text-gray-600 border-gray-200' }}">
@@ -346,9 +346,11 @@
             </div>
 
             {{-- Payment Method --}}
+            @if($this->isQrisAvailable || $this->isCashAvailable)
             <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                 <div class="px-4 py-3 border-b border-gray-100 font-semibold text-gray-700 text-sm">Metode Pembayaran</div>
-                <div class="px-4 py-4 grid grid-cols-2 gap-3">
+                <div class="px-4 py-4 grid {{ ($this->isQrisAvailable && $this->isCashAvailable) ? 'grid-cols-2' : 'grid-cols-1' }} gap-3">
+                    @if($this->isQrisAvailable)
                     <button wire:click="$set('paymentMethod', 'qris')"
                         class="flex flex-col items-center gap-2 py-4 rounded-xl border-2 transition
                             {{ $paymentMethod === 'qris' ? 'border-blue-500 bg-blue-50/50' : 'border-gray-200 bg-gray-50' }}">
@@ -360,7 +362,9 @@
                         <span class="text-xs font-bold {{ $paymentMethod === 'qris' ? 'text-brand' : 'text-gray-600' }}">QRIS</span>
                         <span class="text-[11px] text-gray-400">Bayar sekarang</span>
                     </button>
+                    @endif
 
+                    @if($this->isCashAvailable)
                     <button wire:click="$set('paymentMethod', 'cash_on_counter')"
                         class="flex flex-col items-center gap-2 py-4 rounded-xl border-2 transition
                             {{ $paymentMethod === 'cash_on_counter' ? 'border-blue-500 bg-blue-50/50' : 'border-gray-200 bg-gray-50' }}">
@@ -372,8 +376,14 @@
                         <span class="text-xs font-bold {{ $paymentMethod === 'cash_on_counter' ? 'text-brand' : 'text-gray-600' }}">Bayar di Kasir</span>
                         <span class="text-[11px] text-gray-400">Bayar saat ambil</span>
                     </button>
+                    @endif
                 </div>
             </div>
+            @else
+            <div class="p-4 bg-yellow-50 border border-yellow-200 rounded-2xl text-center text-xs text-yellow-700 font-medium">
+                Metode pembayaran sementara tidak tersedia.
+            </div>
+            @endif
 
             {{-- Honeypot (anti-bot) --}}
             <input type="text" name="website_url" tabindex="-1" aria-hidden="true"

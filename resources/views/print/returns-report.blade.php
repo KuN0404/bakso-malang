@@ -11,6 +11,10 @@
                 break-inside: avoid;
             }
         }
+        * {
+            color: #000 !important;
+            border-color: #000 !important;
+        }
         @media print {
             @page {
                 size: {{ $format == '58mm' ? '58mm auto' : ($format == '76mm' ? '76mm auto' : ($format == 'A5' ? 'A5 landscape' : 'A4 portrait')) }};
@@ -20,6 +24,7 @@
                 -webkit-print-color-adjust: exact;
                 print-color-adjust: exact;
                 width: {{ $format == '58mm' ? '58mm' : ($format == '76mm' ? '76mm' : '100%') }};
+                color: #000 !important;
             }
         }
     </style>

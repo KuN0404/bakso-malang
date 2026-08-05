@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -15,6 +16,17 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        // ── Force HTTPS ──────────────────────────────────────────────────────────
+        // Cloudflare mengirim request ke origin (VPS) sebagai HTTP, meskipun
+        // client mengakses via HTTPS. Laravel harus di-force agar semua
+        // generated URL (asset, redirect, dll) tetap pakai https://.
+        //
+        // Di .env production wajib set: FORCE_HTTPS=true
+        // Di .env local/staging cukup biarkan false (default).
+        if ($this->app->environment('production') || (bool) env('FORCE_HTTPS', false)) {
+            URL::forceScheme('https');
+        }
+
         // ── Admin Panel: per User ID (bukan IP, karena bisa proxy kantor) ──────
         // 120 req/menit cukup untuk navigasi dan form submission admin aktif
         RateLimiter::for('admin', function (Request $request) {

@@ -18,18 +18,32 @@
     </div>
 
     <!-- Summary Cards -->
-    <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
         <div class="bg-white rounded-xl p-4 border border-gray-100">
-            <p class="text-sm text-gray-500">Total Transaksi</p>
-            <p class="text-2xl font-bold text-gray-800">{{ number_format($summary['total_transactions']) }}</p>
+            <p class="text-xs text-gray-500">Total Transaksi</p>
+            <p class="text-xl font-bold text-gray-800">{{ number_format($summary['total_transactions']) }}</p>
         </div>
         <div class="bg-white rounded-xl p-4 border border-gray-100">
-            <p class="text-sm text-gray-500">Total Pendapatan</p>
-            <p class="text-2xl font-bold text-green-600">Rp {{ number_format($summary['total_revenue'], 0, ',', '.') }}</p>
+            <p class="text-xs text-gray-500">Total Pendapatan</p>
+            <p class="text-xl font-bold text-green-600">Rp {{ number_format($summary['total_revenue'], 0, ',', '.') }}</p>
+        </div>
+        <div class="bg-white rounded-xl p-4 border border-purple-100 bg-purple-50/30">
+            <div class="flex items-center gap-1.5 text-xs text-purple-700 font-semibold mb-0.5">
+                <i data-lucide="utensils" class="w-3.5 h-3.5"></i>
+                Makan di Tempat
+            </div>
+            <p class="text-lg font-bold text-purple-900">{{ number_format($summary['dine_in_count']) }} <span class="text-xs text-purple-600 font-normal">(Rp {{ number_format($summary['dine_in_revenue'], 0, ',', '.') }})</span></p>
+        </div>
+        <div class="bg-white rounded-xl p-4 border border-amber-100 bg-amber-50/30">
+            <div class="flex items-center gap-1.5 text-xs text-amber-700 font-semibold mb-0.5">
+                <i data-lucide="shopping-bag" class="w-3.5 h-3.5"></i>
+                Bawa Pulang
+            </div>
+            <p class="text-lg font-bold text-amber-900">{{ number_format($summary['take_away_count']) }} <span class="text-xs text-amber-600 font-normal">(Rp {{ number_format($summary['take_away_revenue'], 0, ',', '.') }})</span></p>
         </div>
         <div class="bg-white rounded-xl p-4 border border-gray-100">
-            <p class="text-sm text-gray-500">Rata-rata per Transaksi</p>
-            <p class="text-2xl font-bold text-blue-600">Rp {{ $summary['total_transactions'] > 0 ? number_format($summary['total_revenue'] / $summary['total_transactions'], 0, ',', '.') : 0 }}</p>
+            <p class="text-xs text-gray-500">Rata-rata / Trx</p>
+            <p class="text-xl font-bold text-blue-600">Rp {{ $summary['total_transactions'] > 0 ? number_format($summary['total_revenue'] / $summary['total_transactions'], 0, ',', '.') : 0 }}</p>
         </div>
     </div>
 
@@ -237,6 +251,12 @@
                     >
                     <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400"></i>
                 </div>
+                <!-- Order Type Filter -->
+                <select wire:model.live="filterOrderType" class="px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-100 focus:border-primary-500 outline-none transition-all">
+                    <option value="">Semua Tipe Order</option>
+                    <option value="dine_in">Makan di Tempat</option>
+                    <option value="take_away">Bawa Pulang</option>
+                </select>
                 <!-- Cashier Filter -->
                 <select wire:model.live="filterCashier" class="px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-100 focus:border-primary-500 outline-none transition-all">
                     <option value="">Semua Kasir</option>
@@ -257,6 +277,7 @@
                         <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Invoice</th>
                         <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Waktu</th>
                         <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Kasir</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Tipe Order</th>
                         <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Pembayaran</th>
                         <th class="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Total</th>
                         <th class="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Cetak</th>
@@ -277,7 +298,20 @@
                                 {{ $transaction->user->name ?? '-' }}
                             </td>
                             <td class="px-4 py-3 text-sm">
-                                <span class="px-2 py-1 rounded-full text-xs font-medium {{ 
+                                @if($transaction->order_type === 'dine_in')
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-xs font-bold bg-purple-100 text-purple-800">
+                                        <i data-lucide="utensils" class="w-3 h-3"></i>
+                                        Makan di Tempat
+                                    </span>
+                                @else
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-xs font-bold bg-amber-100 text-amber-800">
+                                        <i data-lucide="shopping-bag" class="w-3 h-3"></i>
+                                        Bawa Pulang
+                                    </span>
+                                @endif
+                            </td>
+                            <td class="px-4 py-3 text-sm">
+                                <span class="px-2 py-1 rounded-lg text-xs font-bold {{ 
                                     $transaction->payment_method === 'cash' ? 'bg-green-100 text-green-700' : 
                                     ($transaction->payment_method === 'qris' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700') 
                                 }}">
@@ -311,7 +345,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7" class="px-4 py-8 text-center text-gray-500">
+                            <td colspan="8" class="px-4 py-8 text-center text-gray-500">
                                 Tidak ada transaksi ditemukan
                             </td>
                         </tr>
@@ -364,6 +398,40 @@
                                             <p class="text-sm font-bold text-gray-900">Rp {{ number_format($selectedTransaction->total, 0, ',', '.') }}</p>
                                         </div>
                                     </div>
+
+                                    @if($selectedTransaction->selfOrder)
+                                        <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4 text-xs space-y-2">
+                                            <div class="flex items-center justify-between font-bold text-amber-900 border-b border-amber-200/80 pb-2">
+                                                <span class="flex items-center gap-1.5">
+                                                    <i data-lucide="smartphone" class="w-4 h-4 text-amber-700"></i>
+                                                    Pesanan Mandiri (QR Order) #{{ $selectedTransaction->selfOrder->queue_display }}
+                                                </span>
+                                                <span class="px-2.5 py-0.5 rounded-lg text-[11px] font-bold {{ $selectedTransaction->selfOrder->order_type === 'dine_in' ? 'bg-purple-100 text-purple-800' : 'bg-amber-100 text-amber-800' }}">
+                                                    {{ $selectedTransaction->selfOrder->order_type === 'dine_in' ? 'Makan di Tempat' : 'Bawa Pulang' }}
+                                                </span>
+                                            </div>
+                                            <div class="grid grid-cols-2 gap-2.5 text-gray-800 pt-1">
+                                                <div>
+                                                    <span class="text-gray-500 block text-[11px]">Nama Pemesan</span>
+                                                    <strong class="text-sm text-gray-900">{{ $selectedTransaction->selfOrder->customer_name }}</strong>
+                                                </div>
+                                                <div>
+                                                    <span class="text-gray-500 block text-[11px]">No. HP Pemesan</span>
+                                                    <strong class="text-sm font-mono text-gray-900">{{ $selectedTransaction->selfOrder->customer_phone }}</strong>
+                                                </div>
+                                                @if($selectedTransaction->selfOrder->order_type === 'take_away')
+                                                    <div class="col-span-2 pt-2 border-t border-amber-200/60 mt-1">
+                                                        <span class="text-amber-800 font-semibold uppercase text-[10px] tracking-wider block mb-0.5">Pengambil Pesanan (Serah Terima)</span>
+                                                        <p class="text-sm font-bold text-gray-900">{{ $selectedTransaction->selfOrder->pickup_display_name }}</p>
+                                                        <p class="text-xs font-mono text-gray-600">{{ $selectedTransaction->selfOrder->pickup_display_phone }}</p>
+                                                        @if($selectedTransaction->selfOrder->pickup_confirmed_at)
+                                                            <p class="text-[11px] text-emerald-700 font-medium mt-0.5">✓ Dikonfirmasi: {{ $selectedTransaction->selfOrder->pickup_confirmed_at->format('d/m/Y H:i') }}</p>
+                                                        @endif
+                                                    </div>
+                                                @endif
+                                            </div>
+                                        </div>
+                                    @endif
 
                                     <div class="bg-gray-50 rounded-lg p-4">
                                         <p class="text-xs font-semibold text-gray-500 uppercase mb-2">Item Pembelian</p>

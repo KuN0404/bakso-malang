@@ -1,6 +1,6 @@
 <div class="flex flex-col min-h-screen bg-gray-50"
     x-data
-    wire:poll.{{ $refreshInterval }}ms.visible="refreshStatus">
+    @if($refreshInterval > 0) wire:poll.{{ $refreshInterval }}ms.visible="refreshStatus" @endif>
 
     {{-- Header --}}
     <header class="bg-brand text-white px-4 py-4 shadow-md">
@@ -12,7 +12,7 @@
             </a>
             <div>
                 <h1 class="font-bold text-lg">Status Pesanan</h1>
-                <p class="text-white/70 text-xs">Update otomatis setiap beberapa detik</p>
+                <p class="text-white/70 text-xs">Update otomatis</p>
             </div>
         </div>
     </header>
@@ -59,7 +59,7 @@
             <h3 class="font-semibold text-gray-700 text-sm mb-4">Progress Pesanan</h3>
             <div class="relative">
                 {{-- Line --}}
-                <div class="absolute left-4 top-4 bottom-4 w-0.5 bg-gray-100"></div>
+                <div class="absolute left-4 top-4 bottom-4 w-0.5 {{ $selfOrder->isCompleted() ? 'bg-emerald-500' : 'bg-gray-100' }}"></div>
 
                 <div class="space-y-4">
                     @foreach($this->statusSteps as $step)

@@ -1,6 +1,6 @@
 <div class="relative">
     <!-- Loading Overlay -->
-    <div wire:loading wire:target="create, edit, save, openStockModal" class="absolute inset-0 bg-white/50 backdrop-blur-[1px] z-50 rounded-xl">
+    <div wire:loading wire:target="create, edit, save" class="absolute inset-0 bg-white/50 backdrop-blur-[1px] z-50 rounded-xl">
         <div class="sticky top-[40vh] flex flex-col items-center justify-center w-full gap-2">
             <svg class="animate-spin h-8 w-8 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -11,17 +11,25 @@
     </div>
 
     <!-- Header -->
-    <div class="flex items-center justify-between mb-6">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
             <h1 class="text-2xl font-bold text-gray-800">Komponen / Item Setengah Jadi</h1>
-            <p class="text-gray-500">Kelola stok komponen hasil repacking yang digunakan dalam BOM produk POS</p>
+            <p class="text-sm text-gray-500 mt-0.5">Master komponen / item setengah jadi. Penambahan stok komponen HANYA berasal dari <strong>Repacking / Produksi</strong>.</p>
         </div>
-        @can('create_components')
-            <button wire:click="create" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg flex items-center gap-2 shadow-sm transition-colors">
-                <i data-lucide="plus" class="w-5 h-5"></i>
-                Tambah Komponen
-            </button>
-        @endcan
+        <div class="flex items-center gap-2 flex-shrink-0 whitespace-nowrap self-start sm:self-auto">
+            @can('create_productions')
+                <a href="{{ route('admin.productions.index') }}" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg flex items-center gap-2 shadow-sm transition-colors text-sm">
+                    <i data-lucide="package-plus" class="w-4 h-4"></i>
+                    <span>Repacking / Produksi</span>
+                </a>
+            @endcan
+            @can('create_components')
+                <button wire:click="create" class="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg flex items-center gap-2 shadow-sm transition-colors text-sm">
+                    <i data-lucide="plus" class="w-4 h-4"></i>
+                    <span>Tambah Komponen</span>
+                </button>
+            @endcan
+        </div>
     </div>
 
     <!-- Stock Alert Banners -->
@@ -91,12 +99,6 @@
                         </td>
                         <td class="px-6 py-4 text-right">
                             <div class="flex items-center justify-end gap-1">
-                                @can('adjust_component_stock')
-                                    <button wire:click="openStockModal({{ $comp->id }})" title="Sesuaikan Stok"
-                                        class="p-2 text-gray-400 hover:text-blue-600 rounded-lg hover:bg-blue-50">
-                                        <i data-lucide="layers" class="w-4 h-4"></i>
-                                    </button>
-                                @endcan
                                 @can('edit_components')
                                     <button wire:click="edit({{ $comp->id }})" title="Edit Komponen"
                                         class="p-2 text-gray-400 hover:text-emerald-600 rounded-lg hover:bg-emerald-50">
@@ -202,64 +204,6 @@
     </div>
     @endif
 
-    <!-- Stock Adjustment Modal -->
-    @if($showStockModal && $selectedComponent)
-    <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-        <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm border border-gray-100">
-            <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-                <div>
-                    <h3 class="font-bold text-gray-800">Penyesuaian Stok</h3>
-                    <p class="text-xs text-gray-500">{{ $selectedComponent->name }} &bull; Stok saat ini: <strong>{{ number_format($selectedComponent->stock, 2, ',', '.') }} {{ $selectedComponent->unit }}</strong></p>
-                </div>
-                <button wire:click="$set('showStockModal', false)" class="text-gray-400 hover:text-gray-600">
-                    <i data-lucide="x" class="w-5 h-5"></i>
-                </button>
-            </div>
-            <div class="p-6 space-y-4">
-                <div>
-                    <label class="block text-xs font-semibold text-gray-700 mb-2">Jenis Penyesuaian</label>
-                    <div class="grid grid-cols-3 gap-2">
-                        <button type="button" wire:click="$set('stockAdjustmentType', 'add')"
-                            class="py-2 text-xs font-semibold rounded-lg border transition-colors {{ $stockAdjustmentType === 'add' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-gray-600 border-gray-200 hover:border-emerald-300' }}">
-                            + Tambah
-                        </button>
-                        <button type="button" wire:click="$set('stockAdjustmentType', 'sub')"
-                            class="py-2 text-xs font-semibold rounded-lg border transition-colors {{ $stockAdjustmentType === 'sub' ? 'bg-red-600 text-white border-red-600' : 'bg-white text-gray-600 border-gray-200 hover:border-red-300' }}">
-                            - Kurangi
-                        </button>
-                        <button type="button" wire:click="$set('stockAdjustmentType', 'set')"
-                            class="py-2 text-xs font-semibold rounded-lg border transition-colors {{ $stockAdjustmentType === 'set' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300' }}">
-                            = Set
-                        </button>
-                    </div>
-                </div>
-
-                <div>
-                    <label class="block text-xs font-semibold text-gray-700 mb-1">Jumlah ({{ $selectedComponent->unit }})</label>
-                    <input wire:model="stockAdjustmentAmount" type="number" step="0.01" min="0.001"
-                        class="w-full text-sm border border-gray-200 rounded-lg p-2.5">
-                    @error('stockAdjustmentAmount') <span class="text-xs text-red-500">{{ $message }}</span> @enderror
-                </div>
-
-                <div>
-                    <label class="block text-xs font-semibold text-gray-700 mb-1">
-                        Catatan {{ $stockAdjustmentType !== 'add' ? '(Wajib)' : '(Opsional)' }}
-                    </label>
-                    <input wire:model="stockNote" type="text" placeholder="Alasan penyesuaian..."
-                        class="w-full text-sm border border-gray-200 rounded-lg p-2.5">
-                    @error('stockNote') <span class="text-xs text-red-500">{{ $message }}</span> @enderror
-                </div>
-
-                <div class="flex gap-3 pt-2 border-t border-gray-100">
-                    <button type="button" wire:click="$set('showStockModal', false)" class="flex-1 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg">Batal</button>
-                    <button wire:click="saveStock" class="flex-1 py-2.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm">
-                        Simpan Penyesuaian
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-    @endif
 </div>
 
 @script

@@ -23,10 +23,13 @@ class SelfOrder extends Model
         'customer_name',
         'customer_phone',
         'customer_email',
+        'pickup_name',
+        'pickup_phone',
         'subtotal',
         'tax_amount',
         'total',
         'order_type',
+        'service_area_id',
         'notes',
         'payment_method',
         'status',
@@ -41,21 +44,24 @@ class SelfOrder extends Model
         'claimed_at',
         'processing_at',
         'completed_at',
+        'pickup_confirmed_at',
         'idempotency_key',
         'customer_ip',
     ];
 
     protected $casts = [
-        'subtotal'       => 'decimal:2',
-        'tax_amount'     => 'decimal:2',
-        'total'          => 'decimal:2',
-        'status'         => SelfOrderStatus::class,
-        'cancelled_at'   => 'datetime',
-        'paid_at'        => 'datetime',
-        'claimed_at'     => 'datetime',
-        'processing_at'  => 'datetime',
-        'completed_at'   => 'datetime',
-        'queue_number'   => 'integer',
+        'subtotal'            => 'decimal:2',
+        'tax_amount'          => 'decimal:2',
+        'total'               => 'decimal:2',
+        'status'              => SelfOrderStatus::class,
+        'cancelled_at'        => 'datetime',
+        'paid_at'             => 'datetime',
+        'claimed_at'          => 'datetime',
+        'processing_at'       => 'datetime',
+        'completed_at'        => 'datetime',
+        'pickup_confirmed_at' => 'datetime',
+        'queue_number'        => 'integer',
+        'service_area_id'     => 'integer',
     ];
 
     // -----------------------------------------------------------------
@@ -81,6 +87,11 @@ class SelfOrder extends Model
     public function items(): HasMany
     {
         return $this->hasMany(SelfOrderItem::class);
+    }
+
+    public function serviceArea(): BelongsTo
+    {
+        return $this->belongsTo(ServiceArea::class);
     }
 
     public function paymentTransaction(): BelongsTo
@@ -205,13 +216,15 @@ class SelfOrder extends Model
      * berdasarkan metode pembayaran. Tab ini menjawab "sedang dikerjakan siapa", mengurangi ambiguitas
      * dibanding sebelumnya (order ter-claim ikut nyempil di tab Sudah Dibayar/Bayar di Tempat).
      *
-     * @param  int|null  $userId  Jika diisi, hanya tampilkan order yang di-claim kasir tsb (bukan semua kasir).
+     * @param  int|null     $userId        Jika diisi, hanya tampilkan order yang di-claim kasir tsb.
+     * @param  string|null  $statusFilter  Jika diisi, filter berdasarkan nilai status enum (misal: 'paid', 'processing', 'ready').
      */
-    public function scopeForClaimedTab($query, ?int $userId = null)
+    public function scopeForClaimedTab($query, ?int $userId = null, ?string $statusFilter = null)
     {
         return $query->active()
             ->whereNotNull('processed_by')
             ->when($userId, fn($q) => $q->where('processed_by', $userId))
+            ->when($statusFilter, fn($q) => $q->where('status', $statusFilter))
             ->oldest();
     }
 
@@ -369,7 +382,7 @@ class SelfOrder extends Model
      */
     public static function getPaginatedPaid(int $perPage = 20, ?int $userId = null): LengthAwarePaginator
     {
-        return static::with(['items.modifiers', 'paymentTransaction', 'processedBy', 'transaction'])
+        return static::with(['items.modifiers', 'paymentTransaction', 'processedBy', 'transaction', 'serviceArea'])
             ->forPaidTab($userId)
             ->paginate($perPage);
     }
@@ -379,7 +392,7 @@ class SelfOrder extends Model
      */
     public static function getPaginatedWaiting(int $perPage = 20, ?int $userId = null): LengthAwarePaginator
     {
-        return static::with(['items.modifiers', 'processedBy', 'paymentTransaction'])
+        return static::with(['items.modifiers', 'processedBy', 'paymentTransaction', 'serviceArea'])
             ->forWaitingTab($userId)
             ->paginate($perPage);
     }
@@ -402,16 +415,23 @@ class SelfOrder extends Model
 
     /**
      * Paginated list untuk tab "Pesanan Diambil" (order aktif yang sudah di-claim, lintas QRIS/Cash).
+     *
+     * @param  int     $perPage
+     * @param  int|null  $userId        Filter berdasarkan kasir yang mengambil. NULL = semua kasir.
+     * @param  string|null  $statusFilter  Filter status (nilai enum: 'paid','processing','ready'). NULL = semua.
      */
-    public static function getPaginatedClaimed(int $perPage = 20, ?int $userId = null): LengthAwarePaginator
-    {
-        return static::with(['items.modifiers', 'paymentTransaction', 'processedBy', 'transaction', 'shift'])
-            ->forClaimedTab($userId)
+    public static function getPaginatedClaimed(
+        int $perPage = 20,
+        ?int $userId = null,
+        ?string $statusFilter = null
+    ): LengthAwarePaginator {
+        return static::with(['items.modifiers', 'paymentTransaction', 'processedBy', 'transaction', 'shift', 'serviceArea'])
+            ->forClaimedTab($userId, $statusFilter)
             ->paginate($perPage);
     }
 
     /**
-     * Count untuk badge tab "Pesanan Diambil".
+     * Count untuk badge tab "Pesanan Diambil" (total, tanpa filter status).
      */
     public static function countClaimedToday(?int $userId = null): int
     {
@@ -419,11 +439,28 @@ class SelfOrder extends Model
     }
 
     /**
+     * Count order di tab Diambil, dikelompokkan per status — SATU query GROUP BY.
+     * Digunakan untuk badge count pada sub-filter status di tab Diambil.
+     * Menghindari 4 query COUNT(*) terpisah per status.
+     *
+     * @return array<string, int>  Key = status value string, Value = jumlah order.
+     */
+    public static function countClaimedByStatusGroup(?int $userId = null): array
+    {
+        return static::forClaimedTab($userId)
+            ->selectRaw('status, COUNT(*) as total')
+            ->groupBy('status')
+            ->pluck('total', 'status')
+            ->map(fn($v) => (int) $v)
+            ->toArray();
+    }
+
+    /**
      * Ambil self order dengan full detail untuk print struk.
      */
     public static function getForPrint(int $id): ?self
     {
-        return static::with(['items.modifiers', 'processedBy', 'paymentTransaction', 'transaction'])
+        return static::with(['items.modifiers', 'processedBy', 'paymentTransaction', 'transaction', 'serviceArea'])
             ->find($id);
     }
 
@@ -473,5 +510,36 @@ class SelfOrder extends Model
             'cash_on_counter' => 'Bayar di Kasir',
             default           => $this->payment_method,
         };
+    }
+
+    public function getOrderTypeLabelAttribute(): string
+    {
+        return match ($this->order_type) {
+            'dine_in'   => 'Makan di Tempat',
+            'take_away' => 'Bawa Pulang',
+            default     => $this->order_type ?? '-',
+        };
+    }
+
+    /**
+     * Catat data konfirmasi pengambil pesanan (Take Away).
+     */
+    public function recordPickupConfirmation(?string $name, ?string $phone): void
+    {
+        $this->update([
+            'pickup_name'         => $name ?: $this->customer_name,
+            'pickup_phone'        => $phone ?: $this->customer_phone,
+            'pickup_confirmed_at' => now(),
+        ]);
+    }
+
+    public function getPickupDisplayNameAttribute(): string
+    {
+        return $this->pickup_name ?: $this->customer_name;
+    }
+
+    public function getPickupDisplayPhoneAttribute(): string
+    {
+        return $this->pickup_phone ?: $this->customer_phone;
     }
 }

@@ -24,13 +24,14 @@ class PaymentSources extends Component
     #[Rule('required|min:2|max:100')]
     public string $name = '';
 
-    #[Rule('required|in:cash,card,transfer,ewallet,qris')]
+    #[Rule('required|in:cash,qris')]
     public string $type = 'cash';
 
     #[Rule('nullable|max:255')]
     public ?string $description = '';
 
-    public bool $is_active = true;
+    public bool $is_active_pos = true;
+    public bool $is_active_self_order = true;
 
     #[Rule('required|integer|min:0')]
     public int $sort_order = 0;
@@ -51,8 +52,9 @@ class PaymentSources extends Component
 
     public function create(): void
     {
-        $this->reset(['editingId', 'name', 'type', 'description', 'is_active', 'sort_order']);
-        $this->is_active = true;
+        $this->reset(['editingId', 'name', 'type', 'description', 'is_active_pos', 'is_active_self_order', 'sort_order']);
+        $this->is_active_pos = true;
+        $this->is_active_self_order = true;
         $this->sort_order = PaymentSource::getMaxSortOrder() + 1;
         $this->showModal = true;
     }
@@ -64,9 +66,26 @@ class PaymentSources extends Component
         $this->name = $source->name;
         $this->type = $source->type;
         $this->description = $source->description ?? '';
-        $this->is_active = $source->is_active;
+        $this->is_active_pos = $source->is_active_pos;
+        $this->is_active_self_order = $source->is_active_self_order;
         $this->sort_order = $source->sort_order;
         $this->showModal = true;
+    }
+
+    public function toggleActivePos(int $id): void
+    {
+        $source = PaymentSource::findOrFail($id);
+        $source->update(['is_active_pos' => !$source->is_active_pos]);
+        $statusText = $source->is_active_pos ? 'diaktifkan' : 'dinonaktifkan';
+        $this->dispatch('notify', type: 'success', message: "POS: {$source->name} berhasil {$statusText}");
+    }
+
+    public function toggleActiveSelfOrder(int $id): void
+    {
+        $source = PaymentSource::findOrFail($id);
+        $source->update(['is_active_self_order' => !$source->is_active_self_order]);
+        $statusText = $source->is_active_self_order ? 'diaktifkan' : 'dinonaktifkan';
+        $this->dispatch('notify', type: 'success', message: "Pesan Mandiri: {$source->name} berhasil {$statusText}");
     }
 
     public function save(): void
@@ -74,7 +93,7 @@ class PaymentSources extends Component
         // Custom validation: sort_order must be unique (except when editing same record)
         $this->validate([
             'name' => 'required|min:2|max:100',
-            'type' => 'required|in:cash,card,transfer,ewallet,qris',
+            'type' => 'required|in:cash,qris',
             'description' => 'nullable|max:255',
             'sort_order' => [
                 'required',
@@ -88,11 +107,12 @@ class PaymentSources extends Component
         ]);
 
         $data = [
-            'name' => $this->name,
-            'type' => $this->type,
-            'description' => $this->description ?: null,
-            'is_active' => $this->is_active,
-            'sort_order' => $this->sort_order,
+            'name'                 => $this->name,
+            'type'                 => $this->type,
+            'description'          => $this->description ?: null,
+            'is_active_pos'        => $this->is_active_pos,
+            'is_active_self_order' => $this->is_active_self_order,
+            'sort_order'           => $this->sort_order,
         ];
 
         if ($this->editingId) {

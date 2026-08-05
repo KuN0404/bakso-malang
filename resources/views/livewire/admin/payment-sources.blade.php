@@ -50,7 +50,8 @@
                     <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Nama</th>
                     <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Tipe</th>
                     <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Urutan</th>
-                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Status</th>
+                    <th class="px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase">POS Kasir</th>
+                    <th class="px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Pesan Mandiri</th>
                     <th class="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Aksi</th>
                 </tr>
             </thead>
@@ -82,12 +83,25 @@
                             @endif
                         </td>
                         <td class="px-6 py-4 text-gray-600">{{ $source->sort_order }}</td>
-                        <td class="px-6 py-4">
-                            @if($source->is_active)
-                                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">Aktif</span>
-                            @else
-                                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">Nonaktif</span>
-                            @endif
+                        {{-- Toggle POS --}}
+                        <td class="px-6 py-4 text-center">
+                            <button wire:click="toggleActivePos({{ $source->id }})" class="cursor-pointer transition">
+                                @if($source->is_active_pos)
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700 hover:bg-green-200">Aktif</span>
+                                @else
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600 hover:bg-gray-200">Nonaktif</span>
+                                @endif
+                            </button>
+                        </td>
+                        {{-- Toggle Self Order --}}
+                        <td class="px-6 py-4 text-center">
+                            <button wire:click="toggleActiveSelfOrder({{ $source->id }})" class="cursor-pointer transition">
+                                @if($source->is_active_self_order)
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700 hover:bg-blue-200">Aktif</span>
+                                @else
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600 hover:bg-gray-200">Nonaktif</span>
+                                @endif
+                            </button>
                         </td>
                         <td class="px-6 py-4 text-right">
                             <button wire:click="edit({{ $source->id }})" class="p-2 text-gray-400 hover:text-primary-600 rounded-lg hover:bg-gray-100">
@@ -103,7 +117,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="5" class="px-6 py-12 text-center text-gray-500">
+                        <td colspan="6" class="px-6 py-12 text-center text-gray-500">
                             <i data-lucide="wallet" class="w-12 h-12 mx-auto mb-3 text-gray-300"></i>
                             <p>Belum ada metode pembayaran</p>
                         </td>
@@ -135,11 +149,8 @@
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Tipe *</label>
                         <select wire:model="type" class="w-full px-4 py-2 border border-gray-200 rounded-lg">
-                            <option value="cash">Cash</option>
-                            <option value="card">Kartu (Debit/Credit)</option>
-                            <option value="transfer">Transfer Bank</option>
-                            <option value="ewallet">E-Wallet</option>
-                            <option value="qris">QRIS</option>
+                            <option value="cash">Tunai (Cash)</option>
+                            <option value="qris">QRIS (Scan QR)</option>
                         </select>
                     </div>
                     <div>
@@ -147,16 +158,21 @@
                         <input type="text" wire:model="description" class="w-full px-4 py-2 border border-gray-200 rounded-lg" placeholder="Opsional">
                         @error('description') <p class="text-red-500 text-sm mt-1">{{ $message }}</p> @enderror
                     </div>
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Urutan *</label>
-                            <input type="number" wire:model="sort_order" min="0" class="w-full px-4 py-2 border border-gray-200 rounded-lg">
-                            @error('sort_order') <p class="text-red-500 text-sm mt-1">{{ $message }}</p> @enderror
-                        </div>
-                        <div class="flex items-end">
-                            <label class="inline-flex items-center gap-2">
-                                <input type="checkbox" wire:model="is_active" class="w-4 h-4 text-primary-600 border-gray-300 rounded">
-                                <span class="text-sm text-gray-700">Aktif</span>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Urutan *</label>
+                        <input type="number" wire:model="sort_order" min="0" class="w-full px-4 py-2 border border-gray-200 rounded-lg">
+                        @error('sort_order') <p class="text-red-500 text-sm mt-1">{{ $message }}</p> @enderror
+                    </div>
+                    <div class="space-y-2 pt-2 border-t border-gray-100">
+                        <label class="block text-sm font-medium text-gray-700">Status Aktif Per Layar:</label>
+                        <div class="grid grid-cols-2 gap-3">
+                            <label class="inline-flex items-center gap-2 p-2 bg-gray-50 rounded-lg border border-gray-200">
+                                <input type="checkbox" wire:model="is_active_pos" class="w-4 h-4 text-primary-600 border-gray-300 rounded">
+                                <span class="text-xs font-semibold text-gray-700">Aktif di POS</span>
+                            </label>
+                            <label class="inline-flex items-center gap-2 p-2 bg-gray-50 rounded-lg border border-gray-200">
+                                <input type="checkbox" wire:model="is_active_self_order" class="w-4 h-4 text-primary-600 border-gray-300 rounded">
+                                <span class="text-xs font-semibold text-gray-700">Aktif di Self Order</span>
                             </label>
                         </div>
                     </div>

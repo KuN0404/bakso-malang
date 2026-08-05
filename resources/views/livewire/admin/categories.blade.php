@@ -29,6 +29,7 @@
                     <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Nama</th>
                     <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Produk</th>
                     <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Urutan</th>
+                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Target Dapur</th>
                     <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Status</th>
                     <th class="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Aksi</th>
                 </tr>
@@ -49,6 +50,11 @@
                         </td>
                         <td class="px-6 py-4 text-gray-600">{{ $category->products_count }} produk</td>
                         <td class="px-6 py-4 text-gray-600">{{ $category->sort_order }}</td>
+                        <td class="px-6 py-4">
+                            <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold {{ $category->target_kitchen?->value === 'drink' ? 'bg-blue-100 text-blue-800' : ($category->target_kitchen?->value === 'none' ? 'bg-gray-100 text-gray-700' : 'bg-amber-100 text-amber-800') }}">
+                                {{ $category->target_kitchen?->label() ?? 'Dapur Makanan' }}
+                            </span>
+                        </td>
                         <td class="px-6 py-4">
                             @if($category->is_active)
                                 <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
@@ -170,6 +176,15 @@
                                 <p class="text-gray-500 text-xs mt-1">Urutan terakhir: {{ $this->lastSortOrder }}</p>
                             @enderror
                         </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Target Dapur (KDS) *</label>
+                        <select wire:model="target_kitchen" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500">
+                            @foreach(\App\Enums\KitchenTarget::options() as $val => $label)
+                                <option value="{{ $val }}">{{ $label }}</option>
+                            @endforeach
+                        </select>
+                        @error('target_kitchen') <p class="text-red-500 text-sm mt-1">{{ $message }}</p> @enderror
                     </div>
                     <div class="flex items-center gap-2">
                         <input type="checkbox" wire:model="is_active" id="is_active" class="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500">

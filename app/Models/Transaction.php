@@ -127,13 +127,14 @@ class Transaction extends Model
      * Scope filter untuk daftar riwayat transaksi (TransactionHistory Livewire).
      * Mendukung filter berdasarkan periode, pencarian invoice, dan kasir.
      */
-    public function scopeFilter($query, Carbon $start, Carbon $end, ?string $search = null, ?int $cashierId = null)
+    public function scopeFilter($query, Carbon $start, Carbon $end, ?string $search = null, ?int $cashierId = null, ?string $orderType = null)
     {
         return $query
             ->whereBetween('created_at', [$start, $end])
             ->where('status', 'completed')
             ->when($search, fn($q) => $q->where('invoice_number', 'like', "%{$search}%"))
-            ->when($cashierId, fn($q) => $q->where('user_id', $cashierId));
+            ->when($cashierId, fn($q) => $q->where('user_id', $cashierId))
+            ->when($orderType, fn($q) => $q->where('order_type', $orderType));
     }
 
     // -----------------------------------------------------------------
@@ -141,17 +142,25 @@ class Transaction extends Model
     // -----------------------------------------------------------------
 
     /**
-     * Summary statistik transaksi (total count + total revenue) untuk suatu periode.
+     * Summary statistik transaksi (total count + total revenue + breakdown per tipe order) untuk suatu periode.
      */
-    public static function getSummaryStats(Carbon $start, Carbon $end, ?int $cashierId = null): array
+    public static function getSummaryStats(Carbon $start, Carbon $end, ?int $cashierId = null, ?string $orderType = null): array
     {
         $base = static::whereBetween('created_at', [$start, $end])
             ->where('status', 'completed')
-            ->when($cashierId, fn($q) => $q->where('user_id', $cashierId));
+            ->when($cashierId, fn($q) => $q->where('user_id', $cashierId))
+            ->when($orderType, fn($q) => $q->where('order_type', $orderType));
+
+        $dineInQuery = (clone $base)->where('order_type', 'dine_in');
+        $takeAwayQuery = (clone $base)->where('order_type', 'take_away');
 
         return [
             'total_transactions' => (clone $base)->count(),
             'total_revenue'      => (clone $base)->sum('total'),
+            'dine_in_count'      => (clone $dineInQuery)->count(),
+            'dine_in_revenue'    => (clone $dineInQuery)->sum('total'),
+            'take_away_count'    => (clone $takeAwayQuery)->count(),
+            'take_away_revenue'  => (clone $takeAwayQuery)->sum('total'),
         ];
     }
 
@@ -370,17 +379,18 @@ class Transaction extends Model
     }
 
     /**
-     * Get paginated transaction history for admin view.
+     * Get paginated transaction history for admin view with eager loading (Anti N+1).
      */
     public static function getPaginatedHistory(
         Carbon $start,
         Carbon $end,
         ?string $search = null,
         ?int $cashierId = null,
+        ?string $orderType = null,
         int $perPage = 15
     ): LengthAwarePaginator {
-        return static::with(['user', 'paymentSource'])
-            ->filter($start, $end, $search, $cashierId)
+        return static::with(['user', 'paymentSource', 'selfOrder'])
+            ->filter($start, $end, $search, $cashierId, $orderType)
             ->latest()
             ->paginate($perPage);
     }
@@ -392,10 +402,11 @@ class Transaction extends Model
         Carbon $start,
         Carbon $end,
         ?string $search = null,
-        ?int $cashierId = null
+        ?int $cashierId = null,
+        ?string $orderType = null
     ) {
-        return static::with(['paymentSource', 'user'])
-            ->filter($start, $end, $search, $cashierId)
+        return static::with(['paymentSource', 'user', 'selfOrder'])
+            ->filter($start, $end, $search, $cashierId, $orderType)
             ->latest();
     }
 
@@ -405,7 +416,7 @@ class Transaction extends Model
      */
     public static function getForDetail(int $id): self
     {
-        return static::with(['user', 'details.product.category', 'details.modifiers', 'paymentSource'])->findOrFail($id);
+        return static::with(['user', 'details.product.category', 'details.modifiers', 'paymentSource', 'selfOrder'])->findOrFail($id);
     }
 
     /**
@@ -502,6 +513,15 @@ class Transaction extends Model
         return str_pad($this->queue_number, 3, '0', STR_PAD_LEFT);
     }
 
+    public function getOrderTypeLabelAttribute(): string
+    {
+        return match ($this->order_type) {
+            'dine_in'   => 'Makan di Tempat',
+            'take_away' => 'Bawa Pulang',
+            default     => $this->order_type ?? '-',
+        };
+    }
+
     /**
      * Increment print count for a transaction by ID.
      */
@@ -509,8 +529,6 @@ class Transaction extends Model
     {
         static::where('id', $id)->increment('print_count');
     }
-
-
 
     /**
      * Load relationships needed for single transaction print receipt.

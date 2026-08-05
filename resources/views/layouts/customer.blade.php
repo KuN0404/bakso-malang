@@ -1,34 +1,18 @@
 <!DOCTYPE html>
-<html lang="id" class="h-full">
+<html lang="id" class="h-full scroll-smooth">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Layar Pelanggan - Bakso Malang</title>
-    
-    @php
-        $siteLogo = \App\Models\Setting::get('site_logo', null, 'general');
-        $fontFamilyWeb = \App\Models\Setting::get('font_family_web', 'Poppins', 'general');
-    @endphp
+    <meta name="description" content="{{ $title ?? config('app.name', 'Bakso Malang') }} - Cita Rasa Otentik Bakso Malang Spesial Daging Pilihan.">
+    <meta name="theme-color" content="#2563eb">
+    <title>{{ $title ?? config('app.name', 'Bakso Malang') }}</title>
 
-    <!-- Google Fonts: Dynamic -->
+    <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family={{ str_replace(' ', '+', $fontFamilyWeb) }}:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    
-    <style id="base-font-style">
-        :root {
-            --font-sans: '{{ $fontFamilyWeb }}';
-        }
-        body {
-            font-family: var(--font-sans), sans-serif !important;
-        }
-    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,400&display=swap" rel="stylesheet">
 
-    @if ($siteLogo)
-        <link rel="icon" type="image/webp" href="{{ asset('storage/' . $siteLogo) }}">
-    @endif
-    
-    <!-- Tailwind CSS -->
+    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -49,149 +33,48 @@
                         },
                     },
                     fontFamily: {
-                        sans: ['var(--font-sans)', 'sans-serif'],
-                    }
+                        sans: ['Plus Jakarta Sans', 'ui-sans-serif', 'system-ui', '-apple-system', 'sans-serif'],
+                    },
                 }
             }
         }
     </script>
-    
-    <!-- Lucide Icons -->
-    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
-    
-    <!-- Livewire Styles -->
+
+    <!-- Alpine.js CDN -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
     @livewireStyles
-    
+
     <style>
         [x-cloak] { display: none !important; }
-    </style>
-</head>
-<body class="min-h-screen bg-gray-50 antialiased" data-font-web="{{ $fontFamilyWeb }}">
-    {{ $slot }}
-    
-    <!-- Livewire Scripts -->
-    @livewireScripts
-    
-    <script>
-        document.addEventListener('livewire:init', () => {
-            if (typeof Livewire.onPageExpired === 'function') {
-                Livewire.onPageExpired((response, message) => {
-                    window.location.href = "{{ route('login') }}?expired=1";
-                    return false;
-                });
-            } else if (Livewire.hook) {
-                Livewire.hook('request', ({ fail }) => {
-                    fail(({ status, preventDefault }) => {
-                        if (status === 419) {
-                            preventDefault();
-                            window.location.href = "{{ route('login') }}?expired=1";
-                        }
-                    });
-                });
-            }
-        });
 
-        // Dynamic Font Applier
-        function applyDynamicFont(fontFamily) {
-            if (!fontFamily) return;
-            try {
-                let fontLink = document.getElementById('dynamic-font-link');
-                const href = `https://fonts.googleapis.com/css2?family=${fontFamily.replace(/ /g, '+')}:wght@300;400;500;600;700;800&display=swap`;
-                
-                if (!fontLink) {
-                    fontLink = document.createElement('link');
-                    fontLink.id = 'dynamic-font-link';
-                    fontLink.rel = 'stylesheet';
-                    document.head.appendChild(fontLink);
-                }
-                if (fontLink.href !== href) {
-                    fontLink.href = href;
-                }
-
-                // Instantly update the CSS variable on the document root
-                document.documentElement.style.setProperty('--font-sans', `'${fontFamily}'`);
-            } catch (e) {
-                console.error("Error applying font:", e);
-            }
+        :root {
+            --primary-600: #2563eb;
+            --primary-700: #1d4ed8;
         }
 
-        document.addEventListener('DOMContentLoaded', () => {
-            lucide.createIcons();
-            const initialFont = document.body.getAttribute('data-font-web');
-            if (initialFont) applyDynamicFont(initialFont);
-        });
+        * { -webkit-tap-highlight-color: transparent; }
 
-        // Re-initialize on Livewire navigation
-        document.addEventListener('livewire:navigated', () => {
-            lucide.createIcons();
-            const currentFont = document.body.getAttribute('data-font-web');
-            if (currentFont) applyDynamicFont(currentFont);
-        });
+        body {
+            font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
+        }
 
-        // Global MutationObserver to automatically rebuild Lucide icons on any DOM change
-        let lucideDebounce;
-        const lucideObserver = new MutationObserver((mutations) => {
-            let needsRebuild = false;
-            for (const mutation of mutations) {
-                if (mutation.addedNodes.length) {
-                    for (const node of mutation.addedNodes) {
-                        if (node.nodeType === 1) {
-                            if (node.hasAttribute('data-lucide') || node.querySelector('[data-lucide]')) {
-                                needsRebuild = true;
-                                break;
-                            }
-                        }
-                    }
-                }
-                if (needsRebuild) break;
-            }
-            if (needsRebuild) {
-                clearTimeout(lucideDebounce);
-                lucideDebounce = setTimeout(() => {
-                    if (window.lucide) lucide.createIcons();
-                }, 10);
-            }
-        });
-        lucideObserver.observe(document.body, { childList: true, subtree: true });
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: var(--primary-600); border-radius: 99px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--primary-700); }
 
-        // Tangani update in-place Livewire (seperti pengetikan pada input pencarian)
-        document.addEventListener('livewire:init', () => {
-            Livewire.hook('morph.updated', () => {
-                clearTimeout(lucideDebounce);
-                lucideDebounce = setTimeout(() => {
-                    if (window.lucide) lucide.createIcons();
-                }, 15);
-            });
-        });
+        /* Custom scroll for modals */
+        .custom-scroll::-webkit-scrollbar { width: 4px; }
+        .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 99px; }
+    </style>
+</head>
+<body class="h-full bg-slate-50 antialiased text-slate-800">
 
-        // Handle Real-Time Settings Updates for SPA/wire:navigate
-        window.addEventListener('settings-updated', event => {
-            const data = event.detail;
-            const siteLogo = data.site_logo;
-            const fontFamilyWeb = data.font_family_web;
+    {{ $slot }}
 
-            // Update Favicon (site logo)
-            let favicon = document.querySelector('link[rel="icon"]');
-            if (siteLogo) {
-                if (!favicon) {
-                    favicon = document.createElement('link');
-                    favicon.rel = 'icon';
-                    favicon.type = 'image/webp';
-                    document.head.appendChild(favicon);
-                }
-                favicon.href = siteLogo;
-            } else {
-                if (favicon) {
-                    favicon.remove();
-                }
-            }
-
-            // Update Font Family in real-time
-            if (fontFamilyWeb) {
-                document.body.setAttribute('data-font-web', fontFamilyWeb);
-                applyDynamicFont(fontFamilyWeb);
-            }
-        });
-    </script>
+    @livewireScripts
 </body>
 </html>

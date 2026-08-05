@@ -170,8 +170,8 @@ class HandleMidtransWebhookAction
     private function createPosTransaction(PaymentTransaction $paymentTx, array $cartData): Transaction
     {
         $cashierId     = $paymentTx->created_by;
-        $paymentSource = PaymentSource::active()->where('type', 'qris')->first()
-            ?? PaymentSource::active()->first();
+        $paymentSource = PaymentSource::activeForPos()->where('type', 'qris')->first()
+            ?? PaymentSource::activeForPos()->first();
 
         $shift       = Shift::getOrCreateTodayShift($cashierId);
         $queueNumber = DailyQueueNumber::getNextNumber();

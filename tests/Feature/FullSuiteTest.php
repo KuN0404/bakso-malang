@@ -562,16 +562,17 @@ test('[Admin] PaymentSources: create and delete payment source', function () {
 
     Livewire::actingAs($admin)
         ->test(PaymentSources::class)
-        ->set('name', 'OVO')
-        ->set('type', 'ewallet')
-        ->set('is_active', true)
+        ->set('name', 'QRIS Mandiri')
+        ->set('type', 'qris')
+        ->set('is_active_pos', true)
+        ->set('is_active_self_order', true)
         ->set('sort_order', 3)
         ->call('save')
         ->assertHasNoErrors();
 
-    expect(PaymentSource::where('name', 'OVO')->exists())->toBeTrue();
+    expect(PaymentSource::where('name', 'QRIS Mandiri')->exists())->toBeTrue();
 
-    $source = PaymentSource::where('name', 'OVO')->first();
+    $source = PaymentSource::where('name', 'QRIS Mandiri')->first();
     Livewire::actingAs($admin)
         ->test(PaymentSources::class)
         ->call('delete', $source->id);

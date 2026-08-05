@@ -16,18 +16,29 @@ class PaymentSource extends Model
         'account_number',
         'account_name',
         'icon',
-        'is_active',
+        'is_active_pos',
+        'is_active_self_order',
         'sort_order',
     ];
 
     protected $casts = [
-        'is_active' => 'boolean',
-        'sort_order' => 'integer',
+        'is_active_pos'        => 'boolean',
+        'is_active_self_order' => 'boolean',
+        'sort_order'           => 'integer',
     ];
 
-    public function scopeActive($query)
+    // -----------------------------------------------------------------
+    // Scopes (Encapsulated Queries)
+    // -----------------------------------------------------------------
+
+    public function scopeActiveForPos($query)
     {
-        return $query->where('is_active', true);
+        return $query->where('is_active_pos', true);
+    }
+
+    public function scopeActiveForSelfOrder($query)
+    {
+        return $query->where('is_active_self_order', true);
     }
 
     public function scopeOrdered($query)
@@ -40,17 +51,53 @@ class PaymentSource extends Model
         return $query->where('type', $type);
     }
 
+    // -----------------------------------------------------------------
+    // Business & Helper Methods
+    // -----------------------------------------------------------------
+
     public function isCash(): bool
     {
         return $this->type === 'cash';
     }
 
     /**
-     * Get the default cash payment source.
+     * Get active payment sources for POS Checkout.
+     */
+    public static function getForPos(): \Illuminate\Database\Eloquent\Collection
+    {
+        return static::activeForPos()->ordered()->get();
+    }
+
+    /**
+     * Get active payment sources for Self Order.
+     */
+    public static function getForSelfOrder(): \Illuminate\Database\Eloquent\Collection
+    {
+        return static::activeForSelfOrder()->ordered()->get();
+    }
+
+    /**
+     * Check if QRIS is active for Self Order.
+     */
+    public static function isQrisActiveForSelfOrder(): bool
+    {
+        return static::activeForSelfOrder()->where('type', 'qris')->exists();
+    }
+
+    /**
+     * Check if Cash (Bayar di Kasir) is active for Self Order.
+     */
+    public static function isCashActiveForSelfOrder(): bool
+    {
+        return static::activeForSelfOrder()->where('type', 'cash')->exists();
+    }
+
+    /**
+     * Get the default cash payment source for POS.
      */
     public static function getDefaultCash(): ?self
     {
-        return static::active()->where('type', 'cash')->first();
+        return static::activeForPos()->where('type', 'cash')->first();
     }
 
     /**
@@ -62,7 +109,7 @@ class PaymentSource extends Model
     }
 
     /**
-     * Get paginated payment sources.
+     * Get paginated payment sources for admin management.
      */
     public static function getPaginated(string $search = '', int $perPage = 10): \Illuminate\Contracts\Pagination\LengthAwarePaginator
     {

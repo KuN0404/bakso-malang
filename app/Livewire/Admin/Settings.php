@@ -4,6 +4,7 @@ namespace App\Livewire\Admin;
 
 use App\Models\PrinterConfig;
 use App\Models\Setting;
+use Illuminate\Support\Facades\Mail;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 use Livewire\WithFileUploads;
@@ -37,6 +38,9 @@ class Settings extends Component
     public int $font_size_px = 12;
     public bool $auto_print = true;
 
+    // Email Test
+    public string $test_email_address = '';
+
     public function mount(): void
     {
         // Load general settings (key without group prefix, group as separate param)
@@ -68,11 +72,11 @@ class Settings extends Component
     {
         if (!$image) return null;
 
-        $extension = strtolower($image->getClientOriginalExtension());
+        $extension = strtolower($image->getClientOriginalExtension() ?: $image->extension());
         
-        // If it's an ICO file, store it directly without Intervention processing
-        if ($extension === 'ico') {
-            $filename = md5($image->getClientOriginalName() . time()) . '.ico';
+        // If it's an ICO or SVG file, store it directly without Intervention GD processing
+        if (in_array($extension, ['ico', 'svg'])) {
+            $filename = md5($image->getClientOriginalName() . time()) . '.' . $extension;
             $path = 'logos/' . $filename;
             \Illuminate\Support\Facades\Storage::disk('public')->putFileAs('logos', $image, $filename);
             return $path;
@@ -81,20 +85,29 @@ class Settings extends Component
         $filename = md5($image->getClientOriginalName() . time()) . '.webp';
         $path = 'logos/' . $filename;
 
-        // Resize and encode using GD Driver
-        $manager = new \Intervention\Image\ImageManager(new \Intervention\Image\Drivers\Gd\Driver());
-        $img = $manager->read($image->getRealPath());
-        
-        if ($type === 'site_logo') {
-            $img->scaleDown(width: 128); // favicon standard size limit
-        } else {
-            $img->scaleDown(width: 500); // store web logo size
-        }
-        
-        // Save to public storage disk
-        \Illuminate\Support\Facades\Storage::disk('public')->put($path, (string) $img->toWebp(quality: 80));
+        try {
+            // Resize and encode using GD Driver
+            $manager = new \Intervention\Image\ImageManager(new \Intervention\Image\Drivers\Gd\Driver());
+            $realPath = $image->getRealPath() ?: $image->getPathname();
+            $img = $manager->read($realPath);
+            
+            if ($type === 'site_logo') {
+                $img->scaleDown(width: 128); // favicon standard size limit
+            } else {
+                $img->scaleDown(width: 500); // store web logo size
+            }
+            
+            // Save to public storage disk
+            \Illuminate\Support\Facades\Storage::disk('public')->put($path, (string) $img->toWebp(quality: 80));
 
-        return $path;
+            return $path;
+        } catch (\Throwable $e) {
+            // Fallback: If GD / Intervention fails for any reason, store original file safely
+            $filename = md5($image->getClientOriginalName() . time()) . '.' . ($extension ?: 'png');
+            $path = 'logos/' . $filename;
+            \Illuminate\Support\Facades\Storage::disk('public')->putFileAs('logos', $image, $filename);
+            return $path;
+        }
     }
 
     protected function deleteOldLogo(?string $logoPath): void
@@ -218,6 +231,34 @@ class Settings extends Component
         }
 
         $this->dispatch('notify', type: 'success', message: 'Pengaturan printer berhasil disimpan');
+    }
+
+    public function sendTestEmail(): void
+    {
+        $this->validate([
+            'test_email_address' => 'required|email|max:255',
+        ]);
+
+        try {
+            Mail::raw(
+                'Ini adalah email test dari ' . config('app.name') . ".
+
+Jika Anda menerima email ini, konfigurasi Gmail SMTP Anda sudah benar!
+
+Driver  : " . config('mail.default') . "
+Host    : " . config('mail.mailers.smtp.host') . "
+Port    : " . config('mail.mailers.smtp.port') . "
+From    : " . config('mail.from.address'),
+                fn ($message) => $message
+                    ->to($this->test_email_address)
+                    ->subject('[Test] Email SMTP — ' . config('app.name'))
+            );
+
+            $this->dispatch('notify', type: 'success', message: 'Email test berhasil dikirim ke ' . $this->test_email_address);
+            $this->reset('test_email_address');
+        } catch (\Throwable $e) {
+            $this->dispatch('notify', type: 'error', message: 'Gagal kirim email: ' . $e->getMessage());
+        }
     }
 
     public function render()

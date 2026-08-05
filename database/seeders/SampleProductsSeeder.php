@@ -14,10 +14,10 @@ class SampleProductsSeeder extends Seeder
     {
         // Categories
         $categories = [
-            ['name' => 'Bakso', 'slug' => 'bakso', 'icon' => 'soup', 'sort_order' => 1],
-            ['name' => 'Mie', 'slug' => 'mie', 'icon' => 'utensils', 'sort_order' => 2],
-            ['name' => 'Minuman', 'slug' => 'minuman', 'icon' => 'cup-soda', 'sort_order' => 3],
-            ['name' => 'Tambahan', 'slug' => 'tambahan', 'icon' => 'plus-circle', 'sort_order' => 4],
+            ['name' => 'Bakso', 'slug' => 'bakso', 'icon' => 'soup', 'sort_order' => 1, 'target_kitchen' => 'food'],
+            ['name' => 'Mie', 'slug' => 'mie', 'icon' => 'utensils', 'sort_order' => 2, 'target_kitchen' => 'food'],
+            ['name' => 'Minuman', 'slug' => 'minuman', 'icon' => 'cup-soda', 'sort_order' => 3, 'target_kitchen' => 'drink'],
+            ['name' => 'Tambahan', 'slug' => 'tambahan', 'icon' => 'plus-circle', 'sort_order' => 4, 'target_kitchen' => 'food'],
         ];
 
         foreach ($categories as $cat) {

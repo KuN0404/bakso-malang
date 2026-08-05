@@ -2,86 +2,66 @@
 
 namespace App\Livewire;
 
-use App\Models\Category;
+use App\Enums\KitchenTarget;
+use App\Models\Shift;
 use App\Models\TransactionDetail;
 use Livewire\Component;
 use Livewire\Attributes\On;
 
 class KitchenDisplay extends Component
 {
-    public $activeTab = 'food'; // food (bakso, mie, tambahan) or drink (minuman)
-    public $selectedShiftId = null;
+    public string $activeTab = 'food';
 
-    public function mount()
+    public function mount(): void
     {
-        $this->selectedShiftId = session('kitchen_selected_shift_id');
+        $sessionTab = session('kitchen_active_tab');
+        if (in_array($sessionTab, [KitchenTarget::FOOD->value, KitchenTarget::DRINK->value])) {
+            $this->activeTab = $sessionTab;
+        }
     }
 
-    #[On('order-created')] 
-    public function refreshOrders()
+    #[On('order-created')]
+    public function refreshOrders(): void
     {
-        // Just refresh the component
+        // Livewire auto-refreshes
     }
 
-    public function selectShift($shiftId)
+    public function setTab(string $tab): void
     {
-        $this->selectedShiftId = $shiftId;
-        session(['kitchen_selected_shift_id' => $shiftId]);
+        if (in_array($tab, [KitchenTarget::FOOD->value, KitchenTarget::DRINK->value])) {
+            $this->activeTab = $tab;
+            session(['kitchen_active_tab' => $tab]);
+        }
     }
 
-    public function changeShift()
-    {
-        $this->selectedShiftId = null;
-        session()->forget('kitchen_selected_shift_id');
-    }
-
-    public function setTab($tab)
-    {
-        $this->activeTab = $tab;
-    }
-
-    public function markAsDone($detailId)
+    public function markAsDone(int $detailId): void
     {
         $this->authorize('update_order_status');
 
         $detail = TransactionDetail::find($detailId);
         if ($detail) {
             $detail->markAsDone();
-            $this->dispatch('play-sound', 'done'); // Optional: Sound effect
+            $this->dispatch('play-sound', 'done');
         }
     }
 
     public function render()
     {
-        // If no shift selected, show selection screen
-        if (!$this->selectedShiftId) {
-            return view('livewire.kitchen-display', [
-                'shifts' => \App\Models\Shift::getOpenShifts()
-            ])->layout('layouts.pos');
-        }
+        $openShiftIds = Shift::getOpenShiftIds();
+        $openShifts   = Shift::getOpenShifts();
 
-        // Validate currently selected shift is still OPEN
-        $currentShift = \App\Models\Shift::find($this->selectedShiftId);
-        if (!$currentShift || $currentShift->status !== 'open') {
-            $this->changeShift(); // Reset and clear session
-            $this->dispatch('notify', type: 'warning', message: 'Shift kasir telah ditutup.');
-            return view('livewire.kitchen-display', [
-                'shifts' => \App\Models\Shift::getOpenShifts()
-            ])->layout('layouts.pos');
-        }
+        $foodItems  = TransactionDetail::getKitchenQueue($openShiftIds, KitchenTarget::FOOD);
+        $drinkItems = TransactionDetail::getKitchenQueue($openShiftIds, KitchenTarget::DRINK);
 
-        // Define category slugs for each tab
-        $foodSlugs = ['bakso', 'mie', 'tambahan'];
-        $drinkSlugs = ['minuman'];
-
-        $targetSlugs = $this->activeTab === 'drink' ? $drinkSlugs : $foodSlugs;
-
-        $items = TransactionDetail::getKitchenQueue($this->selectedShiftId, $targetSlugs)
-            ->groupBy('transaction_id'); // Group by Order for "Queue" visualization
+        $activeItems = $this->activeTab === KitchenTarget::DRINK->value ? $drinkItems : $foodItems;
+        $groupedOrders = $activeItems->groupBy('transaction_id');
 
         return view('livewire.kitchen-display', [
-            'orders' => $items
-        ])->layout('layouts.pos'); // Use simple layout or admin layout? User said "role pelayanan", maybe strictly simpler layout? 
-        // Let's use layouts.admin for now but maybe full screen mode.
+            'orders'          => $groupedOrders,
+            'openShifts'      => $openShifts,
+            'openShiftsCount' => $openShifts->count(),
+            'foodCount'       => $foodItems->count(),
+            'drinkCount'      => $drinkItems->count(),
+        ])->layout('layouts.pos');
     }
 }

@@ -58,15 +58,10 @@ class DefaultSettingsSeeder extends Seeder
             ]
         );
 
-        // Default Payment Sources (Hanya Tunai dan QRIS yang aktif secara bawaan)
+        // Default Payment Sources (Hanya Tunai dan QRIS)
         $paymentSources = [
-            ['name' => 'Tunai', 'type' => 'cash', 'icon' => 'cash', 'is_active' => true, 'sort_order' => 1],
-            ['name' => 'QRIS', 'type' => 'qris', 'icon' => 'qris', 'is_active' => true, 'sort_order' => 2],
-            ['name' => 'Transfer Bank', 'type' => 'transfer', 'icon' => 'bank', 'is_active' => false, 'sort_order' => 3],
-            ['name' => 'Kartu Debit', 'type' => 'card', 'icon' => 'card', 'is_active' => false, 'sort_order' => 4],
-            ['name' => 'GoPay', 'type' => 'ewallet', 'icon' => 'gopay', 'is_active' => false, 'sort_order' => 5],
-            ['name' => 'OVO', 'type' => 'ewallet', 'icon' => 'ovo', 'is_active' => false, 'sort_order' => 6],
-            ['name' => 'Dana', 'type' => 'ewallet', 'icon' => 'dana', 'is_active' => false, 'sort_order' => 7],
+            ['name' => 'Tunai', 'type' => 'cash', 'icon' => 'cash', 'is_active_pos' => true, 'is_active_self_order' => true, 'sort_order' => 1],
+            ['name' => 'QRIS', 'type' => 'qris', 'icon' => 'qris', 'is_active_pos' => true, 'is_active_self_order' => true, 'sort_order' => 2],
         ];
 
         foreach ($paymentSources as $source) {

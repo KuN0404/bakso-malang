@@ -357,6 +357,14 @@ class Shift extends Model
     }
 
     /**
+     * Get IDs of all currently open shifts.
+     */
+    public static function getOpenShiftIds(): array
+    {
+        return static::where('status', 'open')->pluck('id')->toArray();
+    }
+
+    /**
      * Get today's shifts with optional user filter.
      */
     public static function getTodayShiftsForUser(?int $userId = null): \Illuminate\Database\Eloquent\Collection

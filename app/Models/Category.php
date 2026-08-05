@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
 use App\Traits\SyncsToReport;
 
+use App\Enums\KitchenTarget;
+
 class Category extends Model
 {
     use SyncsToReport;
@@ -18,11 +20,13 @@ class Category extends Model
         'icon',
         'sort_order',
         'is_active',
+        'target_kitchen',
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
         'sort_order' => 'integer',
+        'target_kitchen' => KitchenTarget::class,
     ];
 
     protected static function boot(): void
@@ -62,6 +66,15 @@ class Category extends Model
     public function scopeForPos($query)
     {
         return $query->where('is_active', true)->orderBy('sort_order')->orderBy('name');
+    }
+
+    /**
+     * Scope berdasarkan klasifikasi dapur.
+     */
+    public function scopeForKitchenTarget($query, $target)
+    {
+        $targetValue = $target instanceof KitchenTarget ? $target->value : $target;
+        return $query->where('target_kitchen', $targetValue);
     }
 
     /**

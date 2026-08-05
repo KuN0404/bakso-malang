@@ -59,7 +59,9 @@
                                  <div class="font-semibold">{{ $detail->product->name }}</div>
                                  @if($detail->modifiers->count())
                                      <div class="text-[9px] text-gray-400 italic">
-                                         + {{ $detail->modifiers->pluck('name')->join(', ') }}
+                                         + @foreach($detail->modifiers as $mod)
+                                             {{ $mod->pivot->modifier_name ?? $mod->name }}{{ ($mod->pivot->quantity ?? 1) > 1 ? ' ×' . $mod->pivot->quantity : '' }}{{ !$loop->last ? ', ' : '' }}
+                                         @endforeach
                                      </div>
                                  @endif
                                  <div class="flex justify-between text-[10px] text-gray-600">
@@ -115,11 +117,13 @@
                         <tr class="item-row">
                             <td width="50%">
                                 {{ $detail->product->name }}
-                                @if($detail->modifiers->count() > 0)
-                                    <div class="modifier">
-                                        + {{ $detail->modifiers->pluck('name')->join(', ') }}
-                                    </div>
-                                @endif
+                                  @if($detail->modifiers->count() > 0)
+                                      <div class="modifier">
+                                          + @foreach($detail->modifiers as $mod)
+                                              {{ $mod->pivot->modifier_name ?? $mod->name }}{{ ($mod->pivot->quantity ?? 1) > 1 ? ' ×' . $mod->pivot->quantity : '' }}{{ !$loop->last ? ', ' : '' }}
+                                          @endforeach
+                                      </div>
+                                  @endif
                             </td>
                             <td width="15%" class="text-center">{{ $detail->quantity }}x</td>
                             <td width="20%" class="text-right">{{ number_format($detail->price, 0, ',', '.') }}</td>

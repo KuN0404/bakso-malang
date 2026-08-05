@@ -163,21 +163,6 @@ class AdminActionAuthorizationTest extends TestCase
     // Components
     // -----------------------------------------------------------------
 
-    public function test_components_stock_adjustment_requires_adjust_component_stock_permission(): void
-    {
-        $component = Component::create(['code' => 'CMP-AUTH-1', 'name' => 'Bakso Kecil', 'unit' => 'pcs', 'stock' => 50]);
-
-        $user = User::factory()->create(['username' => 'auth-comp-1']);
-        $this->grantPermissions($user, ['view_components']); // tanpa adjust_component_stock
-
-        Livewire::actingAs($user)->test(Components::class)
-            ->call('openStockModal', $component->id)
-            ->set('stockAdjustmentAmount', 5)
-            ->call('saveStock')
-            ->assertForbidden();
-
-        $this->assertEquals(50, (float) $component->fresh()->stock);
-    }
 
     // -----------------------------------------------------------------
     // Users — role "Manager" di seeder tidak dapat izin users sama sekali,
@@ -247,7 +232,6 @@ class AdminActionAuthorizationTest extends TestCase
         $this->grantPermissions($viewer, ['view_kitchen_display']); // tanpa update_order_status
 
         Livewire::actingAs($viewer)->test(KitchenDisplay::class)
-            ->call('selectShift', $shift->id)
             ->call('markAsDone', $detail->id)
             ->assertForbidden();
     }

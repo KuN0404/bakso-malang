@@ -301,8 +301,8 @@ class HandleSelfOrderWebhookAction
         array $cartData,
         ?Shift $shift
     ): Transaction {
-        $paymentSource = PaymentSource::active()->where('type', 'qris')->first()
-            ?? PaymentSource::active()->first();
+        $paymentSource = PaymentSource::activeForSelfOrder()->where('type', 'qris')->first()
+            ?? PaymentSource::activeForSelfOrder()->first();
 
         $transaction = Transaction::create([
             'user_id'                => $selfOrder->processed_by ?? ($shift?->user_id),

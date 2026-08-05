@@ -11,15 +11,17 @@ return new class extends Migration
         Schema::create('payment_sources', function (Blueprint $table) {
             $table->id();
             $table->string('name', 100); // Cash, QRIS BCA, Transfer BRI, dll
-            $table->enum('type', ['cash', 'qris', 'transfer', 'card', 'ewallet']);
+            $table->enum('type', ['cash', 'qris'])->default('cash');
             $table->string('account_number')->nullable();
             $table->string('account_name')->nullable();
             $table->string('icon')->nullable();
-            $table->boolean('is_active')->default(true);
+            $table->boolean('is_active_pos')->default(true);
+            $table->boolean('is_active_self_order')->default(true);
             $table->integer('sort_order')->default(0);
             $table->timestamps();
             
-            $table->index('is_active');
+            $table->index('is_active_pos');
+            $table->index('is_active_self_order');
             $table->index('type');
         });
     }

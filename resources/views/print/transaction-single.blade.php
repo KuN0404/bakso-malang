@@ -57,7 +57,7 @@
                     </div>
                 @endif
                 <div class="flex justify-between">
-                    <span>Tipe:</span><span>{{ $transaction->order_type === 'dine_in' ? 'Dine In' : 'Take Away' }}</span>
+                    <span>Tipe:</span><span>{{ $transaction->order_type === 'dine_in' ? 'Makan di Tempat' : 'Bawa Pulang' }}</span>
                 </div>
             </div>
 
@@ -72,7 +72,9 @@
                         </div>
                         @if($detail->modifiers->count())
                             <div class="text-[9px] text-gray-400 pl-2 italic">
-                                + {{ $detail->modifiers->pluck('name')->join(', ') }}
+                                + @foreach($detail->modifiers as $mod)
+                                    {{ $mod->pivot->modifier_name ?? $mod->name }}{{ ($mod->pivot->quantity ?? 1) > 1 ? ' ×' . $mod->pivot->quantity : '' }}{{ !$loop->last ? ', ' : '' }}
+                                @endforeach
                             </div>
                         @endif
                     </div>
@@ -144,7 +146,7 @@
                     <table class="text-sm">
                         <tr><td class="text-gray-500 py-1 pr-4">Tanggal:</td><td class="font-medium">{{ $transaction->created_at->format('d F Y, H:i') }}</td></tr>
                         <tr><td class="text-gray-500 py-1 pr-4">Kasir:</td><td class="font-medium">{{ $transaction->user->name ?? '-' }}</td></tr>
-                        <tr><td class="text-gray-500 py-1 pr-4">Tipe:</td><td class="font-medium">{{ $transaction->order_type === 'dine_in' ? 'Dine In' : 'Take Away' }}</td></tr>
+                        <tr><td class="text-gray-500 py-1 pr-4">Tipe:</td><td class="font-medium">{{ $transaction->order_type === 'dine_in' ? 'Makan di Tempat' : 'Bawa Pulang' }}</td></tr>
                          <tr><td class="text-gray-500 py-1 pr-4">Antrian:</td><td class="font-medium text-lg font-bold">{{ $transaction->queue_display }}</td></tr>
                     </table>
                 </div>
@@ -171,7 +173,11 @@
                             <td class="py-3 px-4">
                                 <p class="font-medium text-gray-800">{{ $detail->product_name }}</p>
                                 @if($detail->modifiers->count())
-                                    <p class="text-sm text-gray-500">+ {{ $detail->modifiers->pluck('name')->join(', ') }}</p>
+                                    <p class="text-sm text-gray-500">
+                                        + @foreach($detail->modifiers as $mod)
+                                            {{ $mod->pivot->modifier_name ?? $mod->name }}{{ ($mod->pivot->quantity ?? 1) > 1 ? ' ×' . $mod->pivot->quantity : '' }}{{ !$loop->last ? ', ' : '' }}
+                                        @endforeach
+                                    </p>
                                 @endif
                             </td>
                             <td class="py-3 px-4 text-center">{{ $detail->quantity }}</td>

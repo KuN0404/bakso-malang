@@ -1,6 +1,6 @@
 @php
-    $printerConfig = \App\Models\PrinterConfig::getDefault();
-    $settings = \App\Models\Setting::getGroup('general');
+    $printerConfig = $printerConfig ?? ($this->printerConfig ?? null);
+    $settings = $settings ?? ($this->generalSettings ?? []);
     
     $paperWidth = match($printerConfig?->paper_size ?? '58mm') {
         '58mm' => '58mm',
@@ -10,7 +10,10 @@
     };
 @endphp
 
-<style>
+    #shift-receipt-content, #shift-receipt-content * {
+        color: #000 !important;
+        border-color: #000 !important;
+    }
     @media print {
         @page {
             size: {{ $paperWidth }} auto;
@@ -24,13 +27,13 @@
     }
 </style>
 
-<div id="shift-receipt-content" class="font-mono text-xs animate-fade-in" style="max-width: {{ $paperWidth }}; margin: 0 auto;">
+<div id="shift-receipt-content" class="font-mono text-xs animate-fade-in text-black" style="max-width: {{ $paperWidth }}; margin: 0 auto; color: #000 !important;">
     <!-- Header -->
-    <div class="text-center mb-2 pb-2 border-b border-dashed border-gray-300">
+    <div class="text-center mb-2 pb-2 border-b border-dashed border-black">
         <h1 class="font-bold text-base">{{ $settings['store_name'] ?? 'Bakso Malang' }}</h1>
-        <p class="text-[10px] text-gray-600">{{ $settings['store_address'] ?? '' }}</p>
+        <p class="text-[10px]">{{ $settings['store_address'] ?? '' }}</p>
         @if(!empty($settings['store_phone']))
-        <p class="text-[10px] text-gray-600">Telp: {{ $settings['store_phone'] }}</p>
+        <p class="text-[10px]">Telp: {{ $settings['store_phone'] }}</p>
         @endif
         <div class="font-bold mt-2" style="font-size: 11px;">LAPORAN TUTUP SHIFT</div>
     </div>

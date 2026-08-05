@@ -101,12 +101,40 @@
                             {{ $order->queue_display }}
                         </div>
                         <div>
-                            <p class="font-bold text-gray-800">{{ $order->customer_name }}</p>
-                            <div class="flex items-center gap-2 mt-0.5">
-                                <span class="text-xs bg-{{ $order->status->color() }}-100 text-{{ $order->status->color() }}-700 px-2 py-0.5 rounded-full font-medium">
+                            <div class="flex items-center gap-2">
+                                <p class="font-bold text-gray-800">{{ $order->customer_name }}</p>
+                                @if($order->invoice_number)
+                                    <span class="text-[11px] font-mono font-semibold text-gray-500 bg-gray-100 px-2 py-0.5 rounded border border-gray-200">
+                                        {{ $order->invoice_number }}
+                                    </span>
+                                @endif
+                            </div>
+                            <div class="flex items-center gap-2 mt-1 flex-wrap">
+                                <span class="text-xs bg-{{ $order->status->color() }}-100 text-{{ $order->status->color() }}-800 px-2.5 py-0.5 rounded-lg font-bold">
                                     {{ $order->status->label() }}
                                 </span>
-                                <span class="text-xs text-gray-400">{{ $order->payment_method_label }}</span>
+                                @if($order->payment_method === 'qris')
+                                    <span class="text-xs bg-blue-100 text-blue-800 px-2.5 py-0.5 rounded-lg font-bold inline-flex items-center gap-1">
+                                        <x-lucide name="credit-card" class="w-3.5 h-3.5" />
+                                        QRIS
+                                    </span>
+                                @else
+                                    <span class="text-xs bg-gray-100 text-gray-700 px-2.5 py-0.5 rounded-lg font-bold inline-flex items-center gap-1">
+                                        <x-lucide name="wallet" class="w-3.5 h-3.5" />
+                                        Bayar di Kasir
+                                    </span>
+                                @endif
+                                @if($order->order_type === 'dine_in')
+                                    <span class="text-xs bg-purple-100 text-purple-800 px-2.5 py-0.5 rounded-lg font-bold inline-flex items-center gap-1">
+                                        <x-lucide name="utensils" class="w-3.5 h-3.5" />
+                                        Makan di Tempat {{ $order->serviceArea ? '('.$order->serviceArea->name.')' : '(Belum Set Meja)' }}
+                                    </span>
+                                @else
+                                    <span class="text-xs bg-amber-100 text-amber-800 px-2.5 py-0.5 rounded-lg font-bold inline-flex items-center gap-1">
+                                        <x-lucide name="shopping-bag" class="w-3.5 h-3.5" />
+                                        Bawa Pulang
+                                    </span>
+                                @endif
                             </div>
                             <p class="text-sm font-semibold text-gray-800 mt-1">{{ $order->formatted_total }}</p>
                             <p class="text-xs text-gray-400">{{ $order->created_at->diffForHumans() }}</p>
@@ -148,13 +176,38 @@
             <div class="bg-white rounded-xl shadow-sm border border-orange-100 p-4" wire:key="waiting-{{ $order->id }}">
                 <div class="flex items-start justify-between gap-4">
                     <div class="flex items-start gap-3">
-                        {{-- Nomor antrian --}}
                         <div class="w-12 h-12 bg-orange-500 text-white rounded-xl flex items-center justify-center font-black text-lg flex-shrink-0">
                             {{ $order->queue_display }}
                         </div>
                         <div>
-                            <p class="font-bold text-gray-800">{{ $order->customer_name }}</p>
-                            <p class="text-xs text-gray-400">{{ $order->customer_phone }}</p>
+                            <div class="flex items-center gap-2">
+                                <p class="font-bold text-gray-800">{{ $order->customer_name }}</p>
+                                @if($order->invoice_number)
+                                    <span class="text-[11px] font-mono font-semibold text-gray-500 bg-gray-100 px-2 py-0.5 rounded border border-gray-200">
+                                        {{ $order->invoice_number }}
+                                    </span>
+                                @endif
+                            </div>
+                            <div class="flex items-center gap-2 mt-1 flex-wrap">
+                                <span class="text-xs bg-orange-100 text-orange-800 px-2.5 py-0.5 rounded-lg font-bold">
+                                    {{ $order->status->label() }}
+                                </span>
+                                <span class="text-xs bg-gray-100 text-gray-700 px-2.5 py-0.5 rounded-lg font-bold inline-flex items-center gap-1">
+                                    <x-lucide name="wallet" class="w-3.5 h-3.5" />
+                                    Bayar di Kasir
+                                </span>
+                                @if($order->order_type === 'dine_in')
+                                    <span class="text-xs bg-purple-100 text-purple-800 px-2.5 py-0.5 rounded-lg font-bold inline-flex items-center gap-1">
+                                        <x-lucide name="utensils" class="w-3.5 h-3.5" />
+                                        Makan di Tempat {{ $order->serviceArea ? '('.$order->serviceArea->name.')' : '(Belum Set Meja)' }}
+                                    </span>
+                                @else
+                                    <span class="text-xs bg-amber-100 text-amber-800 px-2.5 py-0.5 rounded-lg font-bold inline-flex items-center gap-1">
+                                        <x-lucide name="shopping-bag" class="w-3.5 h-3.5" />
+                                        Bawa Pulang
+                                    </span>
+                                @endif
+                            </div>
                             <p class="text-sm text-gray-600 mt-1">
                                 {{ $order->items->count() }} item ·
                                 <span class="font-semibold text-gray-800">{{ $order->formatted_total }}</span>
@@ -165,7 +218,6 @@
                         </div>
                     </div>
 
-                    {{-- Actions --}}
                     <div class="flex flex-col gap-2 flex-shrink-0">
                         @can('accept_self_order_payment')
                         <button wire:click="claimOrder({{ $order->id }})"
@@ -183,16 +235,6 @@
                         </button>
                     </div>
                 </div>
-
-                {{-- Items Summary --}}
-                <div class="mt-3 pt-3 border-t border-gray-50">
-                    @foreach($order->items->take(3) as $item)
-                    <p class="text-xs text-gray-500">• {{ $item->quantity }}× {{ $item->product_name }}</p>
-                    @endforeach
-                    @if($order->items->count() > 3)
-                    <p class="text-xs text-gray-400">+{{ $order->items->count() - 3 }} item lainnya</p>
-                    @endif
-                </div>
             </div>
             @empty
             <div class="text-center py-16 text-gray-400">
@@ -207,16 +249,53 @@
             {{ $this->waitingOrders->links() }}
         </div>
 
-        {{-- TAB: Diambil (QRIS & Cash sekaligus — sedang dikerjakan kasir) --}}
         @elseif($activeTab === 'claimed')
         <div class="space-y-3">
-            <div class="flex items-center justify-between px-1">
+            <div class="flex items-center justify-between px-1 gap-2">
                 <p class="text-xs text-gray-400">Pesanan yang sudah diambil kasir, baik QRIS maupun Bayar di Tempat.</p>
                 <label class="flex items-center gap-1.5 text-xs font-medium text-gray-500 cursor-pointer select-none whitespace-nowrap">
                     <input type="checkbox" wire:click="toggleOnlyMine" @checked($onlyMyClaimedOrders)
                         class="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5">
                     Punya saya saja
                 </label>
+            </div>
+
+            @php
+                $statusCounts = $this->claimedStatusCounts;
+                $totalClaimed = array_sum($statusCounts);
+                $subFilters = [
+                    ''           => ['label' => 'Semua',          'color' => 'blue'],
+                    'paid'       => ['label' => 'Sudah Dibayar',  'color' => 'blue'],
+                    'processing' => ['label' => 'Diproses',       'color' => 'purple'],
+                    'ready'      => ['label' => 'Siap Diambil',   'color' => 'cyan'],
+                ];
+            @endphp
+            <div class="flex gap-1.5 flex-wrap">
+                @foreach($subFilters as $filterVal => $filterMeta)
+                    @php
+                        $count = $filterVal === '' ? $totalClaimed : ($statusCounts[$filterVal] ?? 0);
+                        $isActive = $claimedStatusFilter === $filterVal;
+                        $colorActive = match($filterMeta['color']) {
+                            'purple' => 'bg-purple-600 text-white border-purple-600',
+                            'cyan'   => 'bg-cyan-600 text-white border-cyan-600',
+                            default  => 'bg-blue-600 text-white border-blue-600',
+                        };
+                        $colorInactive = match($filterMeta['color']) {
+                            'purple' => 'border-gray-200 text-gray-600 hover:bg-purple-50 hover:border-purple-300 hover:text-purple-700',
+                            'cyan'   => 'border-gray-200 text-gray-600 hover:bg-cyan-50 hover:border-cyan-300 hover:text-cyan-700',
+                            default  => 'border-gray-200 text-gray-600 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700',
+                        };
+                    @endphp
+                    <button wire:click="filterClaimedByStatus('{{ $filterVal }}')"
+                        class="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold border rounded-lg transition {{ $isActive ? $colorActive : $colorInactive }}">
+                        {{ $filterMeta['label'] }}
+                        @if($count > 0)
+                            <span class="{{ $isActive ? 'bg-white/30 text-white' : 'bg-gray-100 text-gray-700' }} text-[10px] font-bold px-1.5 py-0 rounded min-w-[18px] text-center">
+                                {{ $count }}
+                            </span>
+                        @endif
+                    </button>
+                @endforeach
             </div>
             @forelse($this->claimedOrders as $order)
             <div class="bg-white rounded-xl shadow-sm border border-blue-100 p-4" wire:key="claimed-{{ $order->id }}">
@@ -226,16 +305,50 @@
                             {{ $order->queue_display }}
                         </div>
                         <div>
-                            <p class="font-bold text-gray-800">{{ $order->customer_name }}</p>
-                            <div class="flex items-center gap-2 mt-0.5 flex-wrap">
-                                <span class="text-xs bg-{{ $order->status->color() }}-100 text-{{ $order->status->color() }}-700 px-2 py-0.5 rounded-full font-medium">
+                            <div class="flex items-center gap-2">
+                                <p class="font-bold text-gray-800">{{ $order->customer_name }}</p>
+                                @if($order->invoice_number)
+                                    <span class="text-[11px] font-mono font-semibold text-gray-500 bg-gray-100 px-2 py-0.5 rounded border border-gray-200">
+                                        {{ $order->invoice_number }}
+                                    </span>
+                                @endif
+                            </div>
+                            <div class="flex items-center gap-2 mt-1 flex-wrap">
+                                <span class="text-xs bg-{{ $order->status->color() }}-100 text-{{ $order->status->color() }}-800 px-2.5 py-0.5 rounded-lg font-bold">
                                     {{ $order->status->label() }}
                                 </span>
-                                <span class="text-xs text-gray-400">{{ $order->payment_method_label }}</span>
-                                <span class="text-xs text-blue-500 font-medium flex items-center gap-1">
-                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                                @if($order->payment_method === 'qris')
+                                    <span class="text-xs bg-blue-100 text-blue-800 px-2.5 py-0.5 rounded-lg font-bold inline-flex items-center gap-1">
+                                        <x-lucide name="credit-card" class="w-3.5 h-3.5" />
+                                        QRIS
+                                    </span>
+                                @else
+                                    <span class="text-xs bg-gray-100 text-gray-700 px-2.5 py-0.5 rounded-lg font-bold inline-flex items-center gap-1">
+                                        <x-lucide name="wallet" class="w-3.5 h-3.5" />
+                                        Bayar di Kasir
+                                    </span>
+                                @endif
+                                <span class="text-xs bg-blue-50 text-blue-700 px-2.5 py-0.5 rounded-lg font-bold inline-flex items-center gap-1">
+                                    <x-lucide name="user" class="w-3.5 h-3.5" />
                                     {{ $order->processedBy?->name ?? '—' }}
                                 </span>
+                                @if($order->order_type === 'dine_in')
+                                    <span class="text-xs bg-purple-100 text-purple-800 px-2.5 py-0.5 rounded-lg font-bold inline-flex items-center gap-1">
+                                        <x-lucide name="utensils" class="w-3.5 h-3.5" />
+                                        Makan di Tempat {{ $order->serviceArea ? '('.$order->serviceArea->name.')' : '(Belum Set Meja)' }}
+                                    </span>
+                                @else
+                                    <span class="text-xs bg-amber-100 text-amber-800 px-2.5 py-0.5 rounded-lg font-bold inline-flex items-center gap-1">
+                                        <x-lucide name="shopping-bag" class="w-3.5 h-3.5" />
+                                        Bawa Pulang
+                                    </span>
+                                    @if($order->pickup_confirmed_at)
+                                        <span class="text-xs bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-lg font-bold inline-flex items-center gap-1">
+                                            <x-lucide name="check-circle" class="w-3.5 h-3.5 text-emerald-600" />
+                                            Pengambil: {{ $order->pickup_display_name }}
+                                        </span>
+                                    @endif
+                                @endif
                             </div>
                             <p class="text-sm font-semibold text-gray-800 mt-1">{{ $order->formatted_total }}</p>
                             <p class="text-xs text-gray-400">Diambil {{ $order->claimed_at?->diffForHumans() ?? $order->created_at->diffForHumans() }}</p>
@@ -243,7 +356,6 @@
                     </div>
 
                     <div class="flex flex-col gap-2 flex-shrink-0">
-                        {{-- Tombol proses HANYA untuk kasir yang mengambil order ini — kasir lain cuma bisa lihat. --}}
                         @if($order->processed_by === auth()->id())
                         @can('accept_self_order_payment')
                         @if($order->isWaitingPayment())
@@ -313,7 +425,12 @@
     <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[80vh] overflow-y-auto">
             <div class="p-4 border-b flex items-center justify-between">
-                <h3 class="font-bold text-lg">Detail Order #{{ $selectedOrder->queue_display }}</h3>
+                <div>
+                    <h3 class="font-bold text-lg text-gray-800">Detail Order #{{ $selectedOrder->queue_display }}</h3>
+                    @if($selectedOrder->invoice_number)
+                        <p class="text-xs font-mono text-gray-500">Invoice: {{ $selectedOrder->invoice_number }}</p>
+                    @endif
+                </div>
                 <button wire:click="closeDetail" class="text-gray-400 hover:text-gray-600">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
@@ -322,10 +439,72 @@
             </div>
             <div class="p-4 space-y-4">
                 <div class="grid grid-cols-2 gap-3 text-sm">
-                    <div><span class="text-gray-400">Nama</span><p class="font-medium">{{ $selectedOrder->customer_name }}</p></div>
-                    <div><span class="text-gray-400">HP</span><p class="font-medium">{{ $selectedOrder->customer_phone }}</p></div>
-                    <div><span class="text-gray-400">Pembayaran</span><p class="font-medium">{{ $selectedOrder->payment_method_label }}</p></div>
-                    <div><span class="text-gray-400">Status</span><p class="font-medium text-brand">{{ $selectedOrder->status->label() }}</p></div>
+                    <div><span class="text-gray-400">Pemesan</span><p class="font-medium">{{ $selectedOrder->customer_name }}</p></div>
+                    <div><span class="text-gray-400">HP Pemesan</span><p class="font-medium font-mono text-xs">{{ $selectedOrder->customer_phone }}</p></div>
+                    <div>
+                        <span class="text-gray-400">Tipe Order</span>
+                        <div class="mt-0.5">
+                            @if($selectedOrder->order_type === 'dine_in')
+                                <span class="inline-flex items-center gap-1 px-2.5 py-1 bg-purple-100 text-purple-800 text-xs font-bold rounded-lg">
+                                    <x-lucide name="utensils" class="w-3.5 h-3.5" />
+                                    Makan di Tempat
+                                </span>
+                            @else
+                                <span class="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-100 text-amber-800 text-xs font-bold rounded-lg">
+                                    <x-lucide name="shopping-bag" class="w-3.5 h-3.5" />
+                                    Bawa Pulang
+                                </span>
+                            @endif
+                        </div>
+                    </div>
+                    <div>
+                        <span class="text-gray-400">Meja / Area</span>
+                        <p class="font-medium flex items-center gap-1">
+                            {{ $selectedOrder->serviceArea?->name ?? ($selectedOrder->order_type === 'dine_in' ? 'Belum Set Meja' : '-') }}
+                            @if($selectedOrder->order_type === 'dine_in')
+                                <button wire:click="openAssignAreaModal({{ $selectedOrder->id }}, 'none')" class="text-xs text-purple-600 underline hover:text-purple-800 ml-1">
+                                    Edit
+                                </button>
+                            @endif
+                        </p>
+                    </div>
+                    <div>
+                        <span class="text-gray-400">Pembayaran</span>
+                        <div class="mt-0.5">
+                            @if($selectedOrder->payment_method === 'qris')
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-100 text-blue-800 text-xs font-bold rounded-lg">
+                                    <x-lucide name="credit-card" class="w-3.5 h-3.5" />
+                                    QRIS
+                                </span>
+                            @else
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-gray-100 text-gray-700 text-xs font-bold rounded-lg">
+                                    <x-lucide name="wallet" class="w-3.5 h-3.5" />
+                                    {{ $selectedOrder->payment_method_label }}
+                                </span>
+                            @endif
+                        </div>
+                    </div>
+                    <div>
+                        <span class="text-gray-400">Status</span>
+                        <div class="mt-0.5">
+                            <span class="inline-flex px-2.5 py-1 bg-{{ $selectedOrder->status->color() }}-100 text-{{ $selectedOrder->status->color() }}-800 text-xs font-bold rounded-lg">
+                                {{ $selectedOrder->status->label() }}
+                            </span>
+                        </div>
+                    </div>
+                    
+                    @if($selectedOrder->order_type === 'take_away')
+                    <div class="col-span-2 p-2.5 bg-amber-50 rounded-xl border border-amber-200">
+                        <span class="text-xs text-amber-800 font-semibold uppercase tracking-wide">Pengambil Pesanan (Take Away)</span>
+                        <p class="font-bold text-gray-900 mt-0.5">{{ $selectedOrder->pickup_display_name }}</p>
+                        <p class="text-xs font-mono text-gray-600">{{ $selectedOrder->pickup_display_phone }}</p>
+                        @if($selectedOrder->pickup_confirmed_at)
+                            <p class="text-[11px] text-emerald-700 font-medium mt-1">✓ Dikonfirmasi: {{ $selectedOrder->pickup_confirmed_at->format('d/m/Y H:i') }}</p>
+                        @else
+                            <p class="text-[11px] text-amber-700 italic mt-1">Belum dikonfirmasi serah terima</p>
+                        @endif
+                    </div>
+                    @endif
                 </div>
                 <div class="border-t pt-3 space-y-2">
                     @foreach($selectedOrder->items as $item)
@@ -360,20 +539,24 @@
 
     {{-- ─── Modal: Konfirmasi Pembayaran ───────────────────────────────── --}}
     @if($showPaymentModal)
-    @php $payOrder = App\Models\SelfOrder::find($selectedOrderId); @endphp
     <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
             <h3 class="font-bold text-lg mb-4">Konfirmasi Pembayaran</h3>
-            @if($payOrder)
+            @if($this->payOrderData)
             <p class="text-sm text-gray-500 mb-1">Total yang harus dibayar:</p>
-            <p class="text-3xl font-black text-brand mb-4">{{ $payOrder->formatted_total }}</p>
+            <p class="text-3xl font-black text-brand mb-4">{{ $this->payOrderData->formatted_total }}</p>
             <div class="mb-4">
                 <label class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Nominal Diterima</label>
-                <input wire:model="paidAmount" type="number" min="{{ $payOrder->total }}"
+                <input wire:model.live.debounce.150ms="paidAmount" type="number" min="{{ $this->payOrderData->total }}"
                     class="mt-1 w-full rounded-xl border px-3 py-2.5 text-base font-bold text-center focus:outline-none focus:ring-2 focus:ring-red-500">
-                @if($paidAmount >= $payOrder->total)
-                <p class="text-green-600 text-sm mt-1 text-center font-medium">
-                    Kembalian: Rp {{ number_format(max(0, $paidAmount - $payOrder->total), 0, ',', '.') }}
+                @php
+                    $numPaid = is_numeric($paidAmount) ? (float)$paidAmount : 0;
+                    $orderTotal = (float)($this->payOrderData->total ?? 0);
+                    $change = max(0, $numPaid - $orderTotal);
+                @endphp
+                @if($numPaid >= $orderTotal && $orderTotal > 0)
+                <p class="text-green-600 text-sm mt-1 text-center font-bold">
+                    Kembalian: Rp {{ number_format($change, 0, ',', '.') }}
                 </p>
                 @endif
             </div>
@@ -409,6 +592,150 @@
                 <button wire:click="cancelOrder"
                     class="flex-1 bg-red-500 text-white py-2.5 rounded-xl text-sm font-bold hover:bg-red-600 transition">
                     Batalkan Order
+                </button>
+            </div>
+        </div>
+    </div>
+    @endif
+
+    {{-- ─── Modal: Assign Service Area (Meja/Ruangan) ──────────────────── --}}
+    @if($showAssignAreaModal)
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+            <div>
+                <h3 class="font-bold text-lg text-gray-800">Pilih Meja / Area Makan</h3>
+                <p class="text-xs text-gray-500 mt-1">
+                    Pesanan ini adalah tipe <span class="font-semibold text-purple-700">Makan di Tempat</span>. Harap tentukan lokasi meja terlebih dahulu.
+                </p>
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1.5">Meja / Area Makan *</label>
+                <select wire:model="selectedServiceAreaId" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-purple-500">
+                    <option value="">-- Pilih Meja --</option>
+                    @foreach($this->activeServiceAreas as $area)
+                        <option value="{{ $area->id }}">{{ $area->name }} ({{ $area->type_label }})</option>
+                    @endforeach
+                </select>
+            </div>
+
+            <div class="flex gap-3 pt-2">
+                <button wire:click="closeAssignAreaModal" class="flex-1 py-2.5 border border-gray-200 text-gray-600 font-semibold text-sm rounded-xl hover:bg-gray-50">
+                    Batal
+                </button>
+                <button wire:click="saveAreaAndContinue" class="flex-1 py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-bold text-sm rounded-xl transition shadow-md shadow-purple-600/30">
+                    Simpan & Lanjut
+                </button>
+            </div>
+        </div>
+    </div>
+    @endif
+
+    {{-- ─── Modal: Konfirmasi Pengambil (Take Away / Dine In — QRIS & Cash) ── --}}
+    @if($showPickupModal && $pickupOrder)
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
+            <div>
+                <div class="flex items-center justify-between mb-1">
+                    <h3 class="font-bold text-lg text-gray-800">Konfirmasi Pengambil Pesanan</h3>
+                    <div class="flex gap-1.5">
+                        @if($pickupOrder->payment_method === 'qris')
+                            <span class="px-2.5 py-1 bg-blue-100 text-blue-800 text-xs font-bold rounded-lg flex items-center gap-1">
+                                <x-lucide name="credit-card" class="w-3.5 h-3.5" />
+                                QRIS
+                            </span>
+                        @else
+                            <span class="px-2.5 py-1 bg-gray-100 text-gray-700 text-xs font-bold rounded-lg flex items-center gap-1">
+                                <x-lucide name="wallet" class="w-3.5 h-3.5" />
+                                Bayar di Kasir
+                            </span>
+                        @endif
+                        @if($pickupOrder->order_type === 'dine_in')
+                            <span class="px-2.5 py-1 bg-purple-100 text-purple-800 text-xs font-bold rounded-lg flex items-center gap-1">
+                                <x-lucide name="utensils" class="w-3.5 h-3.5" />
+                                Makan di Tempat
+                            </span>
+                        @else
+                            <span class="px-2.5 py-1 bg-amber-100 text-amber-800 text-xs font-bold rounded-lg flex items-center gap-1">
+                                <x-lucide name="shopping-bag" class="w-3.5 h-3.5" />
+                                Bawa Pulang
+                            </span>
+                        @endif
+                    </div>
+                </div>
+                <p class="text-xs text-gray-500">
+                    Antrian: <strong class="font-mono text-gray-800">#{{ $pickupOrder->queue_display }}</strong>
+                    @if($pickupOrder->invoice_number)
+                        &bull; Inv: <strong class="font-mono text-gray-800">{{ $pickupOrder->invoice_number }}</strong>
+                    @endif
+                    &bull;
+                    <span class="font-semibold text-gray-700">
+                        {{ $pickupNextAction === 'claim' ? 'Sebelum Diambil Kasir' : 'Sebelum Diselesaikan' }}
+                    </span>
+                </p>
+            </div>
+
+            <div class="p-3 bg-gray-50 rounded-xl border border-gray-100 text-sm space-y-1">
+                <p class="text-xs text-gray-400 uppercase font-semibold flex items-center gap-1">
+                    <x-lucide name="user" class="w-3.5 h-3.5 text-gray-500" />
+                    Pemesan Asli
+                </p>
+                <p class="font-bold text-gray-800">{{ $pickupOrder->customer_name }}</p>
+                <p class="text-xs text-gray-500 font-mono">{{ $pickupOrder->customer_phone }}</p>
+            </div>
+
+            <div class="space-y-3">
+                <label class="block text-xs font-semibold text-gray-700 uppercase tracking-wide">Siapa yang mengambil pesanan? *</label>
+
+                <label class="flex items-start gap-3 p-3 border rounded-xl cursor-pointer transition {{ $pickupOption === 'same' ? 'border-emerald-500 bg-emerald-50/50 text-emerald-900 font-medium' : 'border-gray-200 hover:bg-gray-50' }}">
+                    <input type="radio" wire:model.live="pickupOption" value="same" class="mt-1 text-emerald-600 focus:ring-emerald-500">
+                    <div>
+                        <p class="text-sm font-bold flex items-center gap-1.5">
+                            <x-lucide name="user" class="w-4 h-4 text-emerald-600" />
+                            Orang yang Sama (Pemesan)
+                        </p>
+                        <p class="text-xs opacity-75 mt-0.5">{{ $pickupOrder->customer_name }} &bull; {{ $pickupOrder->customer_phone }}</p>
+                    </div>
+                </label>
+
+                <label class="flex items-start gap-3 p-3 border rounded-xl cursor-pointer transition {{ $pickupOption === 'other' ? 'border-blue-500 bg-blue-50/50 text-blue-900 font-medium' : 'border-gray-200 hover:bg-gray-50' }}">
+                    <input type="radio" wire:model.live="pickupOption" value="other" class="mt-1 text-blue-600 focus:ring-blue-500">
+                    <div>
+                        <p class="text-sm font-bold flex items-center gap-1.5">
+                            <x-lucide name="users" class="w-4 h-4 text-blue-600" />
+                            Orang Lain / Wakil / Kurir
+                        </p>
+                        <p class="text-xs opacity-75 mt-0.5">Masukkan nama & No. HP penjemput</p>
+                    </div>
+                </label>
+
+                @if($pickupOption === 'other')
+                <div class="space-y-2 pt-2 border-t border-gray-100">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1">Nama Pengambil *</label>
+                        <input type="text" wire:model="pickupName" placeholder="Contoh: Budi (Adik / Ojol)" class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg">
+                        @error('pickupName') <span class="text-xs text-red-500">{{ $message }}</span> @enderror
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1">No. HP Pengambil *</label>
+                        <input type="text" wire:model="pickupPhone" placeholder="Contoh: 08123456789" class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg">
+                        @error('pickupPhone') <span class="text-xs text-red-500">{{ $message }}</span> @enderror
+                    </div>
+                </div>
+                @endif
+            </div>
+
+            <div class="flex gap-3 pt-3 border-t border-gray-100">
+                <button type="button" wire:click="closePickupModal" class="flex-1 py-2.5 text-sm font-semibold text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50">
+                    Batal
+                </button>
+                <button type="button" wire:click="confirmPickup"
+                    wire:loading.attr="disabled" wire:loading.class="opacity-60"
+                    class="flex-1 py-2.5 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-md transition">
+                    <span wire:loading.remove wire:target="confirmPickup">
+                        {{ $pickupNextAction === 'claim' ? 'Konfirmasi & Ambil Pesanan' : 'Konfirmasi & Selesaikan' }}
+                    </span>
+                    <span wire:loading wire:target="confirmPickup">Memproses...</span>
                 </button>
             </div>
         </div>

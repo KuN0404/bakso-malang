@@ -41,6 +41,10 @@ class SelfOrderPaymentSseController extends Controller
             return response('Not Found', 404);
         }
 
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            session_write_close();
+        }
+
         $maxDuration  = (int) config('self_order.sse_max_duration_seconds', 600);
         $pollInterval = (int) config('self_order.sse_poll_interval_seconds', 2);
         $activeCheckEvery = 12; // Cek aktif ke Midtrans setiap ~12 detik jika masih pending

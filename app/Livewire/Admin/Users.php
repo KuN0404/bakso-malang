@@ -44,13 +44,20 @@ class Users extends Component
     public function edit(int $id): void
     {
         $user = User::getForEdit($id);
+
+        // Proteksi: Akun Super Admin HANYA BISA diubah oleh sesama Super Admin
+        if ($user->isSuperAdmin() && !auth()->user()->isSuperAdmin()) {
+            $this->dispatch('notify', type: 'error', message: 'Hanya Super Admin yang berhak mengubah akun Super Admin.');
+            return;
+        }
+
         $this->editingId = $user->id;
         $this->username = $user->username;
         $this->name = $user->name;
         $this->email = $user->email;
         $this->password = '';
         $this->selectedRoles = $user->roles->pluck('name')->toArray();
-        $this->isEditingSuperAdmin = $user->hasRole('Super Admin');
+        $this->isEditingSuperAdmin = $user->isSuperAdmin();
         $this->showModal = true;
     }
 
@@ -58,26 +65,52 @@ class Users extends Component
     {
         $this->authorize($this->editingId ? 'edit_users' : 'create_users');
 
+        // Proteksi simpan: Akun Super Admin HANYA BISA diubah oleh sesama Super Admin
+        if ($this->editingId) {
+            $targetUser = User::find($this->editingId);
+            if ($targetUser && $targetUser->isSuperAdmin() && !auth()->user()->isSuperAdmin()) {
+                $this->dispatch('notify', type: 'error', message: 'Hanya Super Admin yang berhak mengubah akun Super Admin.');
+                $this->showModal = false;
+                return;
+            }
+        }
+
         // Logic khusus Super Admin
         if ($this->isEditingSuperAdmin) {
             $this->validate([
+                'name'  => 'required|min:2|max:100',
+                'email' => 'required|email|unique:users,email,' . $this->editingId,
                 'password' => 'nullable|min:6',
             ]);
 
             $user = User::find($this->editingId);
+            $data = [
+                'name'  => $this->name,
+                'email' => $this->email,
+            ];
             
             if ($this->password) {
-                $user->update(['password' => bcrypt($this->password)]);
-                $this->dispatch('notify', type: 'success', message: 'Password Super Admin berhasil diperbarui');
-            } else {
-                $this->dispatch('notify', type: 'info', message: 'Tidak ada perubahan data');
+                $data['password'] = bcrypt($this->password);
             }
-            
+
+            $user->update($data);
+
+            // Perkuat: Pastikan role Super Admin tidak dapat dilepas
+            if (!$user->hasRole('Super Admin')) {
+                $user->assignRole('Super Admin');
+            }
+
+            $this->dispatch('notify', type: 'success', message: 'Data Super Admin berhasil diperbarui');
             $this->showModal = false;
             return;
         }
 
         // Logic User Biasa
+        if (in_array('Super Admin', $this->selectedRoles) && !$this->isEditingSuperAdmin) {
+            $this->dispatch('notify', type: 'error', message: 'Sistem hanya memperbolehkan 1 akun Super Admin utama.');
+            return;
+        }
+
         $rules = [
             'username' => 'required|min:3|max:50|unique:users,username,' . $this->editingId,
             'name' => 'required|min:2|max:100',
@@ -122,15 +155,17 @@ class Users extends Component
     {
         $this->authorize('delete_users');
 
+        // 1. Tidak dapat menghapus akun sendiri
         if ($id === auth()->id()) {
-            $this->dispatch('notify', type: 'error', message: 'Tidak dapat menghapus akun sendiri');
+            $this->dispatch('notify', type: 'error', message: 'Anda tidak dapat menghapus akun Anda sendiri');
             return;
         }
 
         $user = User::getForEdit($id);
         
-        if ($user->hasRole('Super Admin')) {
-            $this->dispatch('notify', type: 'error', message: 'Super Admin tidak dapat dihapus');
+        // 2. Super Admin TIDAK BISA DIHAPUS oleh SIAPAPUN (termasuk sesama Super Admin)
+        if ($user->isSuperAdmin()) {
+            $this->dispatch('notify', type: 'error', message: 'User Super Admin tidak dapat dihapus oleh siapapun');
             return;
         }
 

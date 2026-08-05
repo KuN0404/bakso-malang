@@ -17,7 +17,7 @@ class SelfOrderTracking extends Component
     public ?SelfOrder $selfOrder = null;
 
     // Auto-refresh setiap 5 detik untuk update status
-    public int $refreshInterval = 5000;
+    public int $refreshInterval = 10000;
 
     public function mount(string $token): void
     {
@@ -67,8 +67,13 @@ class SelfOrderTracking extends Component
         };
 
         foreach ($steps as $i => &$step) {
-            $step['done']   = $i < $activeIndex;
-            $step['active'] = $i === $activeIndex;
+            if ($currentStatus === 'completed') {
+                $step['done']   = true;
+                $step['active'] = false;
+            } else {
+                $step['done']   = $i < $activeIndex;
+                $step['active'] = $i === $activeIndex;
+            }
         }
 
         return $steps;

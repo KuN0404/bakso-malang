@@ -11,7 +11,6 @@
         showModifierModal: false,
         modifierProduct: null,
         selectedModifiers: {},
-        selectedModifiers: {},
         modifierTotal: 0,
         isThrottled: false,
         showConfirmCloseShift: false,
@@ -21,18 +20,20 @@
             this.modifierProduct = product;
             this.selectedModifiers = {};
             this.modifierTotal = 0;
-            // Set defaults for single selection groups (first option)
+            // Set defaults for single selection groups (first option selected by default)
             if (product.modifier_groups) {
                 product.modifier_groups.forEach(group => {
                     if (group.selection_type === 'single' && group.modifiers && group.modifiers.length > 0) {
-                        this.selectModifier(group.id, group.modifiers[0], 'single');
+                        this.selectedModifiers[group.id] = [{ ...group.modifiers[0], qty: 1 }];
                     }
                 });
             }
+            this.calculateModifierTotal();
             this.showModifierModal = true;
         },
         selectModifier(groupId, modifier, selectionType) {
             if (selectionType === 'single') {
+                // Single selection: always set to chosen modifier (cannot be deselected to empty)
                 this.selectedModifiers[groupId] = [{ ...modifier, qty: 1 }];
             } else {
                 if (!this.selectedModifiers[groupId]) {
@@ -49,6 +50,9 @@
         },
         changeModifierQty(groupId, modifierId, delta) {
             if (!this.selectedModifiers[groupId]) return;
+            const group = this.modifierProduct?.modifier_groups?.find(g => g.id === groupId);
+            if (group && group.selection_type === 'single') return;
+
             const item = this.selectedModifiers[groupId].find(m => m.id === modifierId);
             if (item) {
                 const newQty = (item.qty || 1) + delta;
@@ -103,6 +107,19 @@
             if (this.isThrottled) return;
 
             if (this.modifierProduct) {
+                // Ensure all single selection groups have a selection
+                if (this.modifierProduct.modifier_groups) {
+                    for (const group of this.modifierProduct.modifier_groups) {
+                        if (group.selection_type === 'single') {
+                            const sel = this.selectedModifiers[group.id];
+                            if (!sel || sel.length === 0) {
+                                alert('Silakan pilih opsi untuk ' + group.name);
+                                return;
+                            }
+                        }
+                    }
+                }
+
                 this.isThrottled = true;
                 $wire.addToCart(this.modifierProduct.id, this.getModifiersForCart());
                 this.showModifierModal = false;
@@ -186,26 +203,25 @@
                     <div class="flex justify-between items-center">
                         <h3 class="text-xl font-bold text-gray-800 flex items-center gap-2">
                             <x-lucide name="clock" class="w-6 h-6 text-red-600" />
-                            Tutup Shift {{ \App\Models\Shift::find($unclosedShiftId)?->started_at?->format('d/m/Y') }}
+                            Tutup Shift {{ $this->unclosedShiftModalData?->started_at?->format('d/m/Y') }}
                         </h3>
                     </div>
                     <p class="text-sm text-red-500 mt-1">Shift ini akan ditandai sebagai "Ditutup Terlambat"</p>
                 </div>
                 <div class="p-6 space-y-4 overflow-y-auto flex-1 custom-scroll">
                     <!-- Summary Breakdown: Cash vs Non-Cash -->
-                    @php $unclosedShift = \App\Models\Shift::with('transactions')->find($unclosedShiftId); @endphp
-                    @if($unclosedShift)
+                    @if($this->unclosedShiftModalData)
                         <div class="grid grid-cols-2 gap-3">
                             <div class="bg-green-50 rounded-lg p-3">
                                 <p class="text-xs text-green-600 font-medium">Penjualan Tunai</p>
                                 <p class="text-lg font-bold text-green-700">
-                                    Rp {{ number_format($unclosedShift->completedTransactions()->where('payment_method','cash')->sum('total') ?? 0, 0, ',', '.') }}
+                                    Rp {{ number_format($this->unclosedShiftModalData->cash_sales ?? 0, 0, ',', '.') }}
                                 </p>
                             </div>
                             <div class="bg-purple-50 rounded-lg p-3">
                                 <p class="text-xs text-purple-600 font-medium">Non-Tunai (QRIS/EDC)</p>
                                 <p class="text-lg font-bold text-purple-700">
-                                    Rp {{ number_format($unclosedShift->completedTransactions()->where('payment_method','!=','cash')->sum('total') ?? 0, 0, ',', '.') }}
+                                    Rp {{ number_format($this->unclosedShiftModalData->non_cash_sales ?? 0, 0, ',', '.') }}
                                 </p>
                             </div>
                         </div>
@@ -349,14 +365,10 @@
 
     <!-- Left Panel: Products -->
     <div class="flex-1 flex flex-col bg-gray-50 min-w-0 overflow-x-hidden">
-        <!-- Header -->
-        @php
-            $logoWeb = \App\Models\Setting::get('logo_web', null, 'general');
-        @endphp
         <header class="bg-white px-4 md:px-6 py-3 border-b flex justify-between items-center sticky top-0 z-20 gap-4">
             <div class="flex items-center gap-3 flex-shrink-0">
-                @if($logoWeb)
-                    <img src="{{ asset('storage/' . $logoWeb) }}" class="w-10 h-10 object-cover rounded-lg shadow-md">
+                @if($this->logoWeb)
+                    <img src="{{ asset('storage/' . $this->logoWeb) }}" class="w-10 h-10 object-cover rounded-lg shadow-md">
                 @else
                     <div class="w-10 h-10 bg-primary-600 rounded-lg flex items-center justify-center shadow-lg shadow-primary-500/30">
                         <x-lucide name="soup" class="w-6 h-6 text-white" />
@@ -884,8 +896,8 @@
                                                 </template>
                                             </span>
 
-                                            <!-- Qty selector if selected -->
-                                            <template x-if="isModifierSelected(group.id, modifier.id)">
+                                            <!-- Qty selector if selected (only for multi-selection modifier groups) -->
+                                            <template x-if="isModifierSelected(group.id, modifier.id) && group.selection_type !== 'single'">
                                                 <div class="flex items-center gap-1 bg-white border border-gray-200 rounded-lg p-0.5 shadow-xs">
                                                     <button type="button" @click.stop="changeModifierQty(group.id, modifier.id, -1)" class="w-6 h-6 rounded flex items-center justify-center bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs">
                                                         -
@@ -1286,13 +1298,13 @@
                                 wire:click="$set('orderType', 'dine_in')"
                                 class="flex-1 py-2 rounded-lg text-sm font-medium transition-all {{ $orderType === 'dine_in' ? 'bg-white text-primary-600 shadow-sm' : 'text-gray-500 hover:text-gray-700' }}"
                             >
-                                Dine In
+                                Makan di Tempat
                             </button>
                             <button 
                                 wire:click="$set('orderType', 'take_away')"
                                 class="flex-1 py-2 rounded-lg text-sm font-medium transition-all {{ $orderType === 'take_away' ? 'bg-white text-primary-600 shadow-sm' : 'text-gray-500 hover:text-gray-700' }}"
                             >
-                                Take Away
+                                Bawa Pulang
                             </button>
                         </div>
 
@@ -1321,7 +1333,7 @@
                                         @endforeach
                                     </div>
                                     @if(!$selectedServiceAreaId)
-                                        <p class="text-xs text-red-500 mt-1">* Wajib pilih meja untuk Dine In</p>
+                                        <p class="text-xs text-red-500 mt-1">* Wajib pilih meja untuk Makan di Tempat</p>
                                     @endif
                                 @else
                                     <div class="text-center py-4 bg-gray-50 rounded-lg border border-dashed border-gray-300">
@@ -1378,18 +1390,36 @@
     <!-- QRIS Payment Modal (Real-time SSE Listener) -->
     @if($showQrisModal)
         <div
+            wire:key="qris-modal-{{ $qrisOrderId ?? 'none' }}"
+            @qris-start-sse.window="init()"
             x-data="{
                 eventSource: null,
-                expiresAtMs: {{ $qrisExpiresAtMs ?? 'Date.now() + ' . ($qrisExpiresIn * 1000) }},
-                countdown: {{ $qrisExpiresIn }},
+                qrisExpiresAtMs: @js($qrisExpiresAtMs),
+                qrisExpiresIn: @js($qrisExpiresIn),
+                qrisOrderId: @js($qrisOrderId),
+                countdown: null,
                 timer: null,
                 posChannel: null,
                 isChecking: false,
                 showCancelConfirm: false,
+                activeTimerOrderId: null,
+
                 init() {
                     this.startCountdown();
                     this.startSse();
                     this.startChannel();
+
+                    this.$watch('qrisOrderId', (newVal, oldVal) => {
+                        if (newVal && newVal !== oldVal) {
+                            this.startCountdown();
+                            this.startSse();
+                        }
+                    });
+                    this.$watch('qrisExpiresAtMs', (newVal) => {
+                        if (newVal) {
+                            this.startCountdown();
+                        }
+                    });
                 },
                 startChannel() {
                     try {
@@ -1404,10 +1434,18 @@
                 },
                 startCountdown() {
                     if (this.timer) clearInterval(this.timer);
+                    this.timer = null;
+                    this.activeTimerOrderId = this.qrisOrderId;
+
                     const tick = () => {
-                        this.countdown = Math.max(0, Math.round((this.expiresAtMs - Date.now()) / 1000));
+                        const target = (this.qrisExpiresAtMs && this.qrisExpiresAtMs > 1000000000000)
+                            ? this.qrisExpiresAtMs
+                            : (Date.now() + (this.qrisExpiresIn || 300) * 1000);
+
+                        this.countdown = Math.max(0, Math.round((target - Date.now()) / 1000));
                         if (this.countdown <= 0) {
-                            clearInterval(this.timer);
+                            if (this.timer) clearInterval(this.timer);
+                            this.timer = null;
                             $wire.onQrisExpired();
                         }
                     };
@@ -1445,6 +1483,9 @@
                     this.isChecking = true;
                     $wire.checkQrisStatus(false).then(() => {
                         this.isChecking = false;
+                        if (!this.timer && this.countdown > 0) {
+                            this.startCountdown();
+                        }
                     });
                 },
                 cleanup() {
@@ -1462,12 +1503,18 @@
                     }
                 },
                 formatTime(seconds) {
+                    if (seconds === null || seconds === undefined) {
+                        const target = (this.qrisExpiresAtMs && this.qrisExpiresAtMs > 1000000000000)
+                            ? this.qrisExpiresAtMs
+                            : (Date.now() + (this.qrisExpiresIn || 300) * 1000);
+                        seconds = Math.max(0, Math.round((target - Date.now()) / 1000));
+                    }
+                    if (seconds <= 0) return '00:00';
                     const m = Math.floor(seconds / 60);
                     const s = seconds % 60;
                     return `${m}:${s < 10 ? '0' : ''}${s}`;
                 }
             }"
-            x-init="init()"
             @unmount="cleanup()"
             class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
         >
@@ -1532,7 +1579,7 @@
                     <!-- Total Bill -->
                     <div>
                         <span class="text-xs font-semibold text-gray-400 uppercase tracking-wide block">Total Pembayaran</span>
-                        <span class="text-2xl font-extrabold text-gray-900">Rp {{ number_format($this->total, 0, ',', '.') }}</span>
+                        <span class="text-2xl font-extrabold text-gray-900">Rp {{ number_format($qrisAmount ?: $this->total, 0, ',', '.') }}</span>
                         <span class="text-[11px] text-gray-400 block mt-0.5">Inv: {{ $qrisInvoiceNumber }}</span>
                     </div>
 
@@ -1567,18 +1614,14 @@
                             :disabled="isChecking"
                             class="w-full py-3 bg-primary-600 hover:bg-primary-700 disabled:opacity-60 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
                         >
-                            <template x-if="!isChecking">
-                                <span class="flex items-center gap-1.5">
-                                    <x-lucide name="refresh-cw" class="w-4 h-4" />
-                                    <span>Cek Status Pembayaran</span>
-                                </span>
-                            </template>
-                            <template x-if="isChecking">
-                                <span class="flex items-center gap-1.5">
-                                    <div class="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></div>
-                                    <span>Mengecek...</span>
-                                </span>
-                            </template>
+                            <span x-show="!isChecking" class="flex items-center gap-1.5">
+                                <x-lucide name="refresh-cw" class="w-4 h-4" />
+                                <span>Cek Status Pembayaran</span>
+                            </span>
+                            <span x-show="isChecking" x-cloak class="flex items-center gap-1.5">
+                                <div class="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></div>
+                                <span>Mengecek...</span>
+                            </span>
                         </button>
 
                         <div class="grid grid-cols-2 gap-2">
@@ -1600,15 +1643,23 @@
                         </div>
 
                         <!-- Regenerate QRIS (Case 5) -->
-                        <template x-if="countdown <= 0">
-                            <button
-                                @click="cleanup(); $wire.regenerateQris()"
-                                class="w-full py-3 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                            >
+                        <button
+                            x-show="countdown <= 0"
+                            x-cloak
+                            @click="cleanup(); $wire.regenerateQris()"
+                            wire:loading.attr="disabled"
+                            wire:target="regenerateQris"
+                            class="w-full py-3 bg-amber-500 hover:bg-amber-600 disabled:opacity-60 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                        >
+                            <span wire:loading.remove wire:target="regenerateQris" class="flex items-center gap-1.5">
                                 <x-lucide name="rotate-cw" class="w-4 h-4" />
                                 <span>Buat QRIS Baru</span>
-                            </button>
-                        </template>
+                            </span>
+                            <span wire:loading wire:target="regenerateQris" class="flex items-center gap-1.5">
+                                <div class="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></div>
+                                <span>Membuat QRIS Baru...</span>
+                            </span>
+                        </button>
                     </div>
                 </div>
             </div>

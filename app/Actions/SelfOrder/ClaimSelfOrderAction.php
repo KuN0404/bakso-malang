@@ -18,9 +18,9 @@ class ClaimSelfOrderAction
     /**
      * @throws \DomainException
      */
-    public function execute(int $selfOrderId, int $cashierId): SelfOrder
+    public function execute(int $selfOrderId, int $cashierId, ?int $serviceAreaId = null): SelfOrder
     {
-        return DB::transaction(function () use ($selfOrderId, $cashierId) {
+        return DB::transaction(function () use ($selfOrderId, $cashierId, $serviceAreaId) {
             $selfOrder = SelfOrder::where('id', $selfOrderId)
                 ->lockForUpdate()
                 ->firstOrFail();
@@ -48,16 +48,20 @@ class ClaimSelfOrderAction
                 throw new NoOpenShiftException('Anda belum membuka shift. Buka shift terlebih dahulu sebelum mengambil pesanan.');
             }
 
+            $assignedAreaId = $selfOrder->order_type === 'dine_in' ? ($serviceAreaId ?? $selfOrder->service_area_id) : null;
+
             $selfOrder->update([
-                'processed_by' => $cashierId,
-                'shift_id'     => $shift->id,
-                'claimed_at'   => now(),
+                'processed_by'    => $cashierId,
+                'shift_id'        => $shift->id,
+                'service_area_id' => $assignedAreaId,
+                'claimed_at'      => now(),
             ]);
 
             if ($selfOrder->transaction_id) {
                 \App\Models\Transaction::where('id', $selfOrder->transaction_id)->update([
-                    'user_id'  => $cashierId,
-                    'shift_id' => $shift->id,
+                    'user_id'         => $cashierId,
+                    'shift_id'        => $shift->id,
+                    'service_area_id' => $assignedAreaId,
                 ]);
             }
 

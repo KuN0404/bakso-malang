@@ -67,6 +67,6 @@ class RenderSmokeTest extends TestCase
             ->call('addToCart', Product::first()->id, 1)
             ->call('goToCheckout')
             ->assertStatus(200)
-            ->assertSee('Bayar Sekarang');
+            ->assertSee('Pesan Sekarang');
     }
 }

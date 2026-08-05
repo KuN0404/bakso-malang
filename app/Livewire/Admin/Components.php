@@ -19,9 +19,7 @@ class Components extends Component
     use WithPagination;
 
     public bool $showModal = false;
-    public bool $showStockModal = false;
     public ?int $editingId = null;
-    public ?ComponentModel $selectedComponent = null;
 
     // Form fields
     public string $code     = '';
@@ -32,11 +30,6 @@ class Components extends Component
     public float  $costPrice = 0;
     public string $note     = '';
     public bool   $isActive = true;
-
-    // Stock adjustment fields
-    public string  $stockAdjustmentType   = 'add';
-    public float   $stockAdjustmentAmount = 0;
-    public ?string $stockNote             = '';
 
     #[Url(except: '')]
     public string $search = '';
@@ -136,59 +129,6 @@ class Components extends Component
 
         $component->delete(); // SoftDelete
         $this->dispatch('notify', type: 'success', message: 'Komponen berhasil dihapus.');
-    }
-
-    // -----------------------------------------------------------------
-    // Stock Adjustment
-    // -----------------------------------------------------------------
-
-    public function openStockModal(int $id): void
-    {
-        $this->selectedComponent     = ComponentModel::findOrFail($id);
-        $this->stockAdjustmentType   = 'add';
-        $this->stockAdjustmentAmount = 0;
-        $this->stockNote             = '';
-        $this->showStockModal        = true;
-    }
-
-    public function saveStock(): void
-    {
-        $this->authorize('adjust_component_stock');
-
-        $rules = [
-            'stockAdjustmentAmount' => 'required|numeric|min:0.001',
-        ];
-
-        if ($this->stockAdjustmentType !== 'add') {
-            $rules['stockNote'] = 'required|string|max:255';
-        } else {
-            $rules['stockNote'] = 'nullable|string|max:255';
-        }
-
-        $this->validate($rules, [
-            'stockNote.required'           => 'Catatan wajib diisi untuk pengurangan atau penyesuaian stok.',
-            'stockAdjustmentAmount.min'    => 'Jumlah penyesuaian harus lebih dari 0.',
-        ]);
-
-        try {
-            DB::transaction(function () {
-                app(ComponentStockService::class)->adjustStock(
-                    componentId: $this->selectedComponent->id,
-                    type:        $this->stockAdjustmentType,
-                    amount:      $this->stockAdjustmentAmount,
-                    userId:      Auth::id(),
-                    note:        $this->stockNote ?: null,
-                );
-            });
-
-            $this->showStockModal = false;
-            $this->dispatch('notify', type: 'success', message: "Stok '{$this->selectedComponent->name}' berhasil diperbarui.");
-
-        } catch (InsufficientStockException $e) {
-            $this->dispatch('notify', type: 'error', message: $e->getMessage());
-        } catch (\Exception $e) {
-            $this->dispatch('notify', type: 'error', message: 'Terjadi kesalahan: ' . $e->getMessage());
-        }
     }
 
     // -----------------------------------------------------------------

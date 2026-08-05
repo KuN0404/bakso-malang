@@ -75,7 +75,7 @@ class AcceptSelfOrderPaymentAction
             $invoiceNumber = 'SO-' . now()->format('Ymd') . '-' . str_pad($selfOrder->queue_number, 4, '0', STR_PAD_LEFT);
 
             // -- Buat PaymentTransaction (paid langsung) --
-            $paymentSource = PaymentSource::getDefaultCash() ?? PaymentSource::active()->first();
+            $paymentSource = PaymentSource::getDefaultCash() ?? PaymentSource::activeForPos()->first();
             $paymentTx     = PaymentTransaction::create([
                 'self_order_id'     => $selfOrder->id,
                 'invoice_number'    => $invoiceNumber,
@@ -102,6 +102,7 @@ class AcceptSelfOrderPaymentAction
                 'shift_id'               => $shift?->id,
                 'payment_source_id'      => $paymentSource?->id,
                 'payment_transaction_id' => $paymentTx->id,
+                'service_area_id'        => $selfOrder->order_type === 'dine_in' ? $selfOrder->service_area_id : null,
                 'self_order_id'          => $selfOrder->id,
                 'invoice_number'         => $invoiceNumber,
                 'queue_number'           => $selfOrder->queue_number,
