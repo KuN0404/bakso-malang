@@ -58,39 +58,45 @@ class ReportSyncService
             // Gunakan upsert agar safe jika dijalankan dua kali (idempotent)
             $rdb->table('transactions')->upsert(
                 [[
-                    'id'                => $transaction->id,
-                    'user_id'           => $transaction->user_id,
-                    'shift_id'          => $transaction->shift_id,
-                    'payment_source_id' => $transaction->payment_source_id,
-                    'service_area_id'   => $transaction->service_area_id,
-                    'invoice_number'    => $transaction->invoice_number,
-                    'queue_number'      => $transaction->queue_number,
-                    'subtotal'          => $transaction->subtotal,
-                    'discount_amount'   => $transaction->discount_amount,
-                    'tax_amount'        => $transaction->tax_amount,
-                    'total'             => $transaction->total,
-                    'paid_amount'       => $transaction->paid_amount,
-                    'change_amount'     => $transaction->change_amount,
-                    'payment_method'    => $transaction->payment_method,
-                    'status'            => $transaction->status,
-                    'customer_name'     => $transaction->customer_name,
-                    'order_type'        => $transaction->order_type,
-                    'notes'             => $transaction->notes,
-                    'print_count'       => $transaction->print_count ?? 0,
-                    'cancelled_reason'  => $transaction->cancelled_reason,
-                    'cancelled_by'      => $transaction->cancelled_by,
-                    'cancelled_at'      => $transaction->cancelled_at,
-                    'created_at'        => $transaction->created_at,
-                    'updated_at'        => $transaction->updated_at,
+                    'id'                     => $transaction->id,
+                    'user_id'                => $transaction->user_id,
+                    'shift_id'               => $transaction->shift_id,
+                    'payment_source_id'      => $transaction->payment_source_id,
+                    'payment_transaction_id' => $transaction->payment_transaction_id ?? null,
+                    'service_area_id'        => $transaction->service_area_id,
+                    'self_order_id'          => $transaction->self_order_id ?? null,
+                    'invoice_number'         => $transaction->invoice_number,
+                    'queue_number'           => $transaction->queue_number,
+                    'subtotal'               => $transaction->subtotal,
+                    'discount_amount'        => $transaction->discount_amount,
+                    'tax_amount'             => $transaction->tax_amount,
+                    'total'                  => $transaction->total,
+                    'paid_amount'            => $transaction->paid_amount,
+                    'change_amount'          => $transaction->change_amount,
+                    'payment_method'         => $transaction->payment_method,
+                    'payment_gateway_status' => $transaction->payment_gateway_status ?? null,
+                    'source'                 => $transaction->source ?? 'pos',
+                    'status'                 => $transaction->status,
+                    'customer_name'          => $transaction->customer_name,
+                    'order_type'             => $transaction->order_type,
+                    'notes'                  => $transaction->notes,
+                    'print_count'            => $transaction->print_count ?? 0,
+                    'cancelled_reason'       => $transaction->cancelled_reason,
+                    'cancelled_by'           => $transaction->cancelled_by,
+                    'cancelled_at'           => $transaction->cancelled_at,
+                    'created_at'             => $transaction->created_at,
+                    'updated_at'             => $transaction->updated_at,
                 ]],
                 ['id'], // unique key
                 // Kolom yang diupdate jika sudah ada (semua kecuali id dan created_at)
                 [
-                    'user_id', 'shift_id', 'payment_source_id', 'service_area_id', 
-                    'invoice_number', 'queue_number', 'subtotal', 'discount_amount', 
-                    'tax_amount', 'total', 'paid_amount', 'change_amount', 
-                    'payment_method', 'status', 'customer_name', 'order_type', 
-                    'notes', 'print_count', 'cancelled_reason', 'cancelled_by', 
+                    'user_id', 'shift_id', 'payment_source_id', 'payment_transaction_id',
+                    'service_area_id', 'self_order_id',
+                    'invoice_number', 'queue_number', 'subtotal', 'discount_amount',
+                    'tax_amount', 'total', 'paid_amount', 'change_amount',
+                    'payment_method', 'payment_gateway_status', 'source',
+                    'status', 'customer_name', 'order_type',
+                    'notes', 'print_count', 'cancelled_reason', 'cancelled_by',
                     'cancelled_at', 'updated_at'
                 ]
             );
@@ -141,13 +147,132 @@ class ReportSyncService
                             'modifier_id'           => $modifier->id,
                             'modifier_name'         => $modifier->pivot->modifier_name,
                             'price_adjustment'      => $modifier->pivot->price_adjustment,
+                            'quantity'              => $modifier->pivot->quantity ?? 1,
                         ]);
+                    } else {
+                        // Update quantity jika sudah ada
+                        $rdb->table('transaction_detail_modifier')
+                            ->where('transaction_detail_id', $detail->id)
+                            ->where('modifier_id', $modifier->id)
+                            ->update([
+                                'quantity' => $modifier->pivot->quantity ?? 1,
+                            ]);
                     }
                 }
             }
         } catch (\Throwable $e) {
             // Log error tanpa menghentikan transaksi utama
             Log::error('[ReportSync] Gagal sync transaksi ID ' . $transaction->id . ': ' . $e->getMessage());
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Payment Transaction Sync
+    // -----------------------------------------------------------------------
+
+    /**
+     * Salin data PaymentTransaction (Midtrans/QRIS) ke DB laporan.
+     *
+     * @param \App\Models\PaymentTransaction $paymentTx
+     */
+    public function syncPaymentTransaction(\App\Models\PaymentTransaction $paymentTx): void
+    {
+        try {
+            DB::connection(self::REPORT_CONNECTION)->table('payment_transactions')->upsert(
+                [[
+                    'id'                  => $paymentTx->id,
+                    'transaction_id'      => $paymentTx->transaction_id,
+                    'invoice_number'      => $paymentTx->invoice_number,
+                    'midtrans_order_id'   => $paymentTx->midtrans_order_id,
+                    'qr_code_url'         => $paymentTx->qr_code_url,
+                    'payment_method'      => $paymentTx->payment_method,
+                    'amount'              => $paymentTx->amount,
+                    'status'              => $paymentTx->status,
+                    'midtrans_response'   => is_array($paymentTx->midtrans_response)
+                        ? json_encode($paymentTx->midtrans_response)
+                        : $paymentTx->midtrans_response,
+                    'webhook_received_at' => $paymentTx->webhook_received_at,
+                    'paid_at'             => $paymentTx->paid_at,
+                    'expired_at'          => $paymentTx->expired_at,
+                    'idempotency_key'     => $paymentTx->idempotency_key,
+                    'created_by'          => $paymentTx->created_by,
+                    'source'              => $paymentTx->source ?? 'pos',
+                    'self_order_id'       => $paymentTx->self_order_id ?? null,
+                    'created_at'          => $paymentTx->created_at,
+                    'updated_at'          => $paymentTx->updated_at,
+                ]],
+                ['id'],
+                [
+                    'transaction_id', 'status', 'midtrans_response', 'webhook_received_at',
+                    'paid_at', 'expired_at', 'source', 'self_order_id', 'updated_at',
+                ]
+            );
+        } catch (\Throwable $e) {
+            Log::error('[ReportSync] Gagal sync PaymentTransaction ID ' . $paymentTx->id . ': ' . $e->getMessage());
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Self Order Sync
+    // -----------------------------------------------------------------------
+
+    /**
+     * Salin data Self Order ke DB laporan.
+     *
+     * @param \App\Models\SelfOrder $selfOrder
+     */
+    public function syncSelfOrder(\App\Models\SelfOrder $selfOrder): void
+    {
+        try {
+            DB::connection(self::REPORT_CONNECTION)->table('self_orders')->upsert(
+                [[
+                    'id'                     => $selfOrder->id,
+                    'order_token'            => $selfOrder->order_token,
+                    'queue_number'           => $selfOrder->queue_number,
+                    'invoice_number'         => $selfOrder->invoice_number,
+                    'customer_name'          => $selfOrder->customer_name,
+                    'customer_phone'         => $selfOrder->customer_phone,
+                    'customer_email'         => $selfOrder->customer_email,
+                    'pickup_name'            => $selfOrder->pickup_name ?? null,
+                    'pickup_phone'           => $selfOrder->pickup_phone ?? null,
+                    'subtotal'               => $selfOrder->subtotal,
+                    'tax_amount'             => $selfOrder->tax_amount,
+                    'total'                  => $selfOrder->total,
+                    'order_type'             => $selfOrder->order_type,
+                    'service_area_id'        => $selfOrder->service_area_id ?? null,
+                    'notes'                  => $selfOrder->notes,
+                    'payment_method'         => $selfOrder->payment_method,
+                    'status'                 => $selfOrder->status instanceof \BackedEnum
+                        ? $selfOrder->status->value
+                        : $selfOrder->status,
+                    'payment_transaction_id' => $selfOrder->payment_transaction_id,
+                    'transaction_id'         => $selfOrder->transaction_id,
+                    'shift_id'               => $selfOrder->shift_id,
+                    'processed_by'           => $selfOrder->processed_by,
+                    'cancelled_by'           => $selfOrder->cancelled_by,
+                    'cancelled_reason'       => $selfOrder->cancelled_reason,
+                    'cancelled_at'           => $selfOrder->cancelled_at,
+                    'paid_at'                => $selfOrder->paid_at,
+                    'claimed_at'             => $selfOrder->claimed_at,
+                    'processing_at'          => $selfOrder->processing_at ?? null,
+                    'completed_at'           => $selfOrder->completed_at ?? null,
+                    'pickup_confirmed_at'    => $selfOrder->pickup_confirmed_at ?? null,
+                    'idempotency_key'        => $selfOrder->idempotency_key,
+                    'customer_ip'            => $selfOrder->customer_ip,
+                    'created_at'             => $selfOrder->created_at,
+                    'updated_at'             => $selfOrder->updated_at,
+                ]],
+                ['id'],
+                [
+                    'status', 'invoice_number', 'queue_number', 'payment_transaction_id',
+                    'transaction_id', 'shift_id', 'processed_by', 'cancelled_by',
+                    'cancelled_reason', 'cancelled_at', 'paid_at', 'claimed_at',
+                    'processing_at', 'completed_at', 'pickup_confirmed_at',
+                    'pickup_name', 'pickup_phone', 'service_area_id', 'updated_at',
+                ]
+            );
+        } catch (\Throwable $e) {
+            Log::error('[ReportSync] Gagal sync SelfOrder ID ' . $selfOrder->id . ': ' . $e->getMessage());
         }
     }
 
@@ -341,7 +466,7 @@ class ReportSyncService
                     'account_number' => $ps->account_number,
                     'account_name'   => $ps->account_name,
                     'icon'           => $ps->icon,
-                    'is_active'      => $ps->is_active,
+                    'is_active'      => (int) $ps->is_active,
                     'sort_order'     => $ps->sort_order,
                     'created_at'     => $ps->created_at,
                     'updated_at'     => $ps->updated_at,
@@ -365,7 +490,7 @@ class ReportSyncService
                     'type'        => $sa->type,
                     'capacity'    => $sa->capacity,
                     'sort_order'  => $sa->sort_order,
-                    'is_active'   => $sa->is_active,
+                    'is_active'   => (int) $sa->is_active,
                     'created_at'  => $sa->created_at,
                     'updated_at'  => $sa->updated_at,
                 ]],
@@ -381,18 +506,19 @@ class ReportSyncService
         if ($cat) {
             DB::connection(self::REPORT_CONNECTION)->table('categories')->upsert(
                 [[
-                    'id'          => $cat->id,
-                    'name'        => $cat->name,
-                    'slug'        => $cat->slug,
-                    'description' => $cat->description,
-                    'icon'        => $cat->icon,
-                    'sort_order'  => $cat->sort_order,
-                    'is_active'   => $cat->is_active,
-                    'created_at'  => $cat->created_at,
-                    'updated_at'  => $cat->updated_at,
+                    'id'             => $cat->id,
+                    'name'           => $cat->name,
+                    'slug'           => $cat->slug,
+                    'description'    => $cat->description,
+                    'icon'           => $cat->icon,
+                    'sort_order'     => $cat->sort_order,
+                    'is_active'      => (int) $cat->is_active,
+                    'target_kitchen' => $cat->target_kitchen ?? 'food',
+                    'created_at'     => $cat->created_at,
+                    'updated_at'     => $cat->updated_at,
                 ]],
                 ['id'],
-                ['name', 'slug', 'description', 'icon', 'sort_order', 'is_active', 'updated_at']
+                ['name', 'slug', 'description', 'icon', 'sort_order', 'is_active', 'target_kitchen', 'updated_at']
             );
         }
     }
@@ -416,10 +542,10 @@ class ReportSyncService
                     'price'       => $prod->price,
                     'cost_price'  => $prod->cost_price,
                     'image'       => $prod->image,
-                    'is_active'   => $prod->is_active,
-                    'is_featured' => $prod->is_featured,
+                    'is_active'   => (int) $prod->is_active,
+                    'is_featured' => (int) $prod->is_featured,
                     'stock'       => $prod->stock,
-                    'track_stock' => $prod->track_stock,
+                    'track_stock' => (int) $prod->track_stock,
                     'created_at'  => $prod->created_at,
                     'updated_at'  => $prod->updated_at,
                     'deleted_at'  => $prod->deleted_at,
@@ -439,10 +565,10 @@ class ReportSyncService
                     'id'             => $group->id,
                     'name'           => $group->name,
                     'selection_type' => $group->selection_type,
-                    'is_required'    => $group->is_required,
+                    'is_required'    => (int) $group->is_required,
                     'min_selections' => $group->min_selections,
                     'max_selections' => $group->max_selections,
-                    'is_active'      => $group->is_active,
+                    'is_active'      => (int) $group->is_active,
                     'created_at'     => $group->created_at,
                     'updated_at'     => $group->updated_at,
                 ]],
@@ -726,4 +852,188 @@ class ReportSyncService
             );
         }
     }
+
+    // -----------------------------------------------------------------------
+    // Public helpers untuk SyncReportData command (backfill massal)
+    // -----------------------------------------------------------------------
+
+    public function syncUser(\App\Models\User $user): void
+    {
+        try {
+            DB::connection(self::REPORT_CONNECTION)->table('users')->upsert(
+                [[
+                    'id'         => $user->id,
+                    'name'       => $user->name,
+                    'username'   => $user->username,
+                    'email'      => $user->email,
+                    'password'   => $user->password,
+                    'created_at' => $user->created_at,
+                    'updated_at' => $user->updated_at,
+                ]],
+                ['id'],
+                ['name', 'username', 'email', 'password', 'updated_at']
+            );
+        } catch (\Throwable $e) {
+            Log::error('[ReportSync] Gagal sync User ID ' . $user->id . ': ' . $e->getMessage());
+        }
+    }
+
+    public function syncPaymentSource(\App\Models\PaymentSource $ps): void
+    {
+        try {
+            DB::connection(self::REPORT_CONNECTION)->table('payment_sources')->upsert(
+                [[
+                    'id'             => $ps->id,
+                    'name'           => $ps->name,
+                    'type'           => $ps->type,
+                    'account_number' => $ps->account_number,
+                    'account_name'   => $ps->account_name,
+                    'icon'           => $ps->icon,
+                    'is_active'      => (int) $ps->is_active,
+                    'sort_order'     => $ps->sort_order,
+                    'created_at'     => $ps->created_at,
+                    'updated_at'     => $ps->updated_at,
+                ]],
+                ['id'],
+                ['name', 'type', 'account_number', 'account_name', 'icon', 'is_active', 'sort_order', 'updated_at']
+            );
+        } catch (\Throwable $e) {
+            Log::error('[ReportSync] Gagal sync PaymentSource ID ' . $ps->id . ': ' . $e->getMessage());
+        }
+    }
+
+    public function syncServiceArea(\App\Models\ServiceArea $sa): void
+    {
+        try {
+            DB::connection(self::REPORT_CONNECTION)->table('service_areas')->upsert(
+                [[
+                    'id'          => $sa->id,
+                    'name'        => $sa->name,
+                    'code'        => $sa->code,
+                    'description' => $sa->description,
+                    'type'        => $sa->type,
+                    'capacity'    => $sa->capacity,
+                    'sort_order'  => $sa->sort_order,
+                    'is_active'   => (int) $sa->is_active,
+                    'created_at'  => $sa->created_at,
+                    'updated_at'  => $sa->updated_at,
+                ]],
+                ['id'],
+                ['name', 'code', 'description', 'type', 'capacity', 'sort_order', 'is_active', 'updated_at']
+            );
+        } catch (\Throwable $e) {
+            Log::error('[ReportSync] Gagal sync ServiceArea ID ' . $sa->id . ': ' . $e->getMessage());
+        }
+    }
+
+    public function syncCategory(\App\Models\Category $cat): void
+    {
+        try {
+            DB::connection(self::REPORT_CONNECTION)->table('categories')->upsert(
+                [[
+                    'id'             => $cat->id,
+                    'name'           => $cat->name,
+                    'slug'           => $cat->slug,
+                    'description'    => $cat->description,
+                    'icon'           => $cat->icon,
+                    'sort_order'     => $cat->sort_order,
+                    'is_active'      => (int) $cat->is_active,
+                    'target_kitchen' => $cat->target_kitchen ?? 'food',
+                    'created_at'     => $cat->created_at,
+                    'updated_at'     => $cat->updated_at,
+                ]],
+                ['id'],
+                ['name', 'slug', 'description', 'icon', 'sort_order', 'is_active', 'target_kitchen', 'updated_at']
+            );
+        } catch (\Throwable $e) {
+            Log::error('[ReportSync] Gagal sync Category ID ' . $cat->id . ': ' . $e->getMessage());
+        }
+    }
+
+    public function ensureProductSyncedPublic(\App\Models\Product $prod): void
+    {
+        try {
+            if ($prod->category_id) {
+                $this->ensureCategorySynced($prod->category_id);
+            }
+            DB::connection(self::REPORT_CONNECTION)->table('products')->upsert(
+                [[
+                    'id'          => $prod->id,
+                    'category_id' => $prod->category_id,
+                    'name'        => $prod->name,
+                    'slug'        => $prod->slug,
+                    'sku'         => $prod->sku,
+                    'description' => $prod->description,
+                    'price'       => $prod->price,
+                    'cost_price'  => $prod->cost_price,
+                    'image'       => $prod->image,
+                    'is_active'   => (int) $prod->is_active,
+                    'is_featured' => (int) $prod->is_featured,
+                    'stock'       => $prod->stock,
+                    'track_stock' => (int) $prod->track_stock,
+                    'created_at'  => $prod->created_at,
+                    'updated_at'  => $prod->updated_at,
+                    'deleted_at'  => $prod->deleted_at,
+                ]],
+                ['id'],
+                ['category_id', 'name', 'slug', 'sku', 'description', 'price', 'cost_price', 'image', 'is_active', 'is_featured', 'stock', 'track_stock', 'updated_at', 'deleted_at']
+            );
+        } catch (\Throwable $e) {
+            Log::error('[ReportSync] Gagal sync Product ID ' . $prod->id . ': ' . $e->getMessage());
+        }
+    }
+
+    public function syncModifierGroup(\App\Models\ModifierGroup $group): void
+    {
+        try {
+            DB::connection(self::REPORT_CONNECTION)->table('modifier_groups')->upsert(
+                [[
+                    'id'             => $group->id,
+                    'name'           => $group->name,
+                    'selection_type' => $group->selection_type,
+                    'is_required'    => (int) $group->is_required,
+                    'min_selections' => $group->min_selections,
+                    'max_selections' => $group->max_selections,
+                    'is_active'      => (int) $group->is_active,
+                    'created_at'     => $group->created_at,
+                    'updated_at'     => $group->updated_at,
+                ]],
+                ['id'],
+                ['name', 'selection_type', 'is_required', 'min_selections', 'max_selections', 'is_active', 'updated_at']
+            );
+        } catch (\Throwable $e) {
+            Log::error('[ReportSync] Gagal sync ModifierGroup ID ' . $group->id . ': ' . $e->getMessage());
+        }
+    }
+
+    public function syncModifierPublic(\App\Models\Modifier $mod): void
+    {
+        try {
+            if ($mod->modifier_group_id) {
+                $this->ensureModifierGroupSynced($mod->modifier_group_id);
+            }
+            if ($mod->component_id) {
+                $comp = \App\Models\Component::find($mod->component_id);
+                if ($comp) $this->syncComponent($comp);
+            }
+            DB::connection(self::REPORT_CONNECTION)->table('modifiers')->upsert(
+                [[
+                    'id'                => $mod->id,
+                    'modifier_group_id' => $mod->modifier_group_id,
+                    'component_id'      => $mod->component_id,
+                    'name'              => $mod->name,
+                    'price_adjustment'  => $mod->price_adjustment,
+                    'is_active'         => (int) $mod->is_active,
+                    'sort_order'        => $mod->sort_order,
+                    'created_at'        => $mod->created_at,
+                    'updated_at'        => $mod->updated_at,
+                ]],
+                ['id'],
+                ['modifier_group_id', 'component_id', 'name', 'price_adjustment', 'is_active', 'sort_order', 'updated_at']
+            );
+        } catch (\Throwable $e) {
+            Log::error('[ReportSync] Gagal sync Modifier ID ' . $mod->id . ': ' . $e->getMessage());
+        }
+    }
 }
+
