@@ -22,9 +22,6 @@ return [
     // Maksimum order pending per nomor HP (anti-spam)
     'max_pending_per_phone' => env('SELF_ORDER_MAX_PENDING_PER_PHONE', 3),
 
-    // Kirim struk via email jika customer memasukkan email
-    'send_email_receipt' => env('SELF_ORDER_SEND_EMAIL_RECEIPT', true),
-
     // SSE polling interval (detik) — berapa sering SSE controller cek status dari DB
     'sse_poll_interval_seconds' => env('SELF_ORDER_SSE_POLL_SECONDS', 2),
 

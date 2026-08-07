@@ -4,19 +4,23 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
             <!-- Brand Logo & Name from Settings -->
             <a href="{{ route('home') }}" class="flex items-center gap-3.5 group">
-                @if($logoWeb)
-                    <img src="{{ asset('storage/' . $logoWeb) }}" alt="{{ $storeName }}" class="w-11 h-11 object-cover rounded-xl shadow-xs group-hover:scale-105 transition-transform border border-slate-100">
+                @if($logoType === 'full' && $logoFull)
+                    <img src="{{ asset('storage/' . $logoFull) }}" alt="{{ $storeName }}" class="h-11 w-auto max-w-[200px] object-contain group-hover:scale-105 transition-transform">
                 @else
-                    <div class="w-11 h-11 bg-primary-600 rounded-xl flex items-center justify-center text-white shadow-xs group-hover:scale-105 transition-transform">
-                        <x-lucide name="soup" class="w-6 h-6" />
+                    @if($logoWeb)
+                        <img src="{{ asset('storage/' . $logoWeb) }}" alt="{{ $storeName }}" class="w-11 h-11 object-cover rounded-xl shadow-xs group-hover:scale-105 transition-transform border border-slate-100">
+                    @else
+                        <div class="w-11 h-11 bg-primary-600 rounded-xl flex items-center justify-center text-white shadow-xs group-hover:scale-105 transition-transform">
+                            <x-lucide name="soup" class="w-6 h-6" />
+                        </div>
+                    @endif
+                    <div>
+                        <span class="text-xl font-extrabold text-slate-900 tracking-tight block leading-none">
+                            {{ $storeName }}
+                        </span>
+                        <span class="text-xs text-primary-600 font-medium tracking-wide">Digital Menu</span>
                     </div>
                 @endif
-                <div>
-                    <span class="text-xl font-extrabold text-slate-900 tracking-tight block leading-none">
-                        {{ $storeName }}
-                    </span>
-                    <span class="text-xs text-primary-600 font-medium tracking-wide">Digital Menu</span>
-                </div>
             </a>
 
             <!-- Nav Links -->

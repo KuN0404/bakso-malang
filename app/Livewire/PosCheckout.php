@@ -14,6 +14,7 @@ use App\Models\PrinterConfig;
 use App\Models\Product;
 use App\Models\ProductReturn;
 use App\Models\ReturnItem;
+use App\Models\Pager;
 use App\Models\ServiceArea;
 use App\Models\Setting;
 use App\Models\Shift;
@@ -77,12 +78,17 @@ class PosCheckout extends Component
     public function updatedNotes() { $this->broadcastCartState(); }
     public function updatedOrderType() { $this->broadcastCartState(); }
     public function updatedSelectedServiceAreaId() { $this->broadcastCartState(); }
+    public function updatedSelectedPagerId() { $this->broadcastCartState(); }
 
     // Payment state
     public ?int $paymentSourceId = null;
     public string $paymentMethod = 'cash';
     public float $paidAmount = 0;
     public string $customerName = '';
+    // Opsional — beda dari Self Order yang nomor HP-nya wajib. Dipakai untuk
+    // kirim struk digital (email/WhatsApp) kalau kasir sempat mengisinya.
+    public string $customerPhone = '';
+    public string $customerEmail = '';
     public ?string $qrisOrderId = null;
     public ?string $qrisCodeUrl = null;
     public float $qrisAmount = 0;
@@ -97,6 +103,7 @@ class PosCheckout extends Component
 
     public string $orderType = 'dine_in';
     public ?int $selectedServiceAreaId = null;
+    public ?int $selectedPagerId = null;
     public string $notes = '';
 
     // UI state
@@ -373,17 +380,22 @@ class PosCheckout extends Component
 
         $userId = auth()->id();
         if ($userId) {
-            $this->notifiedSelfOrdersCount = \App\Models\SelfOrder::countWaitingToday($userId)
-                + \App\Models\SelfOrder::countPaidToday($userId);
+            // Pakai computed property (bukan panggil static method langsung) supaya
+            // hasilnya di-cache Livewire untuk request ini — dipakai ulang saat
+            // template membaca $this->selfOrdersCount, tidak query 2x.
+            $this->notifiedSelfOrdersCount = $this->selfOrdersCount;
 
             $cachedCart = Cache::get('pos_active_cart_' . $userId);
             if (!empty($cachedCart) && is_array($cachedCart)) {
                 $this->cart                  = $cachedCart['cart'] ?? [];
                 $this->paidAmount            = $cachedCart['paid_amount'] ?? 0;
                 $this->customerName          = $cachedCart['customer_name'] ?? '';
+                $this->customerPhone         = $cachedCart['customer_phone'] ?? '';
+                $this->customerEmail         = $cachedCart['customer_email'] ?? '';
                 $this->notes                 = $cachedCart['notes'] ?? '';
                 $this->orderType             = $cachedCart['order_type'] ?? 'dine_in';
                 $this->selectedServiceAreaId = $cachedCart['selected_service_area_id'] ?? null;
+                $this->selectedPagerId       = $cachedCart['selected_pager_id'] ?? null;
             }
 
             // Restorasi transaksi QRIS pending yang masih aktif (jika ada)
@@ -483,6 +495,18 @@ class PosCheckout extends Component
     }
 
     #[Computed]
+    public function logoFull(): ?string
+    {
+        return Setting::get('logo_full', null, 'general');
+    }
+
+    #[Computed]
+    public function logoType(): string
+    {
+        return Setting::get('logo_type', 'single', 'general');
+    }
+
+    #[Computed]
     public function generalSettings(): array
     {
         return Setting::getGroup('general');
@@ -572,6 +596,12 @@ class PosCheckout extends Component
     public function serviceAreas()
     {
         return ServiceArea::active()->orderBy('sort_order')->get();
+    }
+
+    #[Computed]
+    public function pagers()
+    {
+        return Pager::active()->orderBy('number')->get();
     }
 
     // -----------------------------------------------------------------
@@ -722,9 +752,12 @@ class PosCheckout extends Component
         $this->cart                  = [];
         $this->paidAmount            = 0;
         $this->customerName          = '';
+        $this->customerPhone         = '';
+        $this->customerEmail         = '';
         $this->notes                 = '';
         $this->orderType             = 'dine_in';
         $this->selectedServiceAreaId = null;
+        $this->selectedPagerId       = null;
         $this->broadcastCartState();
     }
 
@@ -772,8 +805,8 @@ class PosCheckout extends Component
             return;
         }
 
-        if ($this->orderType === 'dine_in' && !$this->selectedServiceAreaId) {
-            $this->dispatch('notify', type: 'error', message: 'Wajib pilih Meja / Ruangan untuk Dine In');
+        if ($this->orderType === 'dine_in' && !$this->selectedServiceAreaId && !$this->selectedPagerId) {
+            $this->dispatch('notify', type: 'error', message: 'Wajib pilih Meja/Ruangan atau isi Nomor Pager untuk Dine In');
             return;
         }
 
@@ -1065,8 +1098,11 @@ class PosCheckout extends Component
             paymentSourceId: (int) $this->paymentSourceId,
             paymentMethod:   $method,
             customerName:    $this->customerName,
+            customerPhone:   $this->customerPhone,
+            customerEmail:   $this->customerEmail,
             orderType:       $this->orderType,
             serviceAreaId:   $this->orderType === 'dine_in' ? $this->selectedServiceAreaId : null,
+            pagerId:         $this->selectedPagerId,
             notes:           $this->notes,
             idempotencyKey:  $this->paymentIdempotencyKey,
         );
@@ -1181,7 +1217,7 @@ class PosCheckout extends Component
         $this->openingCash    = 0;
         $this->actualCash     = 0;
         $this->expectedNonCash = (float) $shift->calculateExpectedNonCash();
-        $this->actualNonCash  = $this->expectedNonCash;
+        $this->actualNonCash  = 0;
         $this->closeNotes     = '';
         $this->expenses       = [];
         $this->showCloseShiftModal = true;
@@ -1288,7 +1324,7 @@ class PosCheckout extends Component
         $this->openingCash      = 0;
         $this->actualCash       = 0;
         $this->expectedNonCash  = (float) $shift->calculateExpectedNonCash();
-        $this->actualNonCash    = $this->expectedNonCash;
+        $this->actualNonCash    = 0;
         $this->closeNotes       = '';
         $this->expenses         = [];
         $this->showUnclosedShiftModal = true;
@@ -1419,9 +1455,12 @@ class PosCheckout extends Component
             'paid_amount'              => $this->paidAmount,
             'change_amount'            => $this->changeAmount,
             'customer_name'            => $this->customerName,
+            'customer_phone'           => $this->customerPhone,
+            'customer_email'           => $this->customerEmail,
             'notes'                    => $this->notes,
             'order_type'               => $this->orderType,
             'selected_service_area_id' => $this->selectedServiceAreaId,
+            'selected_pager_id'        => $this->selectedPagerId,
             'cashier_name'             => auth()->user()->name,
             'qris_order_id'            => $this->qrisOrderId,
             'qris_code_url'            => $this->qrisCodeUrl,
@@ -1474,6 +1513,8 @@ class PosCheckout extends Component
             'id'                       => $pendingId,
             'label'                    => $label,
             'customer_name'            => $this->customerName,
+            'customer_phone'           => $this->customerPhone,
+            'customer_email'           => $this->customerEmail,
             'cart'                     => $this->cart,
             'subtotal'                 => $this->subtotal,
             'tax_amount'               => $this->taxAmount,
@@ -1481,6 +1522,7 @@ class PosCheckout extends Component
             'notes'                    => $this->notes,
             'order_type'               => $this->orderType,
             'selected_service_area_id' => $this->selectedServiceAreaId,
+            'selected_pager_id'        => $this->selectedPagerId,
             'item_count'               => array_sum(array_column($this->cart, 'quantity')),
             'held_at'                  => now()->format('H:i'),
             'timestamp'                => now()->timestamp,
@@ -1495,6 +1537,8 @@ class PosCheckout extends Component
 
         $this->cart = [];
         $this->customerName = '';
+        $this->customerPhone = '';
+        $this->customerEmail = '';
         $this->notes = '';
         $this->paidAmount = 0;
         $this->pendingCustomerName = '';
@@ -1539,6 +1583,8 @@ class PosCheckout extends Component
                 'id'                       => 'pending_' . uniqid() . '_' . time(),
                 'label'                    => $currentLabel,
                 'customer_name'            => $this->customerName,
+                'customer_phone'           => $this->customerPhone,
+                'customer_email'           => $this->customerEmail,
                 'cart'                     => $this->cart,
                 'subtotal'                 => $this->subtotal,
                 'tax_amount'               => $this->taxAmount,
@@ -1555,9 +1601,12 @@ class PosCheckout extends Component
 
         $this->cart                  = $targetCart['cart'] ?? [];
         $this->customerName          = $targetCart['customer_name'] ?? '';
+        $this->customerPhone         = $targetCart['customer_phone'] ?? '';
+        $this->customerEmail         = $targetCart['customer_email'] ?? '';
         $this->notes                 = $targetCart['notes'] ?? '';
         $this->orderType             = $targetCart['order_type'] ?? 'dine_in';
         $this->selectedServiceAreaId = $targetCart['selected_service_area_id'] ?? null;
+        $this->selectedPagerId       = $targetCart['selected_pager_id'] ?? null;
         $this->paidAmount            = 0;
 
         if ($targetIndex !== null) {

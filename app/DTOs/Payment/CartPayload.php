@@ -18,8 +18,11 @@ final class CartPayload
      * @param  int    $paymentSourceId
      * @param  string $paymentMethod  cash|qris
      * @param  string $customerName
+     * @param  string $customerPhone  Opsional
+     * @param  string $customerEmail  Opsional
      * @param  string $orderType  dine_in|take_away
      * @param  int|null $serviceAreaId
+     * @param  int|null $pagerId
      * @param  string $notes
      * @param  string $idempotencyKey
      */
@@ -33,8 +36,11 @@ final class CartPayload
         public readonly int $paymentSourceId,
         public readonly string $paymentMethod,
         public readonly string $customerName,
+        public readonly string $customerPhone,
+        public readonly string $customerEmail,
         public readonly string $orderType,
         public readonly ?int $serviceAreaId,
+        public readonly ?int $pagerId,
         public readonly string $notes,
         public readonly string $idempotencyKey,
     ) {}
@@ -50,8 +56,11 @@ final class CartPayload
             'tax_amount'       => $this->taxAmount,
             'total'            => $this->total,
             'customer_name'    => $this->customerName,
+            'customer_phone'   => $this->customerPhone,
+            'customer_email'   => $this->customerEmail,
             'order_type'       => $this->orderType,
             'service_area_id'  => $this->serviceAreaId,
+            'pager_id'         => $this->pagerId,
             'notes'            => $this->notes,
         ];
     }

@@ -151,7 +151,7 @@
                                     <option value="A4" class="text-gray-900 bg-white">Laporan (A4)</option>
                                     <option value="A5" class="text-gray-900 bg-white">Laporan (A5)</option>
                                     <option value="58mm" class="text-gray-900 bg-white">Struk (58mm)</option>
-                                    <option value="76mm" class="text-gray-900 bg-white">Struk (76mm)</option>
+                                    <option value="80mm" class="text-gray-900 bg-white">Struk (80mm)</option>
                                 </select>
                                 <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-1 text-white/50 group-hover:text-white transition-colors">
                                     <i data-lucide="chevron-down" class="w-3 h-3"></i>
@@ -218,7 +218,7 @@
                                 <option value="A4" class="text-gray-900 bg-white">Laporan (A4)</option>
                                 <option value="A5" class="text-gray-900 bg-white">Invoice (A5)</option>
                                 <option value="58mm" class="text-gray-900 bg-white">Struk (58mm)</option>
-                                <option value="76mm" class="text-gray-900 bg-white">Struk (76mm)</option>
+                                <option value="80mm" class="text-gray-900 bg-white">Struk (80mm)</option>
                             </select>
                             <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-white/50 group-hover:text-white transition-colors">
                                 <i data-lucide="chevron-down" class="w-3 h-3"></i>

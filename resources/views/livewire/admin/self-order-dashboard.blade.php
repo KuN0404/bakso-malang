@@ -610,11 +610,23 @@
             </div>
 
             <div>
-                <label class="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1.5">Meja / Area Makan *</label>
+                <label class="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1.5">Meja / Area Makan (opsional jika isi Nomor Pager)</label>
                 <select wire:model="selectedServiceAreaId" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-purple-500">
                     <option value="">-- Pilih Meja --</option>
                     @foreach($this->activeServiceAreas as $area)
                         <option value="{{ $area->id }}">{{ $area->name }} ({{ $area->type_label }})</option>
+                    @endforeach
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1.5">Nomor Pager (opsional)</label>
+                <select wire:model="selectedPagerId" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-purple-500">
+                    <option value="">-- Tanpa Pager --</option>
+                    @foreach($this->activePagers as $pager)
+                        <option value="{{ $pager->id }}">
+                            Pager {{ $pager->number }}{{ $pager->docking_number ? " (Docking {$pager->docking_number})" : '' }}
+                        </option>
                     @endforeach
                 </select>
             </div>

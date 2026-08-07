@@ -30,6 +30,7 @@ class SelfOrder extends Model
         'total',
         'order_type',
         'service_area_id',
+        'pager_id',
         'notes',
         'payment_method',
         'status',
@@ -62,6 +63,7 @@ class SelfOrder extends Model
         'pickup_confirmed_at' => 'datetime',
         'queue_number'        => 'integer',
         'service_area_id'     => 'integer',
+        'pager_id'            => 'integer',
     ];
 
     // -----------------------------------------------------------------
@@ -92,6 +94,11 @@ class SelfOrder extends Model
     public function serviceArea(): BelongsTo
     {
         return $this->belongsTo(ServiceArea::class);
+    }
+
+    public function pager(): BelongsTo
+    {
+        return $this->belongsTo(Pager::class);
     }
 
     public function paymentTransaction(): BelongsTo

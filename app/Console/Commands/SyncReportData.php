@@ -7,6 +7,7 @@ use App\Models\Component;
 use App\Models\ComponentStockLog;
 use App\Models\Ingredient;
 use App\Models\IngredientStockLog;
+use App\Models\Pager;
 use App\Models\PaymentSource;
 use App\Models\PaymentTransaction;
 use App\Models\ProductReturn;
@@ -95,6 +96,11 @@ class SyncReportData extends Command
         $sa = ServiceArea::all();
         $this->withProgressBar($sa, fn($s) => $this->reportSyncService->syncServiceArea($s));
         $this->line(" ✓ Service Areas: {$sa->count()}");
+
+        // Pagers
+        $pagers = Pager::all();
+        $this->withProgressBar($pagers, fn($p) => $this->reportSyncService->syncPager($p));
+        $this->line(" ✓ Pagers: {$pagers->count()}");
 
         // Categories
         $cats = Category::all();

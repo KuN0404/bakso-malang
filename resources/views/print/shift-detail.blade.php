@@ -21,8 +21,8 @@
         .font-bold { font-weight: bold; }
         .border-t { border-top: 1px dashed #000; }
         .border-b { border-bottom: 1px dashed #000; }
-        .py-1 { padding-top: 4px; padding-bottom: 4px; }
-        .mb-2 { margin-bottom: 8px; }
+        .py-1 { padding-top: 2px; padding-bottom: 2px; }
+        .mb-2 { margin-bottom: 4px; }
         .flex { display: flex; justify-content: space-between; }
         .w-full { width: 100%; }
         
@@ -35,9 +35,9 @@
 <body onload="window.print()">
     <div class="text-center mb-2">
         <div class="font-bold" style="font-size: 14px; margin-bottom: 4px;">{{ $settings['store_name'] ?? 'Bakso Malang' }}</div>
-        <div style="font-size: 10px; color: #666;">{{ $settings['store_address'] ?? '' }}</div>
+        <div style="font-size: 10px; color: #000;">{{ $settings['store_address'] ?? '' }}</div>
         @if(!empty($settings['store_phone']))
-        <div style="font-size: 10px; color: #666;">Telp: {{ $settings['store_phone'] }}</div>
+        <div style="font-size: 10px; color: #000;">Telp: {{ $settings['store_phone'] }}</div>
         @endif
         <div class="border-b" style="margin-top: 8px; padding-bottom: 8px;">Laporan Tutup Shift</div>
     </div>
@@ -88,7 +88,7 @@
         <span>Penjualan ({{ $totalTrx }} trx)</span>
         <span class="text-right">{{ number_format($totalOmset, 0, ',', '.') }}</span>
     </div>
-    <div class="flex" style="padding-left: 10px; font-size: 10px; color: #666;">
+    <div class="flex" style="padding-left: 10px; font-size: 10px; color: #000;">
         <span>Tunai: {{ number_format($cashTotal, 0, ',', '.') }} | Non-Tunai: {{ number_format($nonCashTotal, 0, ',', '.') }}</span>
     </div>
     
@@ -98,7 +98,7 @@
         <span class="text-right">{{ number_format($expenseTotal, 0, ',', '.') }}</span>
     </div>
     @foreach($shift->expenses as $exp)
-        <div class="flex" style="padding-left: 10px; font-size: 10px; color: #666;">
+        <div class="flex" style="padding-left: 10px; font-size: 10px; color: #000;">
             <span>- {{ $exp->description }}</span>
             <span class="text-right">{{ number_format($exp->amount, 0, ',', '.') }}</span>
         </div>

@@ -19,11 +19,22 @@
     x-init="connectSse()">
 
     {{-- Header --}}
+    @php
+        $logoType = \App\Models\Setting::get('logo_type', 'single', 'general');
+        $logoWeb = \App\Models\Setting::get('logo_web', null, 'general');
+        $logoFull = \App\Models\Setting::get('logo_full', null, 'general');
+    @endphp
     <header class="bg-brand text-white sticky top-0 z-10 shadow-sm">
         <div class="px-4 py-3.5 flex items-center justify-center gap-2">
-            <svg class="w-5 h-5 text-white/80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/>
-            </svg>
+            @if($logoType === 'full' && $logoFull)
+                <img src="{{ asset('storage/' . $logoFull) }}" class="h-6 w-auto max-w-[130px] object-contain">
+            @elseif($logoWeb)
+                <img src="{{ asset('storage/' . $logoWeb) }}" class="w-6 h-6 object-cover rounded">
+            @else
+                <svg class="w-5 h-5 text-white/80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/>
+                </svg>
+            @endif
             <span class="font-bold text-[15px]">Pembayaran QRIS</span>
         </div>
     </header>

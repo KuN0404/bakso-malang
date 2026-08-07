@@ -19,6 +19,8 @@ return new class extends Migration
             // Data Customer
             $table->string('customer_name', 100);
             $table->string('customer_phone', 20);
+            $table->string('pickup_name', 100)->nullable()->comment('Nama pengambil pesanan bawa pulang');
+            $table->string('pickup_phone', 20)->nullable()->comment('No. HP pengambil pesanan bawa pulang');
             $table->string('customer_email', 150)->nullable();
 
             // Finansial — snapshot harga saat order dibuat
@@ -28,6 +30,7 @@ return new class extends Migration
 
             // Metadata Order
             $table->enum('order_type', ['dine_in', 'take_away'])->default('dine_in');
+            $table->foreignId('service_area_id')->nullable()->constrained('service_areas')->nullOnDelete();
             $table->text('notes')->nullable();
 
             // Payment
@@ -66,6 +69,7 @@ return new class extends Migration
             $table->timestamp('claimed_at')->nullable()->comment('Waktu kasir mengambil pesanan');
             $table->timestamp('processing_at')->nullable();
             $table->timestamp('completed_at')->nullable();
+            $table->timestamp('pickup_confirmed_at')->nullable()->comment('Waktu konfirmasi penyerahan pesanan bawa pulang');
 
             // Idempotency — cegah double submit dari frontend
             $table->string('idempotency_key', 64)->nullable()->unique();
@@ -81,6 +85,7 @@ return new class extends Migration
             $table->index('customer_phone');
             $table->index('processed_by');
             $table->index('shift_id');
+            $table->index('service_area_id');
         });
     }
 

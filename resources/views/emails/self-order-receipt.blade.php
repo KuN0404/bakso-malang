@@ -121,10 +121,17 @@
             </div>
             @endif
 
-            {{-- Tracking Button --}}
-            <a href="{{ route('self-order.tracking', ['token' => $selfOrder->order_token]) }}"
+            {{-- Receipt Button --}}
+            @if($selfOrder->transaction?->receipt_token)
+            <a href="{{ route('receipt.show', ['token' => $selfOrder->transaction->receipt_token]) }}"
                 class="tracking-btn">
-                Pantau Status Pesanan →
+                Lihat Struk →
+            </a>
+            @endif
+
+            <a href="{{ route('self-order.tracking', ['token' => $selfOrder->order_token]) }}"
+                style="display:block; text-align:center; font-size:13px; color:#888; margin-top:12px;">
+                Pantau status pesanan
             </a>
         </div>
 

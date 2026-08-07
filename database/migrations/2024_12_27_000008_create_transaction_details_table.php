@@ -21,7 +21,7 @@ return new class extends Migration
             $table->timestamp('fulfilled_at')->nullable();
             $table->text('notes')->nullable();
             $table->timestamps();
-            
+
             $table->index('transaction_id');
             $table->index('product_id');
         });
@@ -32,6 +32,7 @@ return new class extends Migration
             $table->foreignId('modifier_id')->constrained();
             $table->string('modifier_name'); // Snapshot
             $table->decimal('price_adjustment', 12, 2);
+            $table->unsignedSmallInteger('quantity')->default(1);
             $table->primary(['transaction_detail_id', 'modifier_id']);
         });
     }

@@ -85,6 +85,13 @@
                 position: absolute;
                 left: 0;
                 top: 0;
+                /* Div ini punya kelas Tailwind "p-4" untuk tampilan di modal
+                   (layar) — tanpa di-nolkan, padding itu tetap ikut tercetak
+                   dan membuat struk lebih lebar dari ukuran kertas (@page)
+                   yang sebenarnya, menyebabkan konten overflow ke kanan. */
+                width: fit-content;
+                padding: 0 !important;
+                margin: 0 !important;
             }
         }
     </style>

@@ -44,14 +44,24 @@ return new class extends Migration
             // Idempotency key — mencegah duplikasi request
             $table->string('idempotency_key', 100)->unique()->nullable();
 
-            // Kasir yang membuat
-            $table->foreignId('created_by')->constrained('users');
+            // Kasir yang membuat. Nullable karena Self Order tidak memiliki kasir
+            // (kasir baru assign saat "claim order").
+            $table->unsignedBigInteger('created_by')->nullable();
+            $table->foreign('created_by')->references('id')->on('users');
+
+            // Sumber transaksi pembayaran. FK self_order_id ditambahkan belakangan
+            // (lihat alter_payment_transactions_for_self_order) karena tabel
+            // self_orders baru dibuat setelah tabel ini.
+            $table->enum('source', ['pos', 'self_order'])
+                ->default('pos')
+                ->comment('Sumber: POS atau Self Order');
 
             $table->timestamps();
 
             // Composite indexes
             $table->index(['status', 'expired_at']);
             $table->index(['invoice_number', 'status']);
+            $table->index('source');
         });
     }
 

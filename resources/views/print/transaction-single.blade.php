@@ -14,35 +14,61 @@
             body { margin: 0; padding: 0; }
             .no-print { display: none; }
             @page {
-                size: {{ $format == '58mm' ? '58mm auto' : ($format == '76mm' ? '76mm auto' : ($format == 'A5' ? 'A5 landscape' : 'A4 portrait')) }};
-                margin: {{ $format == '58mm' || $format == '76mm' ? '2mm' : '10mm' }};
+                size: {{ $format == '58mm' ? '58mm auto' : ($format == '80mm' ? '80mm auto' : ($format == 'A5' ? 'A5 landscape' : 'A4 portrait')) }};
+                margin: {{ in_array($format, ['58mm', '80mm']) ? '0' : '10mm' }};
             }
         }
         body { font-family: 'Courier New', Courier, monospace; font-size: 12px; }
         .a4-font { font-family: sans-serif; }
+        #receipt-content, #receipt-content * {
+            color: #000 !important;
+            border-color: #000 !important;
+        }
+        #receipt-content {
+            box-sizing: border-box !important;
+            overflow: hidden !important;
+        }
+        #receipt-content, #receipt-content * {
+            max-width: 100%;
+            overflow-wrap: break-word;
+            word-break: break-word;
+        }
+        #receipt-content .flex {
+            width: 100%;
+            overflow: hidden;
+        }
+        #receipt-content .flex > * {
+            min-width: 0;
+            flex-shrink: 1;
+        }
     </style>
 </head>
-<body class="bg-white {{ ($format == '58mm' || $format == '76mm') ? 'p-1' : 'p-8 a4-font' }}" onload="window.print()">
-    @if($format == '58mm' || $format == '76mm')
+<body class="bg-white {{ in_array($format, ['58mm', '80mm']) ? 'p-1' : 'p-8 a4-font' }}" onload="window.print()">
+    @if(in_array($format, ['58mm', '80mm']))
         <!-- Struk Layout (Adapted from partials.receipt) -->
-        <div class="font-mono text-xs" style="max-width: {{ $format }};">
+        <div id="receipt-content" class="font-mono text-xs" style="max-width: {{ $format }}; width: {{ $format }};">
             <!-- Header -->
-            <div class="text-center border-b border-dashed border-gray-400 pb-3 mb-3">
+            <div class="text-center border-b border-dashed border-black pb-1.5 mb-1.5">
                 <h1 class="text-base font-bold uppercase">{{ $settings['store_name'] ?? 'Bakso Malang' }}</h1>
-                <p class="text-[10px] text-gray-500">{{ $settings['store_address'] ?? '' }}</p>
+                <p class="text-[10px]">{{ $settings['store_address'] ?? '' }}</p>
                 @if(!empty($settings['store_phone']))
-                <p class="text-[10px] text-gray-500">Telp: {{ $settings['store_phone'] }}</p>
+                <p class="text-[10px]">Telp: {{ $settings['store_phone'] }}</p>
                 @endif
             </div>
 
             <!-- Transaction Info -->
-            <div class="border-b border-dashed border-gray-300 pb-3 mb-3 text-[11px]">
+            <div class="border-b border-dashed border-black pb-1.5 mb-1.5 text-[11px]">
                 <div class="flex justify-between">
                     <span>No:</span><span class="font-bold">{{ $transaction->invoice_number }}</span>
                 </div>
                 @if($transaction->service_area_id)
                 <div class="flex justify-between">
                     <span>Area:</span><span class="font-bold text-lg">{{ $transaction->serviceArea->name ?? '-' }}</span>
+                </div>
+                @endif
+                @if($transaction->pager_id)
+                <div class="flex justify-between">
+                    <span>Pager:</span><span class="font-bold text-lg">{{ $transaction->pager->number ?? '-' }}</span>
                 </div>
                 @endif
                 <div class="flex justify-between">
@@ -62,19 +88,30 @@
             </div>
 
             <!-- Items -->
-            <div class="border-b border-dashed border-gray-300 pb-3 mb-3">
+            <div class="border-b border-dashed border-black pb-1.5 mb-1.5">
                 @foreach($transaction->details as $detail)
-                    <div class="mb-2">
+                    <div class="mb-1">
                         <div class="font-bold">{{ $detail->product_name }}</div>
-                        <div class="flex justify-between text-gray-600 pl-2 text-[10px]">
-                            <span>{{ $detail->quantity }} x {{ number_format($detail->unit_price + $detail->modifier_total, 0, ',', '.') }}</span>
-                            <span>{{ number_format($detail->subtotal, 0, ',', '.') }}</span>
+                        <div class="flex justify-between pl-2 text-[10px]">
+                            <span>{{ $detail->quantity }} x {{ number_format($detail->unit_price, 0, ',', '.') }}</span>
+                            <span>{{ number_format($detail->unit_price * $detail->quantity, 0, ',', '.') }}</span>
                         </div>
                         @if($detail->modifiers->count())
-                            <div class="text-[9px] text-gray-400 pl-2 italic">
-                                + @foreach($detail->modifiers as $mod)
-                                    {{ $mod->pivot->modifier_name ?? $mod->name }}{{ ($mod->pivot->quantity ?? 1) > 1 ? ' ×' . $mod->pivot->quantity : '' }}{{ !$loop->last ? ', ' : '' }}
-                                @endforeach
+                            @foreach($detail->modifiers as $mod)
+                                @php
+                                    $modQty = $mod->pivot->quantity ?? 1;
+                                    $modPrice = ($mod->pivot->price_adjustment ?? 0) * $modQty;
+                                @endphp
+                                <div class="flex justify-between pl-4 text-[9px]">
+                                    <span>+ {{ $mod->pivot->modifier_name ?? $mod->name }}{{ $modQty > 1 ? ' ×' . $modQty : '' }}</span>
+                                    @if($modPrice > 0)
+                                        <span>{{ number_format($modPrice, 0, ',', '.') }}</span>
+                                    @endif
+                                </div>
+                            @endforeach
+                            <div class="flex justify-between pl-2 font-semibold text-[10px] border-t border-dotted border-black">
+                                <span>Jumlah</span>
+                                <span>{{ number_format($detail->subtotal, 0, ',', '.') }}</span>
                             </div>
                         @endif
                     </div>
@@ -82,7 +119,7 @@
             </div>
 
             <!-- Totals -->
-            <div class="border-b border-dashed border-gray-300 pb-3 mb-3">
+            <div class="border-b border-dashed border-black pb-1.5 mb-1.5">
                 <div class="flex justify-between">
                     <span>Subtotal:</span><span>{{ number_format($transaction->subtotal, 0, ',', '.') }}</span>
                 </div>
@@ -97,7 +134,7 @@
             </div>
 
             <!-- Payment -->
-            <div class="pb-3 text-[11px]">
+            <div class="pb-1.5 text-[11px]">
                  <div class="flex justify-between">
                     <span>Bayar ({{ $transaction->paymentSource?->name ?? 'Cash' }}):</span>
                     <span>{{ number_format($transaction->paid_amount, 0, ',', '.') }}</span>
@@ -110,13 +147,13 @@
             </div>
 
             @if($transaction->notes)
-            <div class="border-b border-dashed border-gray-300 pb-3 mb-3">
+            <div class="border-b border-dashed border-black pb-1.5 mb-1.5">
                 <span class="font-bold">Catatan:</span>
-                <p class="text-gray-600 italic whitespace-pre-wrap">{{ $transaction->notes }}</p>
+                <p class="italic whitespace-pre-wrap">{{ $transaction->notes }}</p>
             </div>
             @endif
 
-             <div class="text-center text-[10px] text-gray-400 mt-4">
+             <div class="text-center text-[10px] mt-2">
                  {{ $receiptSettings['header_text'] ?? 'Terima Kasih!' }}
                  @if(!empty($receiptSettings['footer_text']))
                  <p class="mt-1">{{ $receiptSettings['footer_text'] }}</p>

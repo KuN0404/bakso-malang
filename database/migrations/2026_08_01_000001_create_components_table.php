@@ -10,6 +10,10 @@ use Illuminate\Support\Facades\Schema;
  *
  * Berbeda dari `ingredients` (bahan baku mentah),
  * komponen adalah hasil olahan yang siap digunakan dalam BOM produk.
+ *
+ * Migration ini juga menambahkan component_id ke `modifiers` dan
+ * `production_outputs` (butuh dilakukan di sini, bukan di migration
+ * create tabel masing-masing, karena components baru dibuat sekarang).
  */
 return new class extends Migration
 {
@@ -31,10 +35,44 @@ return new class extends Migration
             $table->index('name');
             $table->index('is_active');
         });
+
+        // Jika modifier dikaitkan ke component → setiap pemilihan modifier
+        // di POS akan mengurangi stok komponen tersebut sebanyak qty modifier.
+        Schema::table('modifiers', function (Blueprint $table) {
+            $table->foreignId('component_id')
+                ->nullable()
+                ->after('sort_order')
+                ->constrained()
+                ->nullOnDelete(); // Jika komponen dihapus, putus link (bukan hapus modifier)
+        });
+
+        // Ubah production_outputs agar mendukung output ke Component.
+        // Rule (enforced di aplikasi): setiap baris harus memiliki SALAH SATU
+        // dari component_id atau product_id. Repacking baru hanya pakai component_id.
+        Schema::table('production_outputs', function (Blueprint $table) {
+            $table->foreignId('component_id')
+                ->nullable()
+                ->after('production_id')
+                ->constrained()
+                ->cascadeOnDelete();
+
+            $table->foreignId('product_id')->nullable()->change();
+        });
     }
 
     public function down(): void
     {
+        Schema::table('production_outputs', function (Blueprint $table) {
+            $table->dropForeign(['component_id']);
+            $table->dropColumn('component_id');
+            $table->foreignId('product_id')->nullable(false)->change();
+        });
+
+        Schema::table('modifiers', function (Blueprint $table) {
+            $table->dropForeign(['component_id']);
+            $table->dropColumn('component_id');
+        });
+
         Schema::dropIfExists('components');
     }
 };

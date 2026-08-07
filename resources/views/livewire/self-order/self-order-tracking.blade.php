@@ -3,6 +3,11 @@
     @if($refreshInterval > 0) wire:poll.{{ $refreshInterval }}ms.visible="refreshStatus" @endif>
 
     {{-- Header --}}
+    @php
+        $logoType = \App\Models\Setting::get('logo_type', 'single', 'general');
+        $logoWeb = \App\Models\Setting::get('logo_web', null, 'general');
+        $logoFull = \App\Models\Setting::get('logo_full', null, 'general');
+    @endphp
     <header class="bg-brand text-white px-4 py-4 shadow-md">
         <div class="flex items-center gap-3">
             <a href="{{ route('self-order.index') }}" class="text-white/70 hover:text-white transition">
@@ -10,6 +15,11 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
                 </svg>
             </a>
+            @if($logoType === 'full' && $logoFull)
+                <img src="{{ asset('storage/' . $logoFull) }}" class="h-6 w-auto max-w-[130px] object-contain">
+            @elseif($logoWeb)
+                <img src="{{ asset('storage/' . $logoWeb) }}" class="w-6 h-6 object-cover rounded">
+            @endif
             <div>
                 <h1 class="font-bold text-lg">Status Pesanan</h1>
                 <p class="text-white/70 text-xs">Update otomatis</p>

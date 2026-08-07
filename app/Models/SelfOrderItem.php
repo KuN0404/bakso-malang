@@ -42,7 +42,11 @@ class SelfOrderItem extends Model
 
     public function modifiers(): HasMany
     {
-        return $this->hasMany(SelfOrderItemModifier::class);
+        return $this->hasMany(SelfOrderItemModifier::class)
+            ->join('modifiers', 'self_order_item_modifiers.modifier_id', '=', 'modifiers.id')
+            ->orderBy('modifiers.modifier_group_id')
+            ->orderBy('modifiers.sort_order')
+            ->select('self_order_item_modifiers.*');
     }
 
     // -----------------------------------------------------------------

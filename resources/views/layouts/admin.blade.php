@@ -9,6 +9,8 @@
     @php
         $siteLogo = \App\Models\Setting::get('site_logo', null, 'general');
         $logoWeb = \App\Models\Setting::get('logo_web', null, 'general');
+        $logoFull = \App\Models\Setting::get('logo_full', null, 'general');
+        $logoType = \App\Models\Setting::get('logo_type', 'single', 'general');
         $fontFamilyWeb = \App\Models\Setting::get('font_family_web', 'Poppins', 'general');
     @endphp
 
@@ -259,19 +261,25 @@
         >
             <!-- Logo -->
             <div class="p-5 border-b border-sidebar-light flex items-center gap-3 whitespace-nowrap overflow-hidden h-20">
-                <div class="flex-shrink-0 w-10 h-10 bg-white rounded-lg flex items-center justify-center overflow-hidden">
-                    @if ($logoWeb)
-                        <img id="sidebar-logo-img" src="{{ asset('storage/' . $logoWeb) }}" class="w-full h-full object-cover">
-                    @else
-                        <div id="sidebar-logo-placeholder" class="w-full h-full flex items-center justify-center">
-                            <x-lucide name="soup" class="w-6 h-6 text-sidebar" />
-                        </div>
-                    @endif
+                {{-- Mode "single": ikon kotak + nama toko --}}
+                <div id="sidebar-logo-single-wrap" class="contents" style="{{ $logoType === 'full' && $logoFull ? 'display:none' : '' }}">
+                    <div class="flex-shrink-0 w-10 h-10 bg-white rounded-lg flex items-center justify-center overflow-hidden">
+                        @if ($logoWeb)
+                            <img id="sidebar-logo-img" src="{{ asset('storage/' . $logoWeb) }}" class="w-full h-full object-cover">
+                        @else
+                            <div id="sidebar-logo-placeholder" class="w-full h-full flex items-center justify-center">
+                                <x-lucide name="soup" class="w-6 h-6 text-sidebar" />
+                            </div>
+                        @endif
+                    </div>
+                    <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-40 opacity-100'">
+                        <h1 id="sidebar-store-name" class="text-white font-bold text-lg leading-tight">{{ \App\Models\Setting::get('store_name', 'BAKSO MALANG', 'general') }}</h1>
+                        <p class="text-blue-200 text-xs">Point of Sales</p>
+                    </div>
                 </div>
-                <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-40 opacity-100'">
-                    <h1 id="sidebar-store-name" class="text-white font-bold text-lg leading-tight">{{ \App\Models\Setting::get('store_name', 'BAKSO MALANG', 'general') }}</h1>
-                    <p class="text-blue-200 text-xs">Point of Sales</p>
-                </div>
+                {{-- Mode "full": banner logo saja, tanpa teks nama toko (sudah ada di gambar) --}}
+                <img id="sidebar-logo-full-img" src="{{ $logoFull ? asset('storage/' . $logoFull) : '' }}" class="h-10 w-auto max-w-[180px] object-contain"
+                    style="{{ $logoType === 'full' && $logoFull ? '' : 'display:none' }}">
                 <!-- Close Button (Mobile Only) -->
                 <button @click="sidebarOpen = false" class="lg:hidden ml-auto text-blue-200 hover:text-white">
                     <x-lucide name="x" class="w-6 h-6" />
@@ -296,13 +304,14 @@
 
                 <!-- Group: Master Data -->
                 @php
-                    $isMasterActive = request()->routeIs('admin.categories.*') || 
-                                      request()->routeIs('admin.products.*') || 
-                                      request()->routeIs('admin.modifiers.*') || 
+                    $isMasterActive = request()->routeIs('admin.categories.*') ||
+                                      request()->routeIs('admin.products.*') ||
+                                      request()->routeIs('admin.modifiers.*') ||
                                       request()->routeIs('admin.payment-sources.*') ||
-                                      request()->routeIs('admin.service-areas.*');
+                                      request()->routeIs('admin.service-areas.*') ||
+                                      request()->routeIs('admin.customers.*');
                 @endphp
-                @canany(['view_categories', 'view_products', 'view_modifiers', 'manage_payment_sources', 'manage_settings'])
+                @canany(['view_categories', 'view_products', 'view_modifiers', 'manage_payment_sources', 'manage_settings', 'manage_pagers', 'view_customers'])
                 <div x-data="{ open: {{ $isMasterActive ? 'true' : 'false' }} }" class="mt-4">
                     <button @click="open = !open" class="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-blue-300 uppercase tracking-wider hover:text-white transition-colors group whitespace-nowrap text-left">
                         <div class="flex items-center gap-3">
@@ -353,6 +362,20 @@
                         <a href="{{ route('admin.service-areas.index') }}" wire:navigate class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.service-areas.*') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
                             <div class="flex-shrink-0 w-6 flex justify-center"><x-lucide name="map-pin" class="w-4 h-4" /></div>
                             <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Area Pelayanan</span></div>
+                        </a>
+                        @endcan
+
+                        @can('manage_pagers')
+                        <a href="{{ route('admin.pagers.index') }}" wire:navigate class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.pagers.*') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
+                            <div class="flex-shrink-0 w-6 flex justify-center"><x-lucide name="radio" class="w-4 h-4" /></div>
+                            <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Pager</span></div>
+                        </a>
+                        @endcan
+
+                        @can('view_customers')
+                        <a href="{{ route('admin.customers.index') }}" wire:navigate class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.customers.*') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
+                            <div class="flex-shrink-0 w-6 flex justify-center"><x-lucide name="users" class="w-4 h-4" /></div>
+                            <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Pelanggan</span></div>
                         </a>
                         @endcan
                     </div>
@@ -928,6 +951,8 @@
             const storeName = data.store_name;
             const logoWeb = data.logo_web;
             const siteLogo = data.site_logo;
+            const logoFull = data.logo_full;
+            const logoType = data.logo_type || 'single';
             const fontFamilyWeb = data.font_family_web;
 
             // Update Store Name in sidebar
@@ -940,7 +965,7 @@
             const logoImg = document.getElementById('sidebar-logo-img');
             const logoPlaceholder = document.getElementById('sidebar-logo-placeholder');
             const logoContainer = logoImg ? logoImg.parentElement : (logoPlaceholder ? logoPlaceholder.parentElement : null);
-            
+
             if (logoContainer) {
                 if (logoWeb) {
                     logoContainer.innerHTML = `<img id="sidebar-logo-img" src="${logoWeb}" class="w-full h-full object-cover">`;
@@ -948,6 +973,16 @@
                     logoContainer.innerHTML = `<div id="sidebar-logo-placeholder" class="w-full h-full flex items-center justify-center"><i data-lucide="soup" class="w-6 h-6 text-sidebar"></i></div>`;
                     if (window.lucide) window.lucide.createIcons({ nodes: logoContainer.querySelectorAll('[data-lucide]') });
                 }
+            }
+
+            // Toggle mode Single (ikon+teks) vs Panjang (banner saja)
+            const singleWrap = document.getElementById('sidebar-logo-single-wrap');
+            const fullImg = document.getElementById('sidebar-logo-full-img');
+            const showFull = logoType === 'full' && !!logoFull;
+            if (singleWrap) singleWrap.style.display = showFull ? 'none' : '';
+            if (fullImg) {
+                if (logoFull) fullImg.src = logoFull;
+                fullImg.style.display = showFull ? '' : 'none';
             }
 
             // Update Favicon (site logo)

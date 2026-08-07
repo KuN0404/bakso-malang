@@ -13,29 +13,50 @@
             body { margin: 0; padding: 0; }
             .no-print { display: none; }
             @page {
-                size: {{ $format == '58mm' ? '58mm auto' : ($format == '76mm' ? '76mm auto' : ($format == 'A5' ? 'A5 landscape' : 'A4 portrait')) }};
-                margin: {{ $format == '58mm' || $format == '76mm' ? '2mm' : '10mm' }};
+                size: {{ $format == '58mm' ? '58mm auto' : ($format == '80mm' ? '80mm auto' : ($format == 'A5' ? 'A5 landscape' : 'A4 portrait')) }};
+                margin: {{ in_array($format, ['58mm', '80mm']) ? '0' : '10mm' }};
             }
         }
         body { font-family: 'Courier New', Courier, monospace; font-size: 12px; }
         .a4-font { font-family: system-ui, -apple-system, sans-serif; }
+        #receipt-content, #receipt-content * {
+            color: #000 !important;
+            border-color: #000 !important;
+        }
+        #receipt-content {
+            box-sizing: border-box !important;
+            overflow: hidden !important;
+        }
+        #receipt-content, #receipt-content * {
+            max-width: 100%;
+            overflow-wrap: break-word;
+            word-break: break-word;
+        }
+        #receipt-content .flex {
+            width: 100%;
+            overflow: hidden;
+        }
+        #receipt-content .flex > * {
+            min-width: 0;
+            flex-shrink: 1;
+        }
     </style>
 </head>
-<body class="bg-white {{ ($format == '58mm' || $format == '76mm') ? 'p-1' : 'p-8' }}" onload="window.print()">
-    @if($format == '58mm' || $format == '76mm')
-        <div class="font-mono text-xs" style="max-width: {{ $format }};">
+<body class="bg-white {{ in_array($format, ['58mm', '80mm']) ? 'p-1' : 'p-8' }}" onload="window.print()">
+    @if(in_array($format, ['58mm', '80mm']))
+        <div id="receipt-content" class="font-mono text-xs" style="max-width: {{ $format }}; width: {{ $format }};">
             <!-- Header -->
-            <div class="text-left border-b border-dashed border-gray-300 pb-3 mb-3">
+            <div class="text-left border-b border-dashed border-black pb-1.5 mb-1.5">
                 <h1 class="text-base font-bold">{{ strtoupper($settings['store_name'] ?? 'BAKSO MALANG') }}</h1>
-                <p class="text-xs text-gray-600">{{ $settings['store_address'] ?? '' }}</p>
+                <p class="text-xs">{{ $settings['store_address'] ?? '' }}</p>
                 @if(!empty($settings['store_phone']))
-                <p class="text-xs text-gray-600">Telp: {{ $settings['store_phone'] }}</p>
+                <p class="text-xs">Telp: {{ $settings['store_phone'] }}</p>
                 @endif
-                <h2 class="font-bold mt-2">BUKTI RETUR</h2>
+                <h2 class="font-bold mt-1">BUKTI RETUR</h2>
             </div>
 
             <!-- Meta -->
-            <div class="border-b border-dashed border-gray-300 pb-3 mb-3 text-xs">
+            <div class="border-b border-dashed border-black pb-1.5 mb-1.5 text-xs">
                 <div class="flex justify-between">
                     <span>No. Retur:</span>
                     <span class="font-bold">{{ $return->return_number }}</span>
@@ -55,25 +76,34 @@
             </div>
 
             <!-- Items -->
-            <div class="border-b border-dashed border-gray-300 pb-3 mb-3">
+            <div class="border-b border-dashed border-black pb-1.5 mb-1.5">
                 @foreach($return->items as $item)
-                    <div class="mb-2">
+                    <div class="mb-1">
                         <div class="font-bold">{{ $item->product ? $item->product->name : ($item->product_name ?? 'Item Terhapus') }}</div>
+                        <div class="flex justify-between pl-2">
+                            <span>{{ $item->quantity }} x {{ number_format($item->unit_price, 0, ',', '.') }}</span>
+                            <span>{{ number_format($item->unit_price * $item->quantity, 0, ',', '.') }}</span>
+                        </div>
                         @if(is_array($item->modifiers) && count($item->modifiers) > 0)
-                            <div class="text-[10px] text-gray-500 italic pl-2">
-                                + {{ collect($item->modifiers)->pluck('name')->implode(', ') }}
+                            @foreach($item->modifiers as $mod)
+                                <div class="flex justify-between pl-4 text-[11px]">
+                                    <span>+ {{ $mod['name'] ?? '-' }}</span>
+                                    @if(($mod['price'] ?? 0) > 0)
+                                        <span>{{ number_format($mod['price'], 0, ',', '.') }}</span>
+                                    @endif
+                                </div>
+                            @endforeach
+                            <div class="flex justify-between pl-2 font-semibold border-t border-dotted border-black">
+                                <span>Jumlah</span>
+                                <span>{{ number_format($item->subtotal, 0, ',', '.') }}</span>
                             </div>
                         @endif
-                        <div class="flex justify-between text-gray-600 pl-2 mt-1">
-                            <span>{{ $item->quantity }} x {{ number_format($item->unit_price, 0, ',', '.') }}</span>
-                            <span>{{ number_format($item->subtotal, 0, ',', '.') }}</span>
-                        </div>
                     </div>
                 @endforeach
             </div>
 
             <!-- Total -->
-            <div class="border-b border-dashed border-gray-300 pb-3 mb-3">
+            <div class="border-b border-dashed border-black pb-1.5 mb-1.5">
                 <div class="flex justify-between font-bold text-sm">
                     <span>TOTAL REFUND</span>
                     <span>Rp {{ number_format($return->total_refund, 0, ',', '.') }}</span>
@@ -81,10 +111,10 @@
             </div>
 
             <!-- Footer -->
-            <div class="text-center text-xs text-gray-600 mb-4">
-                <p class="italic mb-2">Alasan: "{{ $return->reason }}"</p>
+            <div class="text-center text-xs mb-2">
+                <p class="italic mb-1">Alasan: "{{ $return->reason }}"</p>
                 <p>Simpan struk ini sebagai bukti pengembalian.</p>
-                <p class="mt-2 text-[10px]">{{ now()->format('d/m/Y H:i:s') }}</p>
+                <p class="mt-1 text-[10px]">{{ now()->format('d/m/Y H:i:s') }}</p>
             </div>
         </div>
     @else

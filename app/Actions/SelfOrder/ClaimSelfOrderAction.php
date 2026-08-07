@@ -18,9 +18,9 @@ class ClaimSelfOrderAction
     /**
      * @throws \DomainException
      */
-    public function execute(int $selfOrderId, int $cashierId, ?int $serviceAreaId = null): SelfOrder
+    public function execute(int $selfOrderId, int $cashierId, ?int $serviceAreaId = null, ?int $pagerId = null): SelfOrder
     {
-        return DB::transaction(function () use ($selfOrderId, $cashierId, $serviceAreaId) {
+        return DB::transaction(function () use ($selfOrderId, $cashierId, $serviceAreaId, $pagerId) {
             $selfOrder = SelfOrder::where('id', $selfOrderId)
                 ->lockForUpdate()
                 ->firstOrFail();
@@ -49,11 +49,13 @@ class ClaimSelfOrderAction
             }
 
             $assignedAreaId = $selfOrder->order_type === 'dine_in' ? ($serviceAreaId ?? $selfOrder->service_area_id) : null;
+            $assignedPagerId = $pagerId ?? $selfOrder->pager_id;
 
             $selfOrder->update([
                 'processed_by'    => $cashierId,
                 'shift_id'        => $shift->id,
                 'service_area_id' => $assignedAreaId,
+                'pager_id'        => $assignedPagerId,
                 'claimed_at'      => now(),
             ]);
 
@@ -62,6 +64,7 @@ class ClaimSelfOrderAction
                     'user_id'         => $cashierId,
                     'shift_id'        => $shift->id,
                     'service_area_id' => $assignedAreaId,
+                    'pager_id'        => $assignedPagerId,
                 ]);
             }
 

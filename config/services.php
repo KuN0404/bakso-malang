@@ -45,4 +45,10 @@ return [
         'secret_key' => env('TURNSTILE_SECRET_KEY'),
     ],
 
+    'fonnte' => [
+        'token' => env('FONNTE_TOKEN'),
+        'account_token' => env('FONNTE_ACCOUNT_TOKEN'),
+        'timeout' => env('FONNTE_TIMEOUT', 15),
+    ],
+
 ];

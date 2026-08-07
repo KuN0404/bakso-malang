@@ -10,10 +10,17 @@ return new class extends Migration
     {
         Schema::create('transactions', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('user_id')->constrained();
+            $table->unsignedBigInteger('user_id')->nullable();
+            $table->foreign('user_id')->references('id')->on('users');
             $table->foreignId('shift_id')->nullable()->constrained();
             $table->foreignId('payment_source_id')->nullable()->constrained('payment_sources');
+            // Status pembayaran dari gateway (raw status Midtrans). FK payment_transaction_id
+            // ditambahkan belakangan (lihat alter_transactions_add_payment_gateway_columns)
+            // karena tabel payment_transactions baru dibuat setelah tabel ini.
+            $table->string('payment_gateway_status', 50)->nullable();
+
             $table->string('invoice_number', 50)->unique();
+            $table->string('receipt_token', 64)->nullable()->unique();
             $table->integer('queue_number');
             $table->decimal('subtotal', 14, 2);
             $table->decimal('discount_amount', 14, 2)->default(0);
@@ -27,11 +34,21 @@ return new class extends Migration
             $table->foreignId('cancelled_by')->nullable()->constrained('users');
             $table->timestamp('cancelled_at')->nullable();
             $table->string('customer_name')->nullable();
+            $table->string('customer_phone', 20)->nullable();
+            $table->string('customer_email', 150)->nullable();
             $table->enum('order_type', ['dine_in', 'take_away'])->default('dine_in');
+
+            // Sumber transaksi: POS atau Self Order. FK self_order_id ditambahkan
+            // belakangan (lihat alter_transactions_add_self_order_columns) karena
+            // tabel self_orders baru dibuat setelah tabel ini.
+            $table->enum('source', ['pos', 'self_order'])
+                ->default('pos')
+                ->comment('Sumber transaksi: POS atau Self Order');
+
             $table->text('notes')->nullable();
             $table->unsignedInteger('print_count')->default(0);
             $table->timestamps();
-            
+
             // Heavy indexing for reports
             $table->index('invoice_number');
             $table->index('shift_id');
@@ -40,6 +57,7 @@ return new class extends Migration
             $table->index('created_at');
             $table->index(['status', 'created_at']);
             $table->index(['shift_id', 'status']);
+            $table->index('source');
         });
 
         // Shift expenses table (for operational costs, refunds)

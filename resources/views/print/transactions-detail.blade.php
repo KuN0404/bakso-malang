@@ -13,13 +13,13 @@
             body { margin: 0; padding: 0; }
             .no-print { display: none; }
             @page {
-                size: {{ $format == '58mm' ? '58mm auto' : ($format == '76mm' ? '76mm auto' : ($format == 'A5' ? 'A5 landscape' : 'A4 portrait')) }};
-                margin: {{ $format == '58mm' || $format == '76mm' ? '2mm' : '10mm' }};
+                size: {{ $format == '58mm' ? '58mm auto' : ($format == '80mm' ? '80mm auto' : ($format == 'A5' ? 'A5 landscape' : 'A4 portrait')) }};
+                margin: {{ in_array($format, ['58mm', '80mm']) ? '0' : '10mm' }};
             }
         }
         /* Common */
         body { font-family: 'Courier New', Courier, monospace; font-size: 12px; }
-        
+
         /* A4 Specific */
         .a4-font { font-family: sans-serif; }
         .transaction-card { border: 1px solid #ddd; margin-bottom: 15px; page-break-inside: avoid; }
@@ -30,65 +30,97 @@
         .item-row td { border-bottom: 1px dashed #eee; }
         .modifier { font-size: 10px; color: #666; margin-left: 10px; }
         .grand-total { margin-top: 20px; text-align: right; font-size: 14px; border-top: 2px solid #333; padding-top: 10px; }
+        #receipt-content, #receipt-content * {
+            color: #000 !important;
+            border-color: #000 !important;
+        }
+        #receipt-content, #receipt-content * {
+            max-width: 100%;
+            overflow-wrap: break-word;
+            word-break: break-word;
+        }
+        #receipt-content {
+            box-sizing: border-box !important;
+            overflow: hidden !important;
+        }
+        #receipt-content .flex {
+            width: 100%;
+            overflow: hidden;
+        }
+        #receipt-content .flex > * {
+            min-width: 0;
+            flex-shrink: 1;
+        }
     </style>
 </head>
-<body class="bg-white {{ ($format == '58mm' || $format == '76mm') ? 'p-1' : 'p-8 a4-font' }}" onload="window.print()">
-    @if($format == '58mm' || $format == '76mm')
-        <div class="text-xs font-mono max-w-[{{ $format }}]">
+<body class="bg-white {{ in_array($format, ['58mm', '80mm']) ? 'p-1' : 'p-8 a4-font' }}" onload="window.print()">
+    @if(in_array($format, ['58mm', '80mm']))
+        <div id="receipt-content" class="text-xs font-mono" style="max-width: {{ $format }}; width: {{ $format }};">
              <!-- Header -->
-             <div class="text-center border-b border-dashed border-gray-400 pb-3 mb-3">
+             <div class="text-center border-b border-dashed border-black pb-1.5 mb-1.5">
                  <h1 class="text-sm font-bold uppercase">Detail Transaksi</h1>
                  <p class="text-[10px] mt-1">{{ $start->format('d/m/y') }} - {{ $end->format('d/m/y') }}</p>
              </div>
 
              @foreach($transactions as $transaction)
-                 <div class="border-b border-dashed border-gray-300 pb-2 mb-2">
+                 <div class="border-b border-dashed border-black pb-1 mb-1">
                      <!-- Transaction Header -->
                      <div class="flex justify-between font-bold">
                          <span>{{ $transaction->invoice_number }}</span>
                          <span>{{ $transaction->created_at->format('d/m H:i') }}</span>
                      </div>
-                     <div class="text-[10px] text-gray-500 mb-1">
+                     <div class="text-[10px] mb-0.5">
                          {{ $transaction->user?->name ?? '-' }} | {{ $transaction->paymentSource?->name ?? 'Cash' }}
                      </div>
 
                      <!-- Items -->
-                     <div class="pl-2 border-l border-dashed border-gray-300 ml-1">
+                     <div class="pl-2 border-l border-dashed border-black ml-1">
                          @foreach($transaction->details as $detail)
-                             <div class="mb-1">
+                             <div class="mb-0.5">
                                  <div class="font-semibold">{{ $detail->product->name }}</div>
+                                 <div class="flex justify-between text-[10px]">
+                                     <span>{{ $detail->quantity }} x {{ number_format($detail->price, 0, ',', '.') }}</span>
+                                     <span>{{ number_format($detail->price * $detail->quantity, 0, ',', '.') }}</span>
+                                 </div>
                                  @if($detail->modifiers->count())
-                                     <div class="text-[9px] text-gray-400 italic">
-                                         + @foreach($detail->modifiers as $mod)
-                                             {{ $mod->pivot->modifier_name ?? $mod->name }}{{ ($mod->pivot->quantity ?? 1) > 1 ? ' ×' . $mod->pivot->quantity : '' }}{{ !$loop->last ? ', ' : '' }}
-                                         @endforeach
+                                     @foreach($detail->modifiers as $mod)
+                                         @php
+                                             $modQty = $mod->pivot->quantity ?? 1;
+                                             $modPrice = ($mod->pivot->price_adjustment ?? 0) * $modQty;
+                                         @endphp
+                                         <div class="flex justify-between pl-2 text-[9px]">
+                                             <span>+ {{ $mod->pivot->modifier_name ?? $mod->name }}{{ $modQty > 1 ? ' ×' . $modQty : '' }}</span>
+                                             @if($modPrice > 0)
+                                                 <span>{{ number_format($modPrice, 0, ',', '.') }}</span>
+                                             @endif
+                                         </div>
+                                     @endforeach
+                                     <div class="flex justify-between text-[10px] font-semibold border-t border-dotted border-black">
+                                         <span>Jumlah</span>
+                                         <span>{{ number_format($detail->subtotal, 0, ',', '.') }}</span>
                                      </div>
                                  @endif
-                                 <div class="flex justify-between text-[10px] text-gray-600">
-                                     <span>{{ $detail->quantity }} x {{ number_format($detail->price, 0, ',', '.') }}</span>
-                                     <span>{{ number_format($detail->subtotal, 0, ',', '.') }}</span>
-                                 </div>
                              </div>
                          @endforeach
                      </div>
-                     
+
                      <!-- Total -->
-                     <div class="text-right font-bold mt-1 text-[11px]">
+                     <div class="text-right font-bold mt-0.5 text-[11px]">
                          Total: Rp {{ number_format($transaction->total, 0, ',', '.') }}
                      </div>
                  </div>
              @endforeach
 
              <!-- Grand Total -->
-             <div class="border-t-2 border-dashed border-gray-500 pt-2 mt-2">
+             <div class="border-t-2 border-dashed border-black pt-1 mt-1">
                  <div class="flex justify-between font-bold text-sm">
                      <span>TOTAL</span>
                      <span>Rp {{ number_format($summary['total_revenue'], 0, ',', '.') }}</span>
                  </div>
-                 <div class="text-center text-[10px] text-gray-400 mt-2">
+                 <div class="text-center text-[10px] mt-1">
                      {{ $summary['total_transactions'] }} Transaksi
                  </div>
-                 <div class="text-center text-[9px] text-gray-300 mt-4">
+                 <div class="text-center text-[9px] mt-2">
                      Dicetak: {{ now()->translatedFormat('d F Y H:i') }}
                  </div>
              </div>

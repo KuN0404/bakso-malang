@@ -16,10 +16,12 @@ return new class extends Migration
             $table->string('icon')->nullable();
             $table->integer('sort_order')->default(0);
             $table->boolean('is_active')->default(true);
+            $table->string('target_kitchen', 20)->default('food');
             $table->timestamps();
-            
+
             $table->index('is_active');
             $table->index('sort_order');
+            $table->index('target_kitchen');
         });
     }
 

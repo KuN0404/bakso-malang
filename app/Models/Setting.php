@@ -16,13 +16,25 @@ class Setting extends Model
     ];
 
     /**
+     * Memoisasi in-memory per-request, di atas Cache::remember — beberapa
+     * tempat (layout + komponen Livewire) bisa memanggil key yang sama dalam
+     * satu request; ini menghindari itu memicu query DB berulang kalau cache
+     * store-nya kosong/miss di kedua panggilan tersebut.
+     */
+    protected static array $memo = [];
+
+    /**
      * Get a setting value by key.
      */
     public static function get(string $key, mixed $default = null, string $group = 'general'): mixed
     {
         $cacheKey = "setting.{$group}.{$key}";
-        
-        return Cache::remember($cacheKey, 3600, function () use ($group, $key, $default) {
+
+        if (array_key_exists($cacheKey, static::$memo)) {
+            return static::$memo[$cacheKey];
+        }
+
+        return static::$memo[$cacheKey] = Cache::remember($cacheKey, 3600, function () use ($group, $key, $default) {
             $setting = static::where('group', $group)
                 ->where('key', $key)
                 ->first();
@@ -48,6 +60,7 @@ class Setting extends Model
         );
 
         Cache::forget("setting.{$group}.{$key}");
+        unset(static::$memo["setting.{$group}.{$key}"]);
     }
 
     /**

@@ -209,24 +209,6 @@
                     <p class="text-sm text-red-500 mt-1">Shift ini akan ditandai sebagai "Ditutup Terlambat"</p>
                 </div>
                 <div class="p-6 space-y-4 overflow-y-auto flex-1 custom-scroll">
-                    <!-- Summary Breakdown: Cash vs Non-Cash -->
-                    @if($this->unclosedShiftModalData)
-                        <div class="grid grid-cols-2 gap-3">
-                            <div class="bg-green-50 rounded-lg p-3">
-                                <p class="text-xs text-green-600 font-medium">Penjualan Tunai</p>
-                                <p class="text-lg font-bold text-green-700">
-                                    Rp {{ number_format($this->unclosedShiftModalData->cash_sales ?? 0, 0, ',', '.') }}
-                                </p>
-                            </div>
-                            <div class="bg-purple-50 rounded-lg p-3">
-                                <p class="text-xs text-purple-600 font-medium">Non-Tunai (QRIS/EDC)</p>
-                                <p class="text-lg font-bold text-purple-700">
-                                    Rp {{ number_format($this->unclosedShiftModalData->non_cash_sales ?? 0, 0, ',', '.') }}
-                                </p>
-                            </div>
-                        </div>
-                    @endif
-
                     <!-- Opening Cash -->
                     <div x-data="moneyInput({{ $openingCash }}, 'openingCash')">
                         <label class="block text-sm font-medium text-gray-700 mb-1">Modal Awal (Cash)</label>
@@ -297,32 +279,23 @@
 
                     <!-- Actual Non-Cash (QRIS/Transfer verified from bank) -->
                     <div x-data="moneyInput({{ $actualNonCash }}, 'actualNonCash')">
-                        <div class="flex items-center justify-between mb-1">
-                            <label class="block text-sm font-medium text-gray-700">
-                                Uang Non-Tunai (QRIS / Transfer / EDC)
-                            </label>
-                            @if($expectedNonCash > 0)
-                                <span class="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium">
-                                    Sistem: Rp {{ number_format($expectedNonCash, 0, ',', '.') }}
-                                </span>
-                            @else
-                                <span class="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">Tidak ada transaksi non-tunai</span>
-                            @endif
-                        </div>
-                        <input 
+                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                            Uang Non-Tunai (QRIS / Transfer / EDC)
+                        </label>
+                        <input
                             id="actualNonCashInputPrev"
-                            type="text" 
+                            type="text"
                             inputmode="numeric"
                             x-model="formatted"
                             @input="onInput($event)"
                             @focus="$event.target.select()"
                             @blur="syncToWire()"
-                            class="w-full px-4 py-3 border border-gray-200 rounded-lg text-lg focus:ring-2 focus:ring-purple-500" 
+                            class="w-full px-4 py-3 border border-gray-200 rounded-lg text-lg focus:ring-2 focus:ring-purple-500"
                             placeholder="0"
                         >
                         <p class="text-xs text-gray-500 mt-1 flex items-center gap-1">
                             <x-lucide name="info" class="w-3 h-3 shrink-0" />
-                            Cocokkan dengan mutasi rekening / dashboard QRIS. Nilai default diisi otomatis dari catatan sistem.
+                            Cocokkan dengan mutasi rekening / dashboard QRIS sebelum mengisi.
                         </p>
                     </div>
 
@@ -367,17 +340,21 @@
     <div class="flex-1 flex flex-col bg-gray-50 min-w-0 overflow-x-hidden">
         <header class="bg-white px-4 md:px-6 py-3 border-b flex justify-between items-center sticky top-0 z-20 gap-4">
             <div class="flex items-center gap-3 flex-shrink-0">
-                @if($this->logoWeb)
-                    <img src="{{ asset('storage/' . $this->logoWeb) }}" class="w-10 h-10 object-cover rounded-lg shadow-md">
+                @if($this->logoType === 'full' && $this->logoFull)
+                    <img src="{{ asset('storage/' . $this->logoFull) }}" class="h-10 w-auto max-w-[160px] object-contain">
                 @else
-                    <div class="w-10 h-10 bg-primary-600 rounded-lg flex items-center justify-center shadow-lg shadow-primary-500/30">
-                        <x-lucide name="soup" class="w-6 h-6 text-white" />
+                    @if($this->logoWeb)
+                        <img src="{{ asset('storage/' . $this->logoWeb) }}" class="w-10 h-10 object-cover rounded-lg shadow-md">
+                    @else
+                        <div class="w-10 h-10 bg-primary-600 rounded-lg flex items-center justify-center shadow-lg shadow-primary-500/30">
+                            <x-lucide name="soup" class="w-6 h-6 text-white" />
+                        </div>
+                    @endif
+                    <div class="hidden sm:block">
+                        <h1 class="font-bold text-gray-800 leading-tight">Bakso Malang</h1>
+                        <p class="text-xs text-gray-500">Point of Sale</p>
                     </div>
                 @endif
-                <div class="hidden sm:block">
-                    <h1 class="font-bold text-gray-800 leading-tight">Bakso Malang</h1>
-                    <p class="text-xs text-gray-500">Point of Sale</p>
-                </div>
             </div>
  
             <!-- Desktop Action Buttons (mulai dari xl: 1280px — di bawah itu, termasuk tablet
@@ -1311,29 +1288,29 @@
                         <!-- Service Area Grid (Only for Dine In) -->
                         @if($orderType === 'dine_in')
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Pilih Meja / Area</label>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Pilih Meja / Area (opsional jika isi Nomor Pager)</label>
                                 @if($this->serviceAreas->count() > 0)
                                     <div class="grid grid-cols-4 gap-2 max-h-[200px] overflow-y-auto custom-scroll p-1">
                                         @foreach($this->serviceAreas as $area)
-                                            <button 
+                                            <button
                                                 wire:click="$set('selectedServiceAreaId', {{ $area->id }})"
                                                 class="p-2 rounded-lg border text-sm font-medium transition-all relative overflow-hidden group
-                                                    {{ $selectedServiceAreaId === $area->id 
-                                                        ? 'border-primary-500 bg-primary-50 text-primary-700 ring-1 ring-primary-500' 
-                                                        : 'border-gray-200 hover:border-primary-300 hover:bg-gray-50 text-gray-700' 
+                                                    {{ $selectedServiceAreaId === $area->id
+                                                        ? 'border-primary-500 bg-primary-50 text-primary-700 ring-1 ring-primary-500'
+                                                        : 'border-gray-200 hover:border-primary-300 hover:bg-gray-50 text-gray-700'
                                                     }}"
                                             >
                                                 <span class="block truncate">{{ $area->name }}</span>
                                                 <span class="text-xs text-gray-400">{{ $area->code }}</span>
-                                                
+
                                                 @if($selectedServiceAreaId === $area->id)
                                                     <div class="absolute inset-0 border-2 border-primary-500 rounded-lg pointer-events-none"></div>
                                                 @endif
                                             </button>
                                         @endforeach
                                     </div>
-                                    @if(!$selectedServiceAreaId)
-                                        <p class="text-xs text-red-500 mt-1">* Wajib pilih meja untuk Makan di Tempat</p>
+                                    @if(!$selectedServiceAreaId && !$selectedPagerId)
+                                        <p class="text-xs text-red-500 mt-1">* Wajib pilih Meja/Area atau isi Nomor Pager untuk Makan di Tempat</p>
                                     @endif
                                 @else
                                     <div class="text-center py-4 bg-gray-50 rounded-lg border border-dashed border-gray-300">
@@ -1342,18 +1319,60 @@
                                 @endif
                             </div>
                         @endif
+
+                        <!-- Nomor Pager (opsional, POS & Take Away) -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Nomor Pager (opsional)</label>
+                            @if($this->pagers->count() > 0)
+                                <select wire:model.live="selectedPagerId" class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500">
+                                    <option value="">-- Tanpa Pager --</option>
+                                    @foreach($this->pagers as $pager)
+                                        <option value="{{ $pager->id }}">
+                                            Pager {{ $pager->number }}{{ $pager->docking_number ? " (Docking {$pager->docking_number})" : '' }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            @else
+                                <div class="text-center py-3 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+                                    <p class="text-sm text-gray-500">Belum ada data pager</p>
+                                </div>
+                            @endif
+                        </div>
                     </div>
 
                     <!-- Customer Name -->
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">Nama Pelanggan (opsional)</label>
-                        <input 
-                            type="text" 
+                        <input
+                            type="text"
                             wire:model="customerName"
                             placeholder="Masukkan nama..."
                             class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500"
                         >
                     </div>
+
+                    <!-- Customer Phone & Email (opsional, buat kirim struk digital) -->
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">No. HP (opsional)</label>
+                            <input
+                                type="text"
+                                wire:model="customerPhone"
+                                placeholder="08xxxxxxxxxx"
+                                class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500"
+                            >
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Email (opsional)</label>
+                            <input
+                                type="email"
+                                wire:model="customerEmail"
+                                placeholder="email@contoh.com"
+                                class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500"
+                            >
+                        </div>
+                    </div>
+                    <p class="text-xs text-gray-400 -mt-2">Isi kalau ingin struk dikirim ke pelanggan lewat WhatsApp/email.</p>
 
                     <!-- Notes -->
                     <div>
@@ -1682,22 +1701,6 @@
                     </div>
                 </div>
                 <div class="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
-                    <!-- Breakdown: Cash vs Non-Cash Sales -->
-                    <div class="grid grid-cols-2 gap-3">
-                        <div class="bg-green-50 rounded-lg p-3">
-                            <p class="text-xs text-green-600 font-medium">Penjualan Tunai</p>
-                            <p class="text-lg font-bold text-green-700">
-                                Rp {{ number_format($this->todayShift?->completedTransactions()->where('payment_method','cash')->sum('total') ?? 0, 0, ',', '.') }}
-                            </p>
-                        </div>
-                        <div class="bg-purple-50 rounded-lg p-3">
-                            <p class="text-xs text-purple-600 font-medium">Non-Tunai (QRIS/EDC)</p>
-                            <p class="text-lg font-bold text-purple-700">
-                                Rp {{ number_format($this->todayShift?->completedTransactions()->where('payment_method','!=','cash')->sum('total') ?? 0, 0, ',', '.') }}
-                            </p>
-                        </div>
-                    </div>
-
                     <!-- Opening Cash -->
                     <div x-data="moneyInput({{ $openingCash }}, 'openingCash')">
                         <label class="block text-sm font-medium text-gray-700 mb-1">Modal Awal (Cash)</label>
@@ -1772,32 +1775,23 @@
 
                     <!-- Actual Non-Cash (QRIS/Transfer verified from bank) -->
                     <div x-data="moneyInput({{ $actualNonCash }}, 'actualNonCash')">
-                        <div class="flex items-center justify-between mb-1">
-                            <label class="block text-sm font-medium text-gray-700">
-                                Uang Non-Tunai (QRIS / Transfer / EDC)
-                            </label>
-                            @if($expectedNonCash > 0)
-                                <span class="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium">
-                                    Sistem: Rp {{ number_format($expectedNonCash, 0, ',', '.') }}
-                                </span>
-                            @else
-                                <span class="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">Tidak ada transaksi non-tunai</span>
-                            @endif
-                        </div>
-                        <input 
+                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                            Uang Non-Tunai (QRIS / Transfer / EDC)
+                        </label>
+                        <input
                             id="actualNonCashInput"
-                            type="text" 
+                            type="text"
                             inputmode="numeric"
                             x-model="formatted"
                             @input="onInput($event)"
                             @focus="$event.target.select()"
                             @blur="syncToWire()"
-                            class="w-full px-4 py-3 border border-gray-200 rounded-lg text-lg focus:ring-2 focus:ring-purple-500" 
+                            class="w-full px-4 py-3 border border-gray-200 rounded-lg text-lg focus:ring-2 focus:ring-purple-500"
                             placeholder="0"
                         >
                         <p class="text-xs text-gray-500 mt-1 flex items-center gap-1">
                             <x-lucide name="info" class="w-3 h-3 shrink-0" />
-                            Cocokkan dengan mutasi rekening / dashboard QRIS. Nilai default diisi otomatis dari catatan sistem.
+                            Cocokkan dengan mutasi rekening / dashboard QRIS sebelum mengisi.
                         </p>
                     </div>
 
@@ -2126,7 +2120,7 @@
                 </div>
 
                 <div class="p-4 border-t flex gap-3 flex-none">
-                    <button 
+                    <button
                         @click="window.print()"
                         class="flex-1 py-3 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-xl flex items-center justify-center gap-2"
                         type="button"

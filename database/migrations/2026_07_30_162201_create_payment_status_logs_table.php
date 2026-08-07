@@ -18,7 +18,7 @@ return new class extends Migration
             $table->string('to_status', 30);
 
             // Siapa yang memicu perubahan status
-            $table->enum('triggered_by', ['cashier', 'webhook', 'system', 'job']);
+            $table->string('triggered_by', 50)->default('system');
 
             // Kasir / user (nullable jika diproses oleh sistem)
             $table->foreignId('actor_id')->nullable()->constrained('users')->nullOnDelete();

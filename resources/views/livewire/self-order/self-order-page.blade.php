@@ -4,11 +4,19 @@
     <header class="bg-brand text-white sticky top-0 z-50 shadow-md">
         <div class="px-4 py-3 flex items-center justify-between">
             <div class="flex items-center gap-2">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M3 3h2l.4 2M7 13h10l4-8H5.4m1.6 8L5 3H3m4 10v6a1 1 0 001 1h8a1 1 0 001-1v-6m-9 0h8"/>
-                </svg>
-                <span class="font-bold text-lg leading-tight">{{ $this->storeName }}</span>
+                @if($this->logoType === 'full' && $this->logoFull)
+                    <img src="{{ asset('storage/' . $this->logoFull) }}" class="h-8 w-auto max-w-[160px] object-contain">
+                @else
+                    @if($this->logoWeb)
+                        <img src="{{ asset('storage/' . $this->logoWeb) }}" class="w-6 h-6 object-cover rounded">
+                    @else
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M3 3h2l.4 2M7 13h10l4-8H5.4m1.6 8L5 3H3m4 10v6a1 1 0 001 1h8a1 1 0 001-1v-6m-9 0h8"/>
+                        </svg>
+                    @endif
+                    <span class="font-bold text-lg leading-tight">{{ $this->storeName }}</span>
+                @endif
             </div>
 
             {{-- Cart Badge --}}

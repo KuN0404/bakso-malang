@@ -64,7 +64,8 @@ class RolesAndPermissionsSeeder extends Seeder
             'manage_printers',
             'manage_payment_sources',
             'manage_service_areas',
-            
+            'manage_pagers',
+
             // Users & Roles
             'view_users',
             'create_users',
@@ -102,6 +103,11 @@ class RolesAndPermissionsSeeder extends Seeder
             'accept_self_order_payment',
             'cancel_self_order',
             'print_self_order_receipt',
+
+            // Pelanggan & Blacklist
+            'view_customers',
+            'view_phone_blacklist',
+            'manage_phone_blacklist',
         ];
 
         // Create all permissions
@@ -128,10 +134,12 @@ class RolesAndPermissionsSeeder extends Seeder
             'access_pos', 'view_transactions', 'cancel_transactions',
             'open_shift', 'close_shift', 'view_own_shifts', 'view_all_shifts', 'add_shift_expense',
             'view_sales_reports', 'view_financial_reports', 'view_peak_hours_reports', 'view_cancellation_reports', 'view_inventory_reports', 'view_returns', 'export_reports',
-            'manage_payment_sources', 'manage_service_areas',
+            'manage_payment_sources', 'manage_service_areas', 'manage_pagers',
             'view_kitchen_display', 'update_order_status',
             // Self Order
             'view_self_orders', 'manage_self_orders', 'accept_self_order_payment', 'cancel_self_order', 'print_self_order_receipt',
+            // Pelanggan & Blacklist
+            'view_customers', 'view_phone_blacklist', 'manage_phone_blacklist',
         ]);
 
         // Kasir - can use POS, manage own shifts
@@ -143,6 +151,8 @@ class RolesAndPermissionsSeeder extends Seeder
             // Self Order permissions untuk kasir
             'view_self_orders', 'manage_self_orders', 'accept_self_order_payment',
             'cancel_self_order', 'print_self_order_receipt',
+            // Pelanggan & Blacklist — kasir bisa blokir langsung dari lapangan
+            'view_customers', 'view_phone_blacklist', 'manage_phone_blacklist',
         ]);
 
         // Kitchen - can view orders (read-only for kitchen display)

@@ -2,6 +2,7 @@
 
 namespace App\Actions\Payment;
 
+use App\Actions\Notifications\SendReceiptNotificationAction;
 use App\DTOs\Payment\CartPayload;
 use App\Enums\PaymentTransactionStatus;
 use App\Models\DailyQueueNumber;
@@ -26,6 +27,7 @@ class InitiateCashPaymentAction
         private readonly ReportSyncService $reportSyncService,
         private readonly ComponentStockService $componentStockService,
         private readonly CartValidationService $cartValidationService,
+        private readonly SendReceiptNotificationAction $sendReceiptNotification,
     ) {}
 
     /**
@@ -104,6 +106,7 @@ class InitiateCashPaymentAction
                 'payment_source_id'      => $paymentSource->id,
                 'payment_transaction_id' => $paymentTx->id,
                 'service_area_id'        => $payload->orderType === 'dine_in' ? $payload->serviceAreaId : null,
+                'pager_id'               => $payload->pagerId,
                 'invoice_number'         => $invoiceNumber,
                 'queue_number'           => $queueNumber,
                 'subtotal'               => $subtotal,
@@ -116,6 +119,8 @@ class InitiateCashPaymentAction
                 'payment_gateway_status' => null,
                 'status'                 => 'completed',
                 'customer_name'          => $payload->customerName ?: null,
+                'customer_phone'         => $payload->customerPhone ?: null,
+                'customer_email'         => $payload->customerEmail ?: null,
                 'order_type'             => $payload->orderType,
                 'notes'                  => $payload->notes ?: null,
             ]);
@@ -130,6 +135,13 @@ class InitiateCashPaymentAction
 
             // Sync laporan (di luar lock tapi masih di dalam DB transaction)
             $this->reportSyncService->syncTransaction($transaction);
+
+            // -- Kirim struk digital (email/WhatsApp) kalau kasir mengisi kontak --
+            try {
+                $this->sendReceiptNotification->send($transaction);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Gagal kirim struk digital POS (cash): ' . $e->getMessage());
+            }
 
             return $transaction;
         });

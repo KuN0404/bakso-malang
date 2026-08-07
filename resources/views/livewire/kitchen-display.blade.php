@@ -1,11 +1,22 @@
+@php
+    $logoType = \App\Models\Setting::get('logo_type', 'single', 'general');
+    $logoWeb = \App\Models\Setting::get('logo_web', null, 'general');
+    $logoFull = \App\Models\Setting::get('logo_full', null, 'general');
+@endphp
 <div class="min-h-screen bg-gray-50 flex flex-col">
     <!-- Header -->
     <header class="bg-white border-b border-gray-200 px-4 md:px-6 py-4 flex flex-wrap items-center justify-between gap-4 sticky top-0 z-50 shadow-sm">
         <div class="flex flex-wrap items-center gap-4">
             <div class="flex items-center gap-3">
-                <div class="w-10 h-10 bg-primary-600 rounded-lg flex items-center justify-center text-white">
-                     <x-lucide name="chef-hat" class="w-6 h-6" />
-                </div>
+                @if($logoType === 'full' && $logoFull)
+                    <img src="{{ asset('storage/' . $logoFull) }}" class="h-10 w-auto max-w-[150px] object-contain">
+                @elseif($logoWeb)
+                    <img src="{{ asset('storage/' . $logoWeb) }}" class="w-10 h-10 object-cover rounded-lg">
+                @else
+                    <div class="w-10 h-10 bg-primary-600 rounded-lg flex items-center justify-center text-white">
+                         <x-lucide name="chef-hat" class="w-6 h-6" />
+                    </div>
+                @endif
                 <div>
                     <h1 class="text-xl font-bold text-gray-800">Dapur / Pelayanan</h1>
                     <div class="flex items-center gap-2 text-xs text-gray-500 mt-0.5">
@@ -84,6 +95,11 @@
                                     @if($items->first()->transaction->order_type === 'dine_in' && $items->first()->transaction->serviceArea)
                                         <span class="inline-flex w-fit px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-700 uppercase tracking-wide">
                                             Meja: {{ $items->first()->transaction->serviceArea->name }}
+                                        </span>
+                                    @endif
+                                    @if($items->first()->transaction->pager)
+                                        <span class="inline-flex w-fit px-2 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-700 uppercase tracking-wide">
+                                            Pager: {{ $items->first()->transaction->pager->number }}{{ $items->first()->transaction->pager->docking_number ? ' (Docking ' . $items->first()->transaction->pager->docking_number . ')' : '' }}
                                         </span>
                                     @endif
                                     @if($items->first()->transaction->customer_name)

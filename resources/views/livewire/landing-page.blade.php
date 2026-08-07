@@ -4,21 +4,25 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
             <!-- Brand Logo & Name from Settings -->
             <a href="{{ route('home') }}" class="flex items-center gap-3.5 group">
-                @if($logoWeb)
-                    <img src="{{ asset('storage/' . $logoWeb) }}" alt="{{ $storeName }}" class="w-11 h-11 object-contain rounded-xl shadow-xs group-hover:scale-105 transition-transform" style="image-rendering:auto;">
-                @elseif($siteLogo)
-                    <img src="{{ asset('storage/' . $siteLogo) }}" alt="{{ $storeName }}" class="w-11 h-11 object-contain rounded-xl shadow-xs group-hover:scale-105 transition-transform" style="image-rendering:auto;">
+                @if($logoType === 'full' && $logoFull)
+                    <img src="{{ asset('storage/' . $logoFull) }}" alt="{{ $storeName }}" class="h-11 w-auto max-w-[200px] object-contain group-hover:scale-105 transition-transform">
                 @else
-                    <div class="w-11 h-11 bg-primary-600 rounded-xl flex items-center justify-center text-white shadow-xs group-hover:scale-105 transition-transform">
-                        <x-lucide name="soup" class="w-6 h-6" />
+                    @if($logoWeb)
+                        <img src="{{ asset('storage/' . $logoWeb) }}" alt="{{ $storeName }}" class="w-11 h-11 object-contain rounded-xl shadow-xs group-hover:scale-105 transition-transform" style="image-rendering:auto;">
+                    @elseif($siteLogo)
+                        <img src="{{ asset('storage/' . $siteLogo) }}" alt="{{ $storeName }}" class="w-11 h-11 object-contain rounded-xl shadow-xs group-hover:scale-105 transition-transform" style="image-rendering:auto;">
+                    @else
+                        <div class="w-11 h-11 bg-primary-600 rounded-xl flex items-center justify-center text-white shadow-xs group-hover:scale-105 transition-transform">
+                            <x-lucide name="soup" class="w-6 h-6" />
+                        </div>
+                    @endif
+                    <div>
+                        <span class="text-xl font-extrabold text-slate-900 tracking-tight block leading-none">
+                            {{ $storeName }}
+                        </span>
+                        <span class="text-xs text-primary-600 font-medium tracking-wide">Kuliner Otentik</span>
                     </div>
                 @endif
-                <div>
-                    <span class="text-xl font-extrabold text-slate-900 tracking-tight block leading-none">
-                        {{ $storeName }}
-                    </span>
-                    <span class="text-xs text-primary-600 font-medium tracking-wide">Kuliner Otentik</span>
-                </div>
             </a>
 
             <!-- Nav Links Desktop -->
@@ -393,19 +397,23 @@
                 <!-- Kolom 1: Identity & Address (Lebih lebar) -->
                 <div class="lg:col-span-2 space-y-4">
                     <div class="flex items-center gap-3">
-                        @if($logoWeb)
-                            <img src="{{ asset('storage/' . $logoWeb) }}" class="w-10 h-10 object-contain rounded-xl" style="image-rendering:auto;" alt="{{ $storeName }}">
-                        @elseif($siteLogo)
-                            <img src="{{ asset('storage/' . $siteLogo) }}" class="w-10 h-10 object-contain rounded-xl" style="image-rendering:auto;" alt="{{ $storeName }}">
+                        @if($logoType === 'full' && $logoFull)
+                            <img src="{{ asset('storage/' . $logoFull) }}" class="h-10 w-auto max-w-[180px] object-contain" alt="{{ $storeName }}">
                         @else
-                            <div class="w-10 h-10 bg-primary-600 text-white rounded-xl flex items-center justify-center">
-                                <x-lucide name="soup" class="w-5 h-5" />
+                            @if($logoWeb)
+                                <img src="{{ asset('storage/' . $logoWeb) }}" class="w-10 h-10 object-contain rounded-xl" style="image-rendering:auto;" alt="{{ $storeName }}">
+                            @elseif($siteLogo)
+                                <img src="{{ asset('storage/' . $siteLogo) }}" class="w-10 h-10 object-contain rounded-xl" style="image-rendering:auto;" alt="{{ $storeName }}">
+                            @else
+                                <div class="w-10 h-10 bg-primary-600 text-white rounded-xl flex items-center justify-center">
+                                    <x-lucide name="soup" class="w-5 h-5" />
+                                </div>
+                            @endif
+                            <div>
+                                <span class="text-lg font-bold text-white block leading-none tracking-tight">{{ strtoupper($storeName) }}</span>
+                                <span class="text-xs text-primary-400 font-medium">Cita Rasa Otentik Bakso Malang</span>
                             </div>
                         @endif
-                        <div>
-                            <span class="text-lg font-bold text-white block leading-none tracking-tight">{{ strtoupper($storeName) }}</span>
-                            <span class="text-xs text-primary-400 font-medium">Cita Rasa Otentik Bakso Malang</span>
-                        </div>
                     </div>
 
                     <p class="text-xs text-slate-400 leading-relaxed max-w-sm">

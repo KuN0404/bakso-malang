@@ -10,9 +10,15 @@ class PrinterConfig extends Model
         'name',
         'paper_size',
         'paper_width_px',
+        'paper_width',
+        'paper_unit',
         'is_default',
         'auto_print',
         'margins',
+        'margin_top',
+        'margin_right',
+        'margin_bottom',
+        'margin_left',
         'font_family',
         'font_size_px',
         'show_logo',
@@ -21,9 +27,14 @@ class PrinterConfig extends Model
 
     protected $casts = [
         'paper_width_px' => 'integer',
+        'paper_width' => 'decimal:2',
         'is_default' => 'boolean',
         'auto_print' => 'boolean',
         'margins' => 'array',
+        'margin_top' => 'decimal:2',
+        'margin_right' => 'decimal:2',
+        'margin_bottom' => 'decimal:2',
+        'margin_left' => 'decimal:2',
         'font_size_px' => 'integer',
         'show_logo' => 'boolean',
         'show_footer' => 'boolean',
@@ -40,16 +51,22 @@ class PrinterConfig extends Model
     }
 
     /**
-     * Get CSS width value for printing.
+     * Lebar kertas untuk CSS, dalam satuan pilihan admin (px/mm/cm).
      */
     public function getCssWidthAttribute(): string
     {
-        return match ($this->paper_size) {
-            '58mm' => '58mm',
-            '80mm' => '80mm',
-            'custom' => ($this->paper_width_px ?? 200) . 'px',
-            default => '58mm',
-        };
+        return $this->paper_width . $this->paper_unit;
+    }
+
+    /**
+     * Margin @page untuk CSS (atas kanan bawah kiri), dalam satuan yang sama
+     * dengan lebar kertas.
+     */
+    public function getCssMarginAttribute(): string
+    {
+        $unit = $this->paper_unit;
+
+        return "{$this->margin_top}{$unit} {$this->margin_right}{$unit} {$this->margin_bottom}{$unit} {$this->margin_left}{$unit}";
     }
 
     /**
@@ -57,12 +74,10 @@ class PrinterConfig extends Model
      */
     public function getPrintCssAttribute(): string
     {
-        $margins = $this->margins ?? ['top' => 0, 'right' => 0, 'bottom' => 0, 'left' => 0];
-        
         return "
             @page {
                 size: {$this->css_width} auto;
-                margin: {$margins['top']}mm {$margins['right']}mm {$margins['bottom']}mm {$margins['left']}mm;
+                margin: {$this->css_margin};
             }
             #receipt-print {
                 width: {$this->css_width};

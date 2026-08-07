@@ -54,6 +54,8 @@ return [
         'manage_settings' => 'Kelola Pengaturan',
         'manage_printers' => 'Kelola Printer',
         'manage_payment_sources' => 'Kelola Metode Pembayaran',
+        'manage_service_areas' => 'Kelola Area Pelayanan',
+        'manage_pagers' => 'Kelola Pager',
         
         // Users & Roles
         'view_users' => 'Lihat Pengguna',
@@ -82,6 +84,25 @@ return [
         'accept_self_order_payment'  => 'Konfirmasi Pembayaran Self Order',
         'cancel_self_order'          => 'Batalkan Self Order',
         'print_self_order_receipt'   => 'Cetak Struk Self Order',
+
+        // Returns
+        'view_returns' => 'Lihat Retur',
+
+        // Kitchen Display
+        'view_kitchen_display' => 'Lihat Kitchen Display',
+        'update_order_status'  => 'Update Status Pesanan',
+
+        // Components
+        'view_components'          => 'Lihat Komponen',
+        'create_components'        => 'Buat Komponen',
+        'edit_components'          => 'Edit Komponen',
+        'delete_components'        => 'Hapus Komponen',
+        'adjust_component_stock'   => 'Atur Stok Komponen',
+
+        // Pelanggan & Blacklist
+        'view_customers'            => 'Lihat Data Pelanggan',
+        'view_phone_blacklist'      => 'Lihat Blacklist Nomor HP',
+        'manage_phone_blacklist'    => 'Kelola Blacklist Nomor HP (Blokir/Buka Blokir)',
     ],
     
     /**
@@ -147,6 +168,8 @@ return [
             'manage_settings',
             'manage_printers',
             'manage_payment_sources',
+            'manage_service_areas',
+            'manage_pagers',
         ],
         'Pengguna & Peran' => [
             'view_users',
@@ -161,6 +184,25 @@ return [
             'accept_self_order_payment',
             'cancel_self_order',
             'print_self_order_receipt',
+        ],
+        'Retur' => [
+            'view_returns',
+        ],
+        'Kitchen Display' => [
+            'view_kitchen_display',
+            'update_order_status',
+        ],
+        'Komponen' => [
+            'view_components',
+            'create_components',
+            'edit_components',
+            'delete_components',
+            'adjust_component_stock',
+        ],
+        'Pelanggan' => [
+            'view_customers',
+            'view_phone_blacklist',
+            'manage_phone_blacklist',
         ],
     ],
 ];

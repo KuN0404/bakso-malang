@@ -8,6 +8,7 @@ use App\Actions\SelfOrder\ClaimSelfOrderAction;
 use App\Actions\SelfOrder\UpdateSelfOrderStatusAction;
 use App\Enums\SelfOrderStatus;
 use App\Exceptions\NoOpenShiftException;
+use App\Models\Pager;
 use App\Models\SelfOrder;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
@@ -48,6 +49,7 @@ class SelfOrderDashboard extends Component
     public ?int $selectedOrderId       = null;
     public ?int $assigningOrderId      = null;
     public ?int $selectedServiceAreaId = null;
+    public ?int $selectedPagerId       = null;
     public ?string $pendingActionType  = null;
     public ?SelfOrder $selectedOrder   = null;
     public string $cancelReason        = '';
@@ -107,6 +109,12 @@ class SelfOrderDashboard extends Component
     public function activeServiceAreas()
     {
         return \App\Models\ServiceArea::active()->orderBy('sort_order')->get();
+    }
+
+    #[Computed]
+    public function activePagers()
+    {
+        return Pager::active()->orderBy('number')->get();
     }
 
     #[Computed]
@@ -203,6 +211,7 @@ class SelfOrderDashboard extends Component
         $this->assigningOrderId      = $selfOrderId;
         $this->pendingActionType     = $actionType;
         $this->selectedServiceAreaId = $order->service_area_id;
+        $this->selectedPagerId       = $order->pager_id;
         $this->showAssignAreaModal  = true;
     }
 
@@ -211,19 +220,23 @@ class SelfOrderDashboard extends Component
         $this->showAssignAreaModal   = false;
         $this->assigningOrderId      = null;
         $this->selectedServiceAreaId = null;
+        $this->selectedPagerId       = null;
         $this->pendingActionType     = null;
     }
 
     public function saveAreaAndContinue(ClaimSelfOrderAction $claimAction): void
     {
-        if (!$this->selectedServiceAreaId) {
-            $this->flash('error', 'Harap pilih Meja / Area terlebih dahulu untuk pesanan Makan di Sini.');
+        if (!$this->selectedServiceAreaId && !$this->selectedPagerId) {
+            $this->flash('error', 'Harap pilih Meja/Area atau isi Nomor Pager terlebih dahulu untuk pesanan Makan di Sini.');
             return;
         }
 
         $order = SelfOrder::find($this->assigningOrderId);
         if ($order) {
-            $order->update(['service_area_id' => $this->selectedServiceAreaId]);
+            $order->update([
+                'service_area_id' => $this->selectedServiceAreaId,
+                'pager_id'        => $this->selectedPagerId,
+            ]);
         }
 
         $actionType = $this->pendingActionType;
@@ -249,14 +262,20 @@ class SelfOrderDashboard extends Component
         $order = SelfOrder::find($selfOrderId);
         if (!$order) return;
 
-        if ($order->order_type === 'dine_in' && !$order->service_area_id && !$this->selectedServiceAreaId) {
+        if ($order->order_type === 'dine_in' && !$order->service_area_id && !$order->pager_id && !$this->selectedServiceAreaId && !$this->selectedPagerId) {
             $this->openAssignAreaModal($selfOrderId, 'claim');
             return;
         }
 
         try {
-            $action->execute($selfOrderId, auth()->id(), $this->selectedServiceAreaId ?: $order->service_area_id);
+            $action->execute(
+                $selfOrderId,
+                auth()->id(),
+                $this->selectedServiceAreaId ?: $order->service_area_id,
+                $this->selectedPagerId ?: $order->pager_id
+            );
             $this->selectedServiceAreaId = null;
+            $this->selectedPagerId       = null;
             $this->flash('success', 'Pesanan berhasil diambil — dipindah ke tab "Diambil".');
             $this->activeTab = 'claimed';
             unset($this->claimedOrders, $this->claimedCount, $this->claimedStatusCounts, $this->paidOrders, $this->paidCount, $this->waitingOrders, $this->waitingCount);
@@ -277,7 +296,7 @@ class SelfOrderDashboard extends Component
         $order = SelfOrder::find($selfOrderId);
         if (!$order) return;
 
-        if ($order->order_type === 'dine_in' && !$order->service_area_id) {
+        if ($order->order_type === 'dine_in' && !$order->service_area_id && !$order->pager_id) {
             $this->openAssignAreaModal($selfOrderId, 'payment');
             return;
         }
@@ -404,8 +423,14 @@ class SelfOrderDashboard extends Component
 
             if ($this->pickupNextAction === 'claim') {
                 // Klaim order (pindah dari pool ke tab Diambil)
-                $claimAction->execute($this->pickupOrderId, auth()->id(), $this->selectedServiceAreaId ?: $this->pickupOrder->service_area_id);
+                $claimAction->execute(
+                    $this->pickupOrderId,
+                    auth()->id(),
+                    $this->selectedServiceAreaId ?: $this->pickupOrder->service_area_id,
+                    $this->selectedPagerId ?: $this->pickupOrder->pager_id
+                );
                 $this->selectedServiceAreaId = null;
+                $this->selectedPagerId       = null;
                 $this->closePickupModal();
                 $this->flash('success', 'Data pengambil disimpan & pesanan berhasil diambil.');
                 $this->activeTab = 'claimed';

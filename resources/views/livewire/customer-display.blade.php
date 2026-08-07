@@ -162,11 +162,22 @@
      @keydown.escape.window="showMenuModal = false; detailProduct = null"
 >
     <!-- Header -->
+    @php
+        $logoType = \App\Models\Setting::get('logo_type', 'single', 'general');
+        $logoWeb = \App\Models\Setting::get('logo_web', null, 'general');
+        $logoFull = \App\Models\Setting::get('logo_full', null, 'general');
+    @endphp
     <div class="bg-white shadow-sm border-b px-6 py-4 flex justify-between items-center transition-all duration-300 z-10 flex-shrink-0">
         <div class="flex items-center gap-3">
-            <div class="bg-primary-600 p-2.5 rounded-xl shadow-md shadow-primary-500/20">
-                <x-lucide name="monitor" class="w-6 h-6 text-white" />
-            </div>
+            @if($logoType === 'full' && $logoFull)
+                <img src="{{ asset('storage/' . $logoFull) }}" class="h-11 w-auto max-w-[170px] object-contain">
+            @elseif($logoWeb)
+                <img src="{{ asset('storage/' . $logoWeb) }}" class="w-11 h-11 object-cover rounded-xl shadow-md">
+            @else
+                <div class="bg-primary-600 p-2.5 rounded-xl shadow-md shadow-primary-500/20">
+                    <x-lucide name="monitor" class="w-6 h-6 text-white" />
+                </div>
+            @endif
             <div>
                 <h1 class="text-xl font-extrabold text-gray-800 tracking-tight">Layar Pelanggan</h1>
                 <p class="text-xs text-gray-500 font-medium" x-show="cashierName" x-text="'Kasir: ' + cashierName"></p>

@@ -69,12 +69,16 @@ class PublicMenu extends Component
 
         $storeName = Setting::get('store_name', 'Bakso Malang', 'general');
         $logoWeb = Setting::get('logo_web', null, 'general');
+        $logoFull = Setting::get('logo_full', null, 'general');
+        $logoType = Setting::get('logo_type', 'single', 'general');
 
         return view('livewire.public-menu', [
             'categories' => $categories,
             'products' => $products,
             'storeName' => $storeName,
             'logoWeb' => $logoWeb,
+            'logoFull' => $logoFull,
+            'logoType' => $logoType,
         ])->layout('layouts.customer', ['title' => 'Daftar Menu - ' . $storeName]);
     }
 }

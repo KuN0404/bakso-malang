@@ -48,6 +48,9 @@ class ReportSyncService
             if ($transaction->service_area_id) {
                 $this->ensureServiceAreaSynced($transaction->service_area_id);
             }
+            if ($transaction->pager_id) {
+                $this->ensurePagerSynced($transaction->pager_id);
+            }
             if ($transaction->shift_id) {
                 $shift = Shift::find($transaction->shift_id);
                 if ($shift) {
@@ -64,8 +67,10 @@ class ReportSyncService
                     'payment_source_id'      => $transaction->payment_source_id,
                     'payment_transaction_id' => $transaction->payment_transaction_id ?? null,
                     'service_area_id'        => $transaction->service_area_id,
+                    'pager_id'               => $transaction->pager_id ?? null,
                     'self_order_id'          => $transaction->self_order_id ?? null,
                     'invoice_number'         => $transaction->invoice_number,
+                    'receipt_token'          => $transaction->receipt_token ?? null,
                     'queue_number'           => $transaction->queue_number,
                     'subtotal'               => $transaction->subtotal,
                     'discount_amount'        => $transaction->discount_amount,
@@ -78,6 +83,8 @@ class ReportSyncService
                     'source'                 => $transaction->source ?? 'pos',
                     'status'                 => $transaction->status,
                     'customer_name'          => $transaction->customer_name,
+                    'customer_phone'         => $transaction->customer_phone ?? null,
+                    'customer_email'         => $transaction->customer_email ?? null,
                     'order_type'             => $transaction->order_type,
                     'notes'                  => $transaction->notes,
                     'print_count'            => $transaction->print_count ?? 0,
@@ -91,11 +98,11 @@ class ReportSyncService
                 // Kolom yang diupdate jika sudah ada (semua kecuali id dan created_at)
                 [
                     'user_id', 'shift_id', 'payment_source_id', 'payment_transaction_id',
-                    'service_area_id', 'self_order_id',
-                    'invoice_number', 'queue_number', 'subtotal', 'discount_amount',
+                    'service_area_id', 'pager_id', 'self_order_id',
+                    'invoice_number', 'receipt_token', 'queue_number', 'subtotal', 'discount_amount',
                     'tax_amount', 'total', 'paid_amount', 'change_amount',
                     'payment_method', 'payment_gateway_status', 'source',
-                    'status', 'customer_name', 'order_type',
+                    'status', 'customer_name', 'customer_phone', 'customer_email', 'order_type',
                     'notes', 'print_count', 'cancelled_reason', 'cancelled_by',
                     'cancelled_at', 'updated_at'
                 ]
@@ -224,6 +231,10 @@ class ReportSyncService
     public function syncSelfOrder(\App\Models\SelfOrder $selfOrder): void
     {
         try {
+            if ($selfOrder->pager_id) {
+                $this->ensurePagerSynced($selfOrder->pager_id);
+            }
+
             DB::connection(self::REPORT_CONNECTION)->table('self_orders')->upsert(
                 [[
                     'id'                     => $selfOrder->id,
@@ -240,6 +251,7 @@ class ReportSyncService
                     'total'                  => $selfOrder->total,
                     'order_type'             => $selfOrder->order_type,
                     'service_area_id'        => $selfOrder->service_area_id ?? null,
+                    'pager_id'               => $selfOrder->pager_id ?? null,
                     'notes'                  => $selfOrder->notes,
                     'payment_method'         => $selfOrder->payment_method,
                     'status'                 => $selfOrder->status instanceof \BackedEnum
@@ -268,7 +280,7 @@ class ReportSyncService
                     'transaction_id', 'shift_id', 'processed_by', 'cancelled_by',
                     'cancelled_reason', 'cancelled_at', 'paid_at', 'claimed_at',
                     'processing_at', 'completed_at', 'pickup_confirmed_at',
-                    'pickup_name', 'pickup_phone', 'service_area_id', 'updated_at',
+                    'pickup_name', 'pickup_phone', 'service_area_id', 'pager_id', 'updated_at',
                 ]
             );
         } catch (\Throwable $e) {
@@ -496,6 +508,25 @@ class ReportSyncService
                 ]],
                 ['id'],
                 ['name', 'code', 'description', 'type', 'capacity', 'sort_order', 'is_active', 'updated_at']
+            );
+        }
+    }
+
+    private function ensurePagerSynced(int $pagerId): void
+    {
+        $pager = \App\Models\Pager::find($pagerId);
+        if ($pager) {
+            DB::connection(self::REPORT_CONNECTION)->table('pagers')->upsert(
+                [[
+                    'id'             => $pager->id,
+                    'number'         => $pager->number,
+                    'docking_number' => $pager->docking_number,
+                    'is_active'      => (int) $pager->is_active,
+                    'created_at'     => $pager->created_at,
+                    'updated_at'     => $pager->updated_at,
+                ]],
+                ['id'],
+                ['number', 'docking_number', 'is_active', 'updated_at']
             );
         }
     }
@@ -923,6 +954,26 @@ class ReportSyncService
             );
         } catch (\Throwable $e) {
             Log::error('[ReportSync] Gagal sync ServiceArea ID ' . $sa->id . ': ' . $e->getMessage());
+        }
+    }
+
+    public function syncPager(\App\Models\Pager $pager): void
+    {
+        try {
+            DB::connection(self::REPORT_CONNECTION)->table('pagers')->upsert(
+                [[
+                    'id'             => $pager->id,
+                    'number'         => $pager->number,
+                    'docking_number' => $pager->docking_number,
+                    'is_active'      => (int) $pager->is_active,
+                    'created_at'     => $pager->created_at,
+                    'updated_at'     => $pager->updated_at,
+                ]],
+                ['id'],
+                ['number', 'docking_number', 'is_active', 'updated_at']
+            );
+        } catch (\Throwable $e) {
+            Log::error('[ReportSync] Gagal sync Pager ID ' . $pager->id . ': ' . $e->getMessage());
         }
     }
 

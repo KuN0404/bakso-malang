@@ -2,6 +2,7 @@
 
 namespace App\Actions\SelfOrder;
 
+use App\Actions\Notifications\SendReceiptNotificationAction;
 use App\DTOs\Payment\MidtransWebhookPayload;
 use App\Enums\PaymentTransactionStatus;
 use App\Enums\SelfOrderStatus;
@@ -36,6 +37,7 @@ class HandleSelfOrderWebhookAction
         private readonly StockReservationService $reservationService,
         private readonly ComponentStockService $componentStockService,
         private readonly ReportSyncService $reportSyncService,
+        private readonly SendReceiptNotificationAction $sendReceiptNotification,
     ) {}
 
     /**
@@ -163,14 +165,11 @@ class HandleSelfOrderWebhookAction
         // -- Sync ke laporan --
         $this->reportSyncService->syncTransaction($transaction);
 
-        // -- Kirim email struk jika customer memasukkan email --
-        if ($selfOrder->customer_email && config('self_order.send_email_receipt', true)) {
-            try {
-                \Illuminate\Support\Facades\Mail::to($selfOrder->customer_email)
-                    ->queue(new \App\Mail\SelfOrderReceiptMail($selfOrder->load('items.modifiers')));
-            } catch (\Exception $e) {
-                Log::channel('self_order')->warning("Gagal kirim email struk ke [{$selfOrder->customer_email}]: " . $e->getMessage());
-            }
+        // -- Kirim struk digital (email/WhatsApp sesuai kanal di Pengaturan) --
+        try {
+            $this->sendReceiptNotification->send($transaction, $selfOrder->load(['items.modifiers', 'transaction']));
+        } catch (\Throwable $e) {
+            Log::channel('self_order')->warning("Gagal kirim struk digital untuk SelfOrder [{$selfOrder->id}]: " . $e->getMessage());
         }
 
         // -- Hapus cart snapshot dari Cache (snapshot DB tetap untuk audit) --

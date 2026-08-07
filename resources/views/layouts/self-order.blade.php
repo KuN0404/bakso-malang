@@ -6,6 +6,7 @@
     <meta name="description" content="Pesan makanan & minuman langsung dari meja Anda.">
     <meta name="theme-color" content="#1d4ed8">
     <title>@yield('title', config('app.name', 'Self Order'))</title>
+    @stack('head')
 
     <!-- Google Fonts.
          display=optional (bukan swap) sengaja dipakai agar TIDAK ada visible font-swap saat font

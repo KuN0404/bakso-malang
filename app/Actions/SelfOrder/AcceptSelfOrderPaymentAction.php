@@ -2,6 +2,7 @@
 
 namespace App\Actions\SelfOrder;
 
+use App\Actions\Notifications\SendReceiptNotificationAction;
 use App\Enums\PaymentTransactionStatus;
 use App\Enums\SelfOrderStatus;
 use App\Exceptions\NoOpenShiftException;
@@ -35,6 +36,7 @@ class AcceptSelfOrderPaymentAction
     public function __construct(
         private readonly StockReservationService $reservationService,
         private readonly ReportSyncService $reportSyncService,
+        private readonly SendReceiptNotificationAction $sendReceiptNotification,
     ) {}
 
     /**
@@ -103,6 +105,7 @@ class AcceptSelfOrderPaymentAction
                 'payment_source_id'      => $paymentSource?->id,
                 'payment_transaction_id' => $paymentTx->id,
                 'service_area_id'        => $selfOrder->order_type === 'dine_in' ? $selfOrder->service_area_id : null,
+                'pager_id'               => $selfOrder->pager_id,
                 'self_order_id'          => $selfOrder->id,
                 'invoice_number'         => $invoiceNumber,
                 'queue_number'           => $selfOrder->queue_number,
@@ -166,16 +169,13 @@ class AcceptSelfOrderPaymentAction
             // -- Sync laporan --
             $this->reportSyncService->syncTransaction($transaction);
 
-            // -- Kirim email struk jika customer punya email --
-            if ($selfOrder->customer_email && config('self_order.send_email_receipt', true)) {
-                try {
-                    \Illuminate\Support\Facades\Mail::to($selfOrder->customer_email)
-                        ->queue(new \App\Mail\SelfOrderReceiptMail($selfOrder->load('items.modifiers')));
-                } catch (\Exception $e) {
-                    \Illuminate\Support\Facades\Log::channel('self_order')->warning(
-                        "Gagal kirim email struk ke [{$selfOrder->customer_email}]: " . $e->getMessage()
-                    );
-                }
+            // -- Kirim struk digital (email/WhatsApp sesuai kanal di Pengaturan) --
+            try {
+                $this->sendReceiptNotification->send($transaction, $selfOrder->load(['items.modifiers', 'transaction']));
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::channel('self_order')->warning(
+                    "Gagal kirim struk digital untuk SelfOrder [{$selfOrder->id}]: " . $e->getMessage()
+                );
             }
 
             Log::channel('self_order')->info(

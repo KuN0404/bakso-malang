@@ -6,20 +6,19 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    /**
+     * payment_transaction_id butuh FK ke payment_transactions, tabel yang baru
+     * dibuat di migration ini (payment_gateway_status sudah ada sejak
+     * create_transactions_table). Makanya kolom ini harus ditambah belakangan.
+     */
     public function up(): void
     {
         Schema::table('transactions', function (Blueprint $table) {
-            // Relasi ke payment_transaction (diisi setelah gateway mengkonfirmasi)
             $table->foreignId('payment_transaction_id')
                 ->nullable()
                 ->after('payment_source_id')
                 ->constrained('payment_transactions')
                 ->nullOnDelete();
-
-            // Status pembayaran dari gateway (raw status Midtrans)
-            $table->string('payment_gateway_status', 50)
-                ->nullable()
-                ->after('payment_transaction_id');
         });
     }
 
@@ -27,7 +26,7 @@ return new class extends Migration
     {
         Schema::table('transactions', function (Blueprint $table) {
             $table->dropForeign(['payment_transaction_id']);
-            $table->dropColumn(['payment_transaction_id', 'payment_gateway_status']);
+            $table->dropColumn('payment_transaction_id');
         });
     }
 };

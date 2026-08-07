@@ -95,6 +95,7 @@ class InitiateQrisPaymentAction
                     'customer_name'   => $payload->customerName,
                     'order_type'      => $payload->orderType,
                     'service_area_id' => $payload->serviceAreaId,
+                    'pager_id'        => $payload->pagerId,
                     'notes'           => $payload->notes,
                     'invoice_number'  => $invoiceNumber,
                 ],

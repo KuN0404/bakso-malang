@@ -167,6 +167,24 @@ class SelfOrderPage extends Component
     }
 
     #[Computed]
+    public function logoWeb(): ?string
+    {
+        return Setting::get('logo_web', null, 'general');
+    }
+
+    #[Computed]
+    public function logoFull(): ?string
+    {
+        return Setting::get('logo_full', null, 'general');
+    }
+
+    #[Computed]
+    public function logoType(): string
+    {
+        return Setting::get('logo_type', 'single', 'general');
+    }
+
+    #[Computed]
     public function isQrisAvailable(): bool
     {
         return PaymentSource::isQrisActiveForSelfOrder();
@@ -189,23 +207,30 @@ class SelfOrderPage extends Component
         $basePrice = (float) $product->price;
         $modifierTotal = 0;
 
+        // Kumpulkan semua modifier_id yang relevan dulu, lalu satu query
+        // whereIn — sebelumnya Modifier::find() dipanggil satu-satu per
+        // modifier di dalam loop (N+1), padahal computed ini dievaluasi
+        // ulang tiap interaksi di modal (checkbox/stepper).
+        $modifierIds = array_values(array_filter(array_merge(
+            array_values($this->singleModifiers),
+            array_keys(array_filter($this->modifierQuantities, fn($qty) => $qty > 0))
+        )));
+
+        $modifiers = $modifierIds
+            ? \App\Models\Modifier::whereIn('id', $modifierIds)->get()->keyBy('id')
+            : collect();
+
         // Hitung dari singleModifiers (radio)
         foreach ($this->singleModifiers as $groupId => $modifierId) {
-            if ($modifierId) {
-                $modifier = \App\Models\Modifier::find($modifierId);
-                if ($modifier) {
-                    $modifierTotal += (float) $modifier->price_adjustment;
-                }
+            if ($modifierId && $modifiers->has($modifierId)) {
+                $modifierTotal += (float) $modifiers[$modifierId]->price_adjustment;
             }
         }
 
         // Hitung dari modifierQuantities (stepper per topping)
         foreach ($this->modifierQuantities as $modifierId => $qty) {
-            if ($qty > 0) {
-                $modifier = \App\Models\Modifier::find($modifierId);
-                if ($modifier) {
-                    $modifierTotal += (float) $modifier->price_adjustment * $qty;
-                }
+            if ($qty > 0 && $modifiers->has($modifierId)) {
+                $modifierTotal += (float) $modifiers[$modifierId]->price_adjustment * $qty;
             }
         }
 

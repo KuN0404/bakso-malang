@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class Transaction extends Model
 {
@@ -18,8 +19,10 @@ class Transaction extends Model
         'payment_source_id',
         'payment_transaction_id',
         'service_area_id',
+        'pager_id',
         'self_order_id',
         'invoice_number',
+        'receipt_token',
         'queue_number',
         'subtotal',
         'discount_amount',
@@ -35,6 +38,8 @@ class Transaction extends Model
         'cancelled_by',
         'cancelled_at',
         'customer_name',
+        'customer_phone',
+        'customer_email',
         'order_type',
         'notes',
         'print_count',
@@ -54,6 +59,20 @@ class Transaction extends Model
 
     // Eager load these relations by default for performance
     protected $with = ['details'];
+
+    protected static function boot(): void
+    {
+        parent::boot();
+
+        // Token acak untuk link struk publik (/receipt/{token}) — dibuat sekali
+        // saat transaksi dibuat, terpisah dari invoice_number yang sekuensial
+        // (dan karena itu bisa ditebak).
+        static::creating(function (Transaction $transaction) {
+            if (empty($transaction->receipt_token)) {
+                $transaction->receipt_token = (string) Str::uuid();
+            }
+        });
+    }
 
     // -----------------------------------------------------------------
     // Relationships
@@ -77,6 +96,11 @@ class Transaction extends Model
     public function serviceArea(): BelongsTo
     {
         return $this->belongsTo(ServiceArea::class);
+    }
+
+    public function pager(): BelongsTo
+    {
+        return $this->belongsTo(Pager::class);
     }
 
     public function cancelledBy(): BelongsTo
@@ -536,6 +560,18 @@ class Transaction extends Model
     public function loadForPrintSingle(): self
     {
         return $this->load(['user', 'paymentSource', 'details.product', 'details.modifiers', 'details.product.category']);
+    }
+
+    /**
+     * Cari transaksi lewat receipt_token untuk halaman struk publik
+     * (/receipt/{token}) — sekaligus eager-load semua relasi yang dipakai
+     * halaman itu supaya tidak N+1.
+     */
+    public static function findByReceiptToken(string $token): ?self
+    {
+        return static::with(['user', 'paymentSource', 'serviceArea', 'pager', 'details.product', 'details.modifiers'])
+            ->where('receipt_token', $token)
+            ->first();
     }
 }
 

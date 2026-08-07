@@ -57,6 +57,17 @@ class AppServiceProvider extends ServiceProvider
                 ));
         });
 
+        // ── Struk Publik: halaman /receipt/{token}, publik tanpa login ───────
+        RateLimiter::for('receipt-page', function (Request $request) {
+            return Limit::perMinute(300)
+                ->by('receipt-page|' . ($request->user()?->id ?: $request->ip()))
+                ->response(fn() => response(
+                    view('errors.429', ['retryAfter' => 60]),
+                    429,
+                    ['Retry-After' => 60, 'Content-Type' => 'text/html']
+                ));
+        });
+
         // ── Self Order API: Payment SSE & Status Check ────────────────────────
         // Strict 20 req/menit per IP — SSE harusnya persistent, bukan polling
         // Jika SSE disconnect, klien akan reconnect, 20 masih lebih dari cukup

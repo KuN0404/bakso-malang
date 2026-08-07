@@ -3,6 +3,7 @@
 use App\Http\Controllers\ExportController;
 use App\Livewire\Admin\Categories;
 use App\Livewire\Admin\Components;
+use App\Livewire\Admin\Customers;
 use App\Livewire\Admin\Dashboard;
 use App\Livewire\Admin\Ingredients;
 use App\Livewire\Admin\InventoryReport;
@@ -55,6 +56,7 @@ Route::middleware(['auth', 'throttle:admin'])->prefix('admin')->name('admin.')->
     Route::get('/modifiers', Modifiers::class)->name('modifiers.index')->middleware('can:view_modifiers');
     Route::get('/payment-sources', PaymentSources::class)->name('payment-sources.index')->middleware('can:manage_payment_sources');
     Route::get('/service-areas', App\Livewire\Admin\ServiceAreas::class)->name('service-areas.index')->middleware('can:manage_service_areas');
+    Route::get('/pagers', App\Livewire\Admin\Pagers::class)->name('pagers.index')->middleware('can:manage_pagers');
 
     // Inventory & Production
     Route::get('/ingredients', Ingredients::class)->name('ingredients.index')->middleware('can:view_ingredients');
@@ -65,6 +67,9 @@ Route::middleware(['auth', 'throttle:admin'])->prefix('admin')->name('admin.')->
     // Transactions & Shifts
     Route::get('/shifts', Shifts::class)->name('shifts.index')->middleware('can:view_own_shifts');
     Route::get('/returns', App\Livewire\Admin\Returns::class)->name('returns')->middleware('can:view_returns');
+
+    // Pelanggan & Blacklist Nomor HP
+    Route::get('/customers', Customers::class)->name('customers.index')->middleware('can:view_customers');
 
     // Reports
     Route::get('/reports/transactions', TransactionHistory::class)->name('reports.transactions')->middleware('can:view_transactions');
@@ -93,6 +98,13 @@ Route::middleware(['auth'])->prefix('print')->name('print.')->group(function () 
     Route::get('/shifts/table', [App\Http\Controllers\PrintController::class, 'shiftsTable'])->name('shifts.table')->middleware('can:view_all_shifts');
     Route::get('/shift/{shift}', [App\Http\Controllers\PrintController::class, 'shiftDetail'])->name('shift.detail')->middleware('can:view_all_shifts');
     Route::get('/shift/{shift}/custom', [App\Http\Controllers\PrintController::class, 'shiftCustom'])->name('shift.custom')->middleware('can:view_all_shifts');
+
+    // Halaman uji sementara: garis penggaris polos (tanpa Tailwind/Livewire) untuk
+    // memastikan apakah masalah lebar cetak ada di driver/printer atau di kode
+    // struk aplikasi. Aman dihapus setelah diagnosis selesai.
+    Route::get('/test-ruler/{mm?}', function (int $mm = 80) {
+        return view('print.test-ruler', ['mm' => $mm]);
+    })->name('test-ruler');
 });
 
 // Export Routes (separate for streaming)
@@ -211,6 +223,11 @@ Route::prefix('api/self-order')
             ->name('stock')
             ->middleware('throttle:self-order-stock');
     });
+
+// Struk Publik (tanpa auth, token-based — dibagikan lewat WA/email)
+Route::get('/receipt/{token}', App\Livewire\PublicReceipt::class)
+    ->name('receipt.show')
+    ->middleware('throttle:receipt-page');
 
 // Webhook Midtrans Self Order (CSRF excluded, signature verified)
 Route::post('/api/webhook/midtrans/self-order', App\Http\Controllers\Payment\SelfOrderMidtransWebhookController::class)

@@ -2,6 +2,7 @@
 
 namespace App\Actions\Payment;
 
+use App\Actions\Notifications\SendReceiptNotificationAction;
 use App\DTOs\Payment\MidtransWebhookPayload;
 use App\Enums\PaymentTransactionStatus;
 use App\Models\DailyQueueNumber;
@@ -32,6 +33,7 @@ class HandleMidtransWebhookAction
     public function __construct(
         private readonly ReportSyncService $reportSyncService,
         private readonly ComponentStockService $componentStockService,
+        private readonly SendReceiptNotificationAction $sendReceiptNotification,
     ) {}
 
     /**
@@ -113,6 +115,13 @@ class HandleMidtransWebhookAction
         // Sync ke laporan
         $this->reportSyncService->syncTransaction($transaction);
 
+        // -- Kirim struk digital (email/WhatsApp) kalau pelanggan mengisi kontak --
+        try {
+            $this->sendReceiptNotification->send($transaction);
+        } catch (\Throwable $e) {
+            Log::warning('Gagal kirim struk digital POS (QRIS): ' . $e->getMessage());
+        }
+
         Log::info("Webhook Midtrans: PaymentTransaction [{$paymentTx->id}] berhasil. Transaksi POS [{$transaction->id}] dibuat.");
 
         return $transaction;
@@ -182,6 +191,7 @@ class HandleMidtransWebhookAction
             'payment_source_id'      => $paymentSource?->id,
             'payment_transaction_id' => $paymentTx->id,
             'service_area_id'        => $cartData['service_area_id'] ?? null,
+            'pager_id'               => $cartData['pager_id'] ?? null,
             'invoice_number'         => $paymentTx->invoice_number,
             'queue_number'           => $queueNumber,
             'subtotal'               => $cartData['subtotal'],
@@ -194,6 +204,8 @@ class HandleMidtransWebhookAction
             'payment_gateway_status' => 'settlement',
             'status'                 => 'completed',
             'customer_name'          => $cartData['customer_name'] ?: null,
+            'customer_phone'         => $cartData['customer_phone'] ?? null,
+            'customer_email'         => $cartData['customer_email'] ?? null,
             'order_type'             => $cartData['order_type'],
             'notes'                  => $cartData['notes'] ?: null,
         ]);

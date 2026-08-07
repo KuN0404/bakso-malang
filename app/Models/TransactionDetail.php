@@ -49,7 +49,9 @@ class TransactionDetail extends Model
     public function modifiers(): BelongsToMany
     {
         return $this->belongsToMany(Modifier::class, 'transaction_detail_modifier')
-            ->withPivot(['modifier_name', 'price_adjustment', 'quantity']);
+            ->withPivot(['modifier_name', 'price_adjustment', 'quantity'])
+            ->orderBy('modifiers.modifier_group_id')
+            ->orderBy('modifiers.sort_order');
     }
 
     // -----------------------------------------------------------------
@@ -207,7 +209,7 @@ class TransactionDetail extends Model
         $targetValue = $target instanceof \App\Enums\KitchenTarget ? $target->value : $target;
 
         return static::query()
-            ->with(['transaction.user', 'transaction.serviceArea', 'product.category', 'modifiers'])
+            ->with(['transaction.user', 'transaction.serviceArea', 'transaction.pager', 'product.category', 'modifiers'])
             ->whereHas('transaction', function ($q) use ($shiftIds) {
                 $q->when(!empty($shiftIds), fn($sq) => $sq->whereIn('shift_id', $shiftIds))
                   ->whereIn('status', ['pending', 'completed']);

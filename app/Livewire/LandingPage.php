@@ -35,6 +35,8 @@ class LandingPage extends Component
         $storeName = Setting::get('store_name', 'Bakso Malang', 'general');
         $logoWeb = Setting::get('logo_web', null, 'general');
         $siteLogo = Setting::get('site_logo', null, 'general');
+        $logoFull = Setting::get('logo_full', null, 'general');
+        $logoType = Setting::get('logo_type', 'single', 'general');
         $storeAddress = Setting::get('store_address', 'Jl. Raya Bakso Malang No. 123, Kota Malang', 'general');
         $storePhone = Setting::get('store_phone', '0812-3456-7890', 'general');
         $storeEmail = Setting::get('store_email', 'info@baksomalang.com', 'general');
@@ -62,6 +64,8 @@ class LandingPage extends Component
             'storeName' => $storeName,
             'logoWeb' => $logoWeb,
             'siteLogo' => $siteLogo,
+            'logoFull' => $logoFull,
+            'logoType' => $logoType,
             'storeAddress' => $storeAddress,
             'storePhone' => $storePhone,
             'storeEmail' => $storeEmail,

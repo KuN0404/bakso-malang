@@ -19,6 +19,8 @@ class DefaultSettingsSeeder extends Seeder
             ['group' => 'general', 'key' => 'tax_percentage', 'value' => '0', 'type' => 'integer', 'description' => 'Persentase pajak (0 = tidak ada pajak)'],
             ['group' => 'general', 'key' => 'currency', 'value' => 'IDR', 'type' => 'string', 'description' => 'Mata uang'],
             ['group' => 'payment', 'key' => 'qris_expiry_minutes', 'value' => '5', 'type' => 'integer', 'description' => 'Durasi kadaluarsa QRIS (menit)'],
+            ['group' => 'self_order', 'key' => 'spam_window_minutes', 'value' => '10', 'type' => 'integer', 'description' => 'Rentang waktu (menit) untuk deteksi spam nomor HP di Self Order'],
+            ['group' => 'self_order', 'key' => 'spam_threshold', 'value' => '5', 'type' => 'integer', 'description' => 'Jumlah order dalam rentang waktu di atas sebelum nomor HP diblokir otomatis'],
         ];
 
         foreach ($generalSettings as $setting) {

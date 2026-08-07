@@ -12,6 +12,7 @@ use App\Models\SelfOrderCartSnapshot;
 use App\Models\SelfOrderItem;
 use App\Models\Setting;
 use App\Services\MidtransService;
+use App\Services\PhoneBlacklistService;
 use App\Services\StockReservationService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -38,6 +39,7 @@ class PlaceSelfOrderAction
     public function __construct(
         private readonly StockReservationService $reservationService,
         private readonly MidtransService $midtransService,
+        private readonly PhoneBlacklistService $phoneBlacklistService,
     ) {}
 
     /**
@@ -53,6 +55,11 @@ class PlaceSelfOrderAction
                 Log::info("PlaceSelfOrderAction: Idempotency key [{$idempotencyKey}] sudah digunakan, return existing order [{$existing->id}].");
                 return $existing->load(['items.modifiers', 'paymentTransaction']);
             }
+        }
+
+        // -- Blacklist check: nomor yang diblokir (manual/otomatis) tidak boleh order --
+        if ($this->phoneBlacklistService->isBlocked($validatedData['customer_phone'])) {
+            throw new \RuntimeException('Nomor HP ini diblokir sementara. Silakan hubungi kasir untuk bantuan.');
         }
 
         // -- Anti-spam: max 3 pending orders per nomor HP --
@@ -133,6 +140,9 @@ class PlaceSelfOrderAction
                 "Customer: {$selfOrder->customer_name}, " .
                 "Method: {$paymentMethod}, Total: {$total}"
             );
+
+            // -- Anti-spam: blokir otomatis kalau nomor ini submit order terlalu sering --
+            $this->phoneBlacklistService->registerSelfOrderAndAutoBlockIfSpam($selfOrder->customer_phone);
 
             return $selfOrder->load(['items.modifiers', 'paymentTransaction']);
         });
