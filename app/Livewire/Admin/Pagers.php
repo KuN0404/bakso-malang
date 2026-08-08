@@ -62,8 +62,9 @@ class Pagers extends Component
 
     public function save(): void
     {
+        $exceptId = $this->editingId ?: 'NULL';
         $this->validate([
-            'number' => 'required|min:1|max:20|unique:pagers,number' . ($this->editingId ? ",{$this->editingId}" : ''),
+            'number' => "required|min:1|max:20|unique:pagers,number,{$exceptId},id,deleted_at,NULL",
             'docking_number' => 'nullable|max:20',
             'is_active' => 'boolean',
         ]);

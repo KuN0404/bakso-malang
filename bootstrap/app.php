@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\SanitizeInput;
 use App\Http\Middleware\SecurityHeaders;
+use App\Http\Middleware\VerifyFonnteWebhookSecret;
 use App\Http\Middleware\VerifyMidtransSignature;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -45,17 +46,19 @@ return Application::configure(basePath: dirname(__DIR__))
             users: '/admin'
         );
 
-        // Kecualikan /logout dan Midtrans webhook dari validasi CSRF
+        // Kecualikan /logout, Midtrans webhook, dan Fonnte webhook dari validasi CSRF
         $middleware->validateCsrfTokens(except: [
             '/logout',
             'logout',
             '/api/webhook/midtrans',          // Midtrans POS webhook
             '/api/webhook/midtrans/self-order', // Midtrans Self Order webhook
+            '/api/webhook/fonnte/*',          // Fonnte WhatsApp webhook (device-status & message-status)
         ]);
 
-        // Alias untuk Midtrans signature middleware
+        // Alias untuk middleware verifikasi webhook
         $middleware->alias([
-            'midtrans.signature' => VerifyMidtransSignature::class,
+            'midtrans.signature'  => VerifyMidtransSignature::class,
+            'fonnte.webhook.secret' => VerifyFonnteWebhookSecret::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

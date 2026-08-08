@@ -5,12 +5,35 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 use App\Traits\SyncsToReport;
 
 class ModifierGroup extends Model
 {
-    use SyncsToReport;
+    use SyncsToReport, SoftDeletes;
+
+    protected static function boot(): void
+    {
+        parent::boot();
+
+        // Ikut nonaktifkan/aktifkan semua modifier di dalam grup ini,
+        // menggantikan FK cascadeOnDelete yang tidak berjalan pada soft delete.
+        //
+        // Sengaja di-loop per model (bukan ->modifiers()->delete()/restore() langsung di
+        // relation) karena bulk update lewat query builder TIDAK memicu event Eloquent
+        // ('trashed'/'saved'), sehingga SyncsToReport pada Modifier tidak akan pernah
+        // terpanggil dan modifier-modifier ini tidak akan ikut tersinkron ke report.
+        static::deleting(function (ModifierGroup $group) {
+            if (! $group->isForceDeleting()) {
+                $group->modifiers()->get()->each(fn (Modifier $modifier) => $modifier->delete());
+            }
+        });
+
+        static::restoring(function (ModifierGroup $group) {
+            $group->modifiers()->onlyTrashed()->get()->each(fn (Modifier $modifier) => $modifier->restore());
+        });
+    }
 
     protected $fillable = [
         'name',

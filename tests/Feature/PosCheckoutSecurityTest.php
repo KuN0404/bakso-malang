@@ -98,8 +98,11 @@ class PosCheckoutSecurityTest extends TestCase
             paymentSourceId: $this->cashSource->id,
             paymentMethod:   $method,
             customerName:    'Budi',
+            customerPhone:   '',
+            customerEmail:   '',
             orderType:       'take_away',
             serviceAreaId:   null,
+            pagerId:         null,
             notes:           '',
             idempotencyKey:  (string) \Illuminate\Support\Str::uuid(),
         );
@@ -158,8 +161,11 @@ class PosCheckoutSecurityTest extends TestCase
             paymentSourceId: $qrisSource->id,
             paymentMethod:   'qris',
             customerName:    $payload->customerName,
+            customerPhone:   $payload->customerPhone,
+            customerEmail:   $payload->customerEmail,
             orderType:       $payload->orderType,
             serviceAreaId:   $payload->serviceAreaId,
+            pagerId:         $payload->pagerId,
             notes:           $payload->notes,
             idempotencyKey:  $payload->idempotencyKey,
         );

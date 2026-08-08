@@ -22,6 +22,7 @@ use App\Models\ShiftExpense;
 use App\Models\StockLog;
 use App\Models\Transaction;
 use App\Models\TransactionDetail;
+use App\Services\ComponentStockService;
 use App\Services\MidtransService;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -339,7 +340,21 @@ class PosCheckout extends Component
 
             foreach ($selectedItems as $detailId => $item) {
                 $detail = TransactionDetail::find($detailId);
-                if ($detail && $detail->product && $detail->product->track_stock) {
+
+                if (!$detail) {
+                    continue;
+                }
+
+                // restoreForReturn() menangani BOM (jika produk punya BOM) DAN modifier
+                // ber-component_id (independen dari status BOM produk) dalam satu panggilan.
+                app(ComponentStockService::class)->restoreForReturn(
+                    $detailId,
+                    (float) $item['quantity'],
+                    auth()->id(),
+                    $return->id
+                );
+
+                if ($detail->product && !$detail->product->hasBom() && $detail->product->track_stock) {
                     $detail->product->increment('stock', $item['quantity']);
 
                     StockLog::record(

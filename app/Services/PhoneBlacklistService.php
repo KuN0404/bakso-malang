@@ -26,6 +26,11 @@ class PhoneBlacklistService
      */
     public function block(string $phone, ?string $reason = null, ?int $blockedBy = null, bool $auto = false): BlockedPhoneNumber
     {
+        // Normalisasi SEBELUM dipakai sebagai kunci pencarian updateOrCreate —
+        // mutator tidak berlaku untuk kondisi where(), jadi ini wajib di sini
+        // supaya nomor yang sama dalam format beda tidak jadi baris duplikat.
+        $phone = BlockedPhoneNumber::normalizePhone($phone);
+
         return BlockedPhoneNumber::updateOrCreate(
             ['phone' => $phone],
             [
@@ -45,7 +50,7 @@ class PhoneBlacklistService
      */
     public function unblock(string $phone, int $unblockedBy): ?BlockedPhoneNumber
     {
-        $entry = BlockedPhoneNumber::where('phone', $phone)->first();
+        $entry = BlockedPhoneNumber::where('phone', BlockedPhoneNumber::normalizePhone($phone))->first();
 
         if (!$entry) {
             return null;

@@ -49,6 +49,7 @@ return [
         'token' => env('FONNTE_TOKEN'),
         'account_token' => env('FONNTE_ACCOUNT_TOKEN'),
         'timeout' => env('FONNTE_TIMEOUT', 15),
+        'webhook_secret' => env('FONNTE_WEBHOOK_SECRET'),
     ],
 
 ];

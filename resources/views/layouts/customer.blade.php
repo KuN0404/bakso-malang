@@ -40,8 +40,10 @@
         }
     </script>
 
-    <!-- Alpine.js CDN -->
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    {{-- Alpine.js sudah dibundel otomatis oleh @livewireScripts (Livewire 3). Memuat Alpine
+         CDN terpisah di sini akan membuat DUA instance Alpine berjalan bersamaan, yang
+         menyebabkan x-data/wire:click di halaman ini gagal/berperilaku acak (mis. modal
+         detail produk tidak muncul saat ikon mata diklik). Jangan tambahkan lagi. --}}
 
     @livewireStyles
 
@@ -69,6 +71,21 @@
         .custom-scroll::-webkit-scrollbar { width: 4px; }
         .custom-scroll::-webkit-scrollbar-track { background: transparent; }
         .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 99px; }
+
+        /* Scroll-reveal: fade + slide-up yang halus, bukan animasi mencolok */
+        [data-reveal] {
+            opacity: 0;
+            transform: translateY(22px);
+            transition: opacity .7s cubic-bezier(.16,.84,.44,1), transform .7s cubic-bezier(.16,.84,.44,1);
+            transition-delay: var(--reveal-delay, 0ms);
+        }
+        [data-reveal].is-revealed {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        @media (prefers-reduced-motion: reduce) {
+            [data-reveal] { opacity: 1; transform: none; transition: none; }
+        }
     </style>
 </head>
 <body class="h-full bg-slate-50 antialiased text-slate-800">
@@ -76,5 +93,34 @@
     {{ $slot }}
 
     @livewireScripts
+
+    <script>
+        function initScrollReveal() {
+            const targets = document.querySelectorAll('[data-reveal]:not(.is-revealed)');
+            if (!targets.length) return;
+
+            if (!('IntersectionObserver' in window) || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                targets.forEach((el) => el.classList.add('is-revealed'));
+                return;
+            }
+
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach((entry) => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('is-revealed');
+                        observer.unobserve(entry.target);
+                    }
+                });
+            }, { threshold: 0.15, rootMargin: '0px 0px -60px 0px' });
+
+            targets.forEach((el) => observer.observe(el));
+        }
+
+        document.addEventListener('DOMContentLoaded', initScrollReveal);
+        document.addEventListener('livewire:navigated', initScrollReveal);
+        document.addEventListener('livewire:init', () => {
+            Livewire.hook('morph.updated', () => initScrollReveal());
+        });
+    </script>
 </body>
 </html>

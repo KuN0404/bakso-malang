@@ -2,10 +2,12 @@
 
 namespace App\Providers;
 
+use App\Models\Setting;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
@@ -101,9 +103,26 @@ class AppServiceProvider extends ServiceProvider
                 ->by('webhook|' . $orderId);
         });
 
+        // Fonnte bisa kirim banyak event status pesan berturutan saat ada broadcast/
+        // batch kirim struk, jadi lebih longgar dari limiter Midtrans. Per-IP karena
+        // tidak ada order_id yang relevan untuk webhook device-status/message-status.
+        RateLimiter::for('fonnte-webhook', function (Request $request) {
+            return Limit::perMinute(60)->by($request->ip());
+        });
+
         // ── Super Admin: bypass semua permission check ────────────────────────
         Gate::before(function ($user, $ability) {
             return $user->hasRole('Super Admin') ? true : null;
+        });
+
+        // ── Queue worker: reset memoisasi Setting sebelum tiap job ─────────────
+        // `php artisan queue:work` memproses banyak job berturutan dalam SATU
+        // proses PHP yang sama — Setting::$memo (lihat catatan di modelnya)
+        // baru benar-benar "per-request" kalau dibersihkan di batas ini, kalau
+        // tidak worker bisa terus memakai nilai setting basi dari job pertama
+        // yang dia proses, walau settingnya sudah diubah lewat request lain.
+        Queue::before(function () {
+            Setting::forgetMemo();
         });
     }
 }

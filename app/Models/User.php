@@ -4,8 +4,10 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Traits\HasRoles;
 use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\Activitylog\LogOptions;
@@ -13,7 +15,7 @@ use App\Traits\SyncsToReport;
 
 class User extends Authenticatable
 {
-    use HasFactory, Notifiable, HasRoles, LogsActivity, SyncsToReport;
+    use HasFactory, Notifiable, HasRoles, LogsActivity, SyncsToReport, SoftDeletes;
 
     protected $fillable = [
         'username',
@@ -68,6 +70,47 @@ class User extends Authenticatable
     }
 
     /**
+     * Non-aktif = soft deleted. Digunakan sebagai satu-satunya sumber kebenaran
+     * status user, tanpa kolom is_active terpisah.
+     */
+    public function isActive(): bool
+    {
+        return $this->deleted_at === null;
+    }
+
+    /**
+     * Nonaktifkan user (soft delete) dan paksa keluar dari semua sesi yang
+     * sedang aktif agar tidak bisa lanjut memakai sistem meski masih login.
+     */
+    public function deactivate(): void
+    {
+        DB::transaction(function () {
+            $this->delete();
+            DB::table('sessions')->where('user_id', $this->id)->delete();
+        });
+    }
+
+    /**
+     * Aktifkan kembali user yang sebelumnya dinonaktifkan.
+     */
+    public function activate(): void
+    {
+        $this->restore();
+    }
+
+    /**
+     * Cek apakah username/email user ini sudah dipakai user aktif lain,
+     * yang berarti user ini TIDAK BISA diaktifkan kembali sebelum ada
+     * penyesuaian data (mencegah dua user aktif dengan username/email sama).
+     */
+    public function hasActiveUsernameOrEmailConflict(): bool
+    {
+        return static::where('id', '!=', $this->id)
+            ->where(fn ($q) => $q->where('username', $this->username)->orWhere('email', $this->email))
+            ->exists();
+    }
+
+    /**
      * Check if a Super Admin account already exists in the system.
      */
     public static function hasSuperAdmin(): bool
@@ -95,21 +138,30 @@ class User extends Authenticatable
 
     /**
      * Get paginated users list with roles.
+     *
+     * @param string $status 'active' (default, hanya user aktif), 'inactive' (hanya nonaktif), atau 'all'.
      */
-    public static function getPaginated(string $search = '', int $perPage = 10): \Illuminate\Contracts\Pagination\LengthAwarePaginator
+    public static function getPaginated(string $search = '', string $status = 'active', int $perPage = 10): \Illuminate\Contracts\Pagination\LengthAwarePaginator
     {
-        return static::with('roles')
-            ->when($search, fn($q) => $q->where('name', 'like', "%{$search}%")->orWhere('username', 'like', "%{$search}%"))
+        return static::query()
+            ->when($status === 'inactive', fn($q) => $q->onlyTrashed())
+            ->when($status === 'all', fn($q) => $q->withTrashed())
+            // status === 'active' tidak perlu apa-apa: default query Eloquent sudah
+            // mengecualikan baris yang di-soft-delete.
+            ->with('roles')
+            ->when($search, fn($q) => $q->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")->orWhere('username', 'like', "%{$search}%");
+            }))
             ->latest()
             ->paginate($perPage);
     }
 
     /**
-     * Find user with roles for editing.
+     * Find user (including nonaktif) with roles for editing.
      */
     public static function getForEdit(int $id): self
     {
-        return static::with('roles')->findOrFail($id);
+        return static::withTrashed()->with('roles')->findOrFail($id);
     }
 
     /**
@@ -117,15 +169,16 @@ class User extends Authenticatable
      */
     public static function getAllSortedByName(): \Illuminate\Database\Eloquent\Collection
     {
-        return static::orderBy('name')->get();
+        return static::withTrashed()->orderBy('name')->get();
     }
 
     /**
      * Get users who have transactions (for cashier filter dropdown).
+     * Includes nonaktif users so historical report filters keep working.
      */
     public static function getCashiersWithTransactions(): \Illuminate\Database\Eloquent\Collection
     {
-        return static::whereHas('transactions')->orderBy('name')->get(['id', 'name']);
+        return static::withTrashed()->whereHas('transactions')->orderBy('name')->get(['id', 'name']);
     }
 }
 

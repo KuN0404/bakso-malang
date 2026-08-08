@@ -93,15 +93,18 @@ class FonnteService
     }
 
     /**
-     * Kirim pesan teks WhatsApp ke satu nomor. Return true kalau Fonnte
+     * Kirim pesan teks WhatsApp ke satu nomor. 'sent' => true kalau Fonnte
      * menerima permintaan (masuk antrean kirim), bukan berarti pesan sudah
-     * benar-benar sampai di HP penerima.
+     * benar-benar sampai di HP penerima — status delivered/read datang belakangan
+     * lewat webhook message-status, dikorelasikan pakai 'id' di balikan ini.
+     *
+     * @return array{sent: bool, id: ?string, reason: ?string}
      */
-    public function sendMessage(string $target, string $message): bool
+    public function sendMessage(string $target, string $message): array
     {
         if (!$this->isConfigured()) {
             Log::warning('Fonnte sendMessage dilewati: token belum diset');
-            return false;
+            return ['sent' => false, 'id' => null, 'reason' => 'Token Fonnte belum diset'];
         }
 
         try {
@@ -118,13 +121,17 @@ class FonnteService
 
             if (!$response->successful() || !($data['status'] ?? false)) {
                 Log::warning('Fonnte sendMessage gagal', ['target' => $target, 'body' => $data]);
-                return false;
+                return ['sent' => false, 'id' => null, 'reason' => $data['reason'] ?? $data['detail'] ?? 'Gagal menghubungi Fonnte'];
             }
 
-            return true;
+            // Respons sukses: 'id' berupa array (satu per target). Service ini
+            // selalu kirim ke satu target, jadi ambil elemen pertama saja.
+            $id = $data['id'][0] ?? null;
+
+            return ['sent' => true, 'id' => $id, 'reason' => null];
         } catch (\Throwable $e) {
             Log::error('Fonnte sendMessage exception', ['target' => $target, 'message' => $e->getMessage()]);
-            return false;
+            return ['sent' => false, 'id' => null, 'reason' => 'Tidak bisa menghubungi Fonnte'];
         }
     }
 }

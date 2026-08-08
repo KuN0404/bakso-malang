@@ -4,12 +4,13 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 use App\Traits\SyncsToReport;
 
 class Modifier extends Model
 {
-    use SyncsToReport;
+    use SyncsToReport, SoftDeletes;
 
     protected $fillable = [
         'modifier_group_id',

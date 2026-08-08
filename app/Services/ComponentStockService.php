@@ -7,6 +7,7 @@ use App\Models\Component;
 use App\Models\ComponentStockLog;
 use App\Models\Modifier;
 use App\Models\ProductBom;
+use App\Models\TransactionDetail;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -132,6 +133,85 @@ class ComponentStockService
 
         if ($component->fresh()->isLowStock()) {
             Log::warning("⚠ Stok komponen '{$component->name}' menipis: {$newStock} {$component->unit} (min: {$component->minimum_stock})");
+        }
+    }
+
+    // -----------------------------------------------------------------
+    // Return Operations
+    // -----------------------------------------------------------------
+
+    /**
+     * Kembalikan stok komponen (BOM produk & modifier ber-component) untuk satu
+     * baris retur. Dipanggil dari PosCheckout::processReturn() di dalam
+     * DB::transaction() yang sama dengan pembuatan ProductReturn.
+     *
+     * Sengaja tidak melempar exception — stok hanya bertambah di sini, tidak
+     * ada skenario "tidak cukup stok" untuk pengembalian.
+     */
+    public function restoreForReturn(
+        int $transactionDetailId,
+        float $returnedQty,
+        ?int $userId,
+        int $returnId
+    ): void {
+        $detail = TransactionDetail::with(['product.bom', 'modifiers'])->find($transactionDetailId);
+
+        if (!$detail || $returnedQty <= 0) {
+            return;
+        }
+
+        if ($detail->product && $detail->product->hasBom()) {
+            foreach ($detail->product->bom as $bom) {
+                $component = Component::lockForUpdate()->find($bom->component_id);
+
+                if (!$component) {
+                    Log::warning("Retur: Komponen ID [{$bom->component_id}] dalam BOM produk ID [{$detail->product_id}] tidak ditemukan.");
+                    continue;
+                }
+
+                $restored = $bom->quantity * $returnedQty;
+                $newStock = $component->stock + $restored;
+                $component->update(['stock' => $newStock]);
+
+                ComponentStockLog::record(
+                    componentId:   $component->id,
+                    userId:        $userId,
+                    type:          'return_add',
+                    amount:        $restored,
+                    finalStock:    $newStock,
+                    note:          "Retur: Transaksi Detail #{$transactionDetailId} (Retur #{$returnId})",
+                    referenceId:   $returnId,
+                    referenceType: 'return',
+                );
+            }
+        }
+
+        foreach ($detail->modifiers as $modifier) {
+            if (!$modifier->component_id) {
+                continue;
+            }
+
+            $component = Component::lockForUpdate()->find($modifier->component_id);
+
+            if (!$component) {
+                Log::warning("Retur: Modifier [{$modifier->id}] mereferensikan component_id [{$modifier->component_id}] yang tidak ditemukan.");
+                continue;
+            }
+
+            $restored = (float) $modifier->pivot->quantity * $returnedQty;
+            $newStock = $component->stock + $restored;
+            $component->update(['stock' => $newStock]);
+
+            ComponentStockLog::record(
+                componentId:   $component->id,
+                userId:        $userId,
+                type:          'return_add',
+                amount:        $restored,
+                finalStock:    $newStock,
+                note:          "Retur: Modifier '{$modifier->name}' × {$restored} — Transaksi Detail #{$transactionDetailId} (Retur #{$returnId})",
+                referenceId:   $returnId,
+                referenceType: 'return',
+            );
         }
     }
 

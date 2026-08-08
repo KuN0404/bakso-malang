@@ -20,6 +20,17 @@ class Setting extends Model
      * tempat (layout + komponen Livewire) bisa memanggil key yang sama dalam
      * satu request; ini menghindari itu memicu query DB berulang kalau cache
      * store-nya kosong/miss di kedua panggilan tersebut.
+     *
+     * PENTING: ini "per-request" HANYA kalau prosesnya memang berumur satu
+     * request (PHP-FPM klasik). Di proses yang berumur panjang — queue worker
+     * yang memproses banyak job berturutan dalam satu proses, atau test suite
+     * yang menjalankan banyak test case dalam satu proses `php artisan test` —
+     * array static ini akan terus menyimpan nilai LAMA selama proses hidup,
+     * walau baris di DB & cache store sudah berubah lewat proses/request lain.
+     * forgetMemo() WAJIB dipanggil di setiap batas "unit kerja" pada proses
+     * semacam itu (lihat AppServiceProvider::boot() untuk queue worker, dan
+     * tests/TestCase::setUp() untuk test suite) supaya perilakunya benar-benar
+     * "per-request" sesuai niatnya, bukan "sekali di-cache seumur proses".
      */
     protected static array $memo = [];
 
@@ -93,14 +104,30 @@ class Setting extends Model
     }
 
     /**
-     * Clear settings cache.
+     * Clear settings cache. Sebelumnya hanya membersihkan cache store, TIDAK
+     * membersihkan static::$memo — jadi pemanggil yang mengira ini "reset
+     * total" tetap dapat nilai basi dari memo di proses yang sama. Sekarang
+     * keduanya selalu dibersihkan bersamaan.
      */
     public static function clearCache(?string $group = null, ?string $key = null): void
     {
         if ($group && $key) {
-            Cache::forget("setting.{$group}.{$key}");
+            $cacheKey = "setting.{$group}.{$key}";
+            Cache::forget($cacheKey);
+            unset(static::$memo[$cacheKey]);
         } else {
             Cache::flush(); // Clear all cache (use with caution)
+            static::$memo = [];
         }
+    }
+
+    /**
+     * Reset memoisasi in-process saja (tanpa menyentuh cache store/DB). Dipanggil
+     * di batas "unit kerja" pada proses yang berumur panjang — lihat catatan di
+     * static::$memo di atas.
+     */
+    public static function forgetMemo(): void
+    {
+        static::$memo = [];
     }
 }

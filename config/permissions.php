@@ -56,12 +56,14 @@ return [
         'manage_payment_sources' => 'Kelola Metode Pembayaran',
         'manage_service_areas' => 'Kelola Area Pelayanan',
         'manage_pagers' => 'Kelola Pager',
+        'manage_whatsapp' => 'Kelola WhatsApp (Fonnte)',
         
         // Users & Roles
         'view_users' => 'Lihat Pengguna',
         'create_users' => 'Buat Pengguna',
         'edit_users' => 'Edit Pengguna',
-        'delete_users' => 'Hapus Pengguna',
+        'delete_users' => 'Nonaktifkan Pengguna',
+        'activate_users' => 'Aktifkan Kembali Pengguna',
         'manage_roles' => 'Kelola Peran',
 
         // Inventory & Production
@@ -170,12 +172,14 @@ return [
             'manage_payment_sources',
             'manage_service_areas',
             'manage_pagers',
+            'manage_whatsapp',
         ],
         'Pengguna & Peran' => [
             'view_users',
             'create_users',
             'edit_users',
             'delete_users',
+            'activate_users',
             'manage_roles',
         ],
         'Self Order' => [

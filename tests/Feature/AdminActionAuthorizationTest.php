@@ -177,10 +177,43 @@ class AdminActionAuthorizationTest extends TestCase
         $this->grantPermissions($staff, ['view_users']); // tanpa delete_users
 
         Livewire::actingAs($staff)->test(Users::class)
-            ->call('delete', $target->id)
+            ->call('deactivate', $target->id)
             ->assertForbidden();
 
         $this->assertNotNull(User::find($target->id));
+        $this->assertTrue(User::find($target->id)->isActive());
+    }
+
+    public function test_users_activate_requires_activate_users_permission(): void
+    {
+        $target = User::factory()->create(['username' => 'target-user-2']);
+        $target->deactivate();
+
+        // Staff punya edit_users (bisa ubah data user) tapi TIDAK activate_users —
+        // reaktivasi harus tetap ditolak walau bisa edit data user biasa.
+        $staff = User::factory()->create(['username' => 'auth-users-3']);
+        $this->grantPermissions($staff, ['view_users', 'edit_users']);
+
+        Livewire::actingAs($staff)->test(Users::class)
+            ->call('activate', $target->id)
+            ->assertForbidden();
+
+        $this->assertFalse(User::withTrashed()->find($target->id)->isActive());
+    }
+
+    public function test_users_activate_succeeds_with_activate_users_permission(): void
+    {
+        $target = User::factory()->create(['username' => 'target-user-3']);
+        $target->deactivate();
+
+        $admin = User::factory()->create(['username' => 'auth-users-4']);
+        $this->grantPermissions($admin, ['view_users', 'activate_users']);
+
+        Livewire::actingAs($admin)->test(Users::class)
+            ->call('activate', $target->id)
+            ->assertOk();
+
+        $this->assertTrue(User::find($target->id)->isActive());
     }
 
     public function test_users_save_create_requires_create_users_permission(): void
@@ -252,5 +285,50 @@ class AdminActionAuthorizationTest extends TestCase
             ->assertOk();
 
         $this->assertNull(Product::find($product->id));
+    }
+
+    // -----------------------------------------------------------------
+    // Users — filter status aktif/nonaktif
+    // -----------------------------------------------------------------
+
+    public function test_users_list_defaults_to_active_only(): void
+    {
+        $active = User::factory()->create(['username' => 'filter-active-1', 'name' => 'User Aktif']);
+        $inactive = User::factory()->create(['username' => 'filter-inactive-1', 'name' => 'User Nonaktif']);
+        $inactive->deactivate();
+
+        $viewer = User::factory()->create(['username' => 'filter-viewer-1']);
+
+        Livewire::actingAs($viewer)->test(\App\Livewire\Admin\Users::class)
+            ->assertSee('User Aktif')
+            ->assertDontSee('User Nonaktif');
+    }
+
+    public function test_users_list_inactive_filter_shows_only_deactivated_users(): void
+    {
+        $active = User::factory()->create(['username' => 'filter-active-2', 'name' => 'User Aktif Dua']);
+        $inactive = User::factory()->create(['username' => 'filter-inactive-2', 'name' => 'User Nonaktif Dua']);
+        $inactive->deactivate();
+
+        $viewer = User::factory()->create(['username' => 'filter-viewer-2']);
+
+        Livewire::actingAs($viewer)->test(\App\Livewire\Admin\Users::class)
+            ->set('statusFilter', 'inactive')
+            ->assertDontSee('User Aktif Dua')
+            ->assertSee('User Nonaktif Dua');
+    }
+
+    public function test_users_list_all_filter_shows_both_active_and_inactive(): void
+    {
+        $active = User::factory()->create(['username' => 'filter-active-3', 'name' => 'User Aktif Tiga']);
+        $inactive = User::factory()->create(['username' => 'filter-inactive-3', 'name' => 'User Nonaktif Tiga']);
+        $inactive->deactivate();
+
+        $viewer = User::factory()->create(['username' => 'filter-viewer-3']);
+
+        Livewire::actingAs($viewer)->test(\App\Livewire\Admin\Users::class)
+            ->set('statusFilter', 'all')
+            ->assertSee('User Aktif Tiga')
+            ->assertSee('User Nonaktif Tiga');
     }
 }

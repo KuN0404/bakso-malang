@@ -154,7 +154,7 @@ class PrintController extends Controller
         $format = $request->query('format', 'A4');
 
         $totalIngredients = \App\Models\Ingredient::count();
-        $criticalStockCount = \App\Models\Ingredient::whereColumn('stock', '<=', 'minimum_stock')->count();
+        $criticalStockCount = \App\Models\Ingredient::lowStock()->count();
         $totalAssetValue = \App\Models\Ingredient::select(\Illuminate\Support\Facades\DB::raw('SUM(stock * cost_price) as total_asset'))->value('total_asset') ?? 0;
 
         $ingredients = \App\Models\Ingredient::when($search, fn($q) => $q->where('name', 'like', "%{$search}%")->orWhere('code', 'like', "%{$search}%"))->orderBy('name')->get();

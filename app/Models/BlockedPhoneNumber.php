@@ -28,12 +28,12 @@ class BlockedPhoneNumber extends Model
 
     public function blockedBy(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'blocked_by');
+        return $this->belongsTo(User::class, 'blocked_by')->withTrashed();
     }
 
     public function unblockedBy(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'unblocked_by');
+        return $this->belongsTo(User::class, 'unblocked_by')->withTrashed();
     }
 
     public function scopeBlocked($query)
@@ -42,12 +42,30 @@ class BlockedPhoneNumber extends Model
     }
 
     /**
+     * Normalisasi nomor HP ke format kanonik 62xxxxxxxxxxx (tanpa +/spasi/strip,
+     * prefix 0 diganti 62). Nomor HP bisa masuk ke aplikasi ini dalam 3 bentuk
+     * berbeda tergantung siapa yang input (customer Self Order: +62/62/0, admin
+     * form blokir: bebas, kasir POS: bebas) — tanpa disamakan dulu, exact-string
+     * match di isPhoneBlocked() akan gagal mendeteksi nomor fisik yang sama.
+     */
+    public static function normalizePhone(string $phone): string
+    {
+        $digits = preg_replace('/\D/', '', $phone) ?? '';
+
+        if (str_starts_with($digits, '0')) {
+            $digits = '62' . substr($digits, 1);
+        }
+
+        return $digits;
+    }
+
+    /**
      * Cek cepat apakah sebuah nomor HP sedang diblokir. Dipakai di jalur
      * hot-path (submit Self Order), jadi query tunggal indexed lookup.
      */
     public static function isPhoneBlocked(string $phone): bool
     {
-        return static::where('phone', $phone)->where('is_blocked', true)->exists();
+        return static::where('phone', static::normalizePhone($phone))->where('is_blocked', true)->exists();
     }
 
     /**

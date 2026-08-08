@@ -125,12 +125,16 @@ class Purchases extends Component
             'note' => 'nullable|string|max:500',
             'items' => 'required|array|min:1',
             'items.*.item_type' => 'required|in:ingredient,product',
+            'items.*.ingredient_id' => 'nullable|exists:ingredients,id',
+            'items.*.product_id' => 'nullable|exists:products,id',
             'items.*.quantity' => 'required|numeric|gt:0',
             'items.*.unit_price' => 'required|numeric|min:0',
         ], [
             'invoice_number.unique' => 'Nomor faktur ini sudah terdaftar.',
             'items.min' => 'Pembelian minimal harus berisi 1 barang.',
             'items.*.quantity.gt' => 'Jumlah harus lebih besar dari 0.',
+            'items.*.ingredient_id.exists' => 'Bahan baku pada salah satu item sudah tidak ada / dihapus.',
+            'items.*.product_id.exists' => 'Produk pada salah satu item sudah tidak ada / dihapus.',
         ]);
 
         // Validate selected ids

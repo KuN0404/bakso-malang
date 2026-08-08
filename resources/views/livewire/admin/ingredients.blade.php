@@ -49,6 +49,7 @@
             </thead>
             <tbody class="divide-y divide-gray-100">
                 @forelse($ingredients as $ing)
+                    @php $stockStatus = $ing->getStockStatus(); @endphp
                     <tr class="hover:bg-gray-50 transition-colors">
                         <td class="px-6 py-4 font-mono text-xs font-semibold text-gray-500">{{ $ing->code }}</td>
                         <td class="px-6 py-4 font-medium text-gray-900">
@@ -58,9 +59,14 @@
                             @endif
                         </td>
                         <td class="px-6 py-4 font-bold">
-                            <span class="{{ $ing->stock <= $ing->minimum_stock ? 'text-red-600 bg-red-50 px-2 py-0.5 rounded' : 'text-emerald-600' }}">
+                            <span class="{{ $stockStatus === 'out' ? 'text-red-600 bg-red-50 px-2 py-0.5 rounded' : ($stockStatus === 'low' ? 'text-yellow-700 bg-yellow-50 px-2 py-0.5 rounded' : 'text-emerald-600') }}">
                                 {{ number_format($ing->stock, 2, ',', '.') }} {{ $ing->unit }}
                             </span>
+                            @if($stockStatus === 'out')
+                                <span class="ml-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700">Habis</span>
+                            @elseif($stockStatus === 'low')
+                                <span class="ml-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-700">Menipis</span>
+                            @endif
                         </td>
                         <td class="px-6 py-4 text-gray-600">{{ number_format($ing->minimum_stock, 2, ',', '.') }} {{ $ing->unit }}</td>
                         <td class="px-6 py-4 font-medium text-gray-800">Rp {{ number_format($ing->cost_price, 0, ',', '.') }} / {{ $ing->unit }}</td>

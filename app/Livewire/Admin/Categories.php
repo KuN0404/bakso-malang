@@ -80,8 +80,9 @@ class Categories extends Component
         $this->authorize($this->editingId ? 'edit_categories' : 'create_categories');
 
         // Custom validation for unique sort_order
+        $exceptId = $this->editingId ?: 'NULL';
         $rules = [
-            'name' => 'required|min:2|max:100',
+            'name' => "required|min:2|max:100|unique:categories,name,{$exceptId},id,deleted_at,NULL",
             'description' => 'nullable|max:500',
             'icon' => 'nullable|max:50',
             'sort_order' => 'required|integer|min:0',

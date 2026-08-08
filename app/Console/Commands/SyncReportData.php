@@ -82,28 +82,28 @@ class SyncReportData extends Command
     {
         $this->line('📦 Sync Data Master...');
 
-        // Users
-        $users = \App\Models\User::all();
+        // Users (withTrashed: user nonaktif tetap harus tersinkron dengan deleted_at terisi)
+        $users = \App\Models\User::withTrashed()->get();
         $this->withProgressBar($users, fn($u) => $this->reportSyncService->syncUser($u));
         $this->line(" ✓ User: {$users->count()}");
 
         // Payment Sources
-        $ps = PaymentSource::all();
+        $ps = PaymentSource::withTrashed()->get();
         $this->withProgressBar($ps, fn($p) => $this->reportSyncService->syncPaymentSource($p));
         $this->line(" ✓ Payment Sources: {$ps->count()}");
 
         // Service Areas
-        $sa = ServiceArea::all();
+        $sa = ServiceArea::withTrashed()->get();
         $this->withProgressBar($sa, fn($s) => $this->reportSyncService->syncServiceArea($s));
         $this->line(" ✓ Service Areas: {$sa->count()}");
 
         // Pagers
-        $pagers = Pager::all();
+        $pagers = Pager::withTrashed()->get();
         $this->withProgressBar($pagers, fn($p) => $this->reportSyncService->syncPager($p));
         $this->line(" ✓ Pagers: {$pagers->count()}");
 
         // Categories
-        $cats = Category::all();
+        $cats = Category::withTrashed()->get();
         $this->withProgressBar($cats, fn($c) => $this->reportSyncService->syncCategory($c));
         $this->line(" ✓ Categories: {$cats->count()}");
 
@@ -113,20 +113,20 @@ class SyncReportData extends Command
         $this->line(" ✓ Products: {$prods->count()}");
 
         // Modifier Groups & Modifiers
-        $groups = \App\Models\ModifierGroup::all();
+        $groups = \App\Models\ModifierGroup::withTrashed()->get();
         $this->withProgressBar($groups, fn($g) => $this->reportSyncService->syncModifierGroup($g));
         $this->line(" ✓ Modifier Groups: {$groups->count()}");
 
-        $mods = \App\Models\Modifier::all();
+        $mods = \App\Models\Modifier::withTrashed()->get();
         $this->withProgressBar($mods, fn($m) => $this->reportSyncService->syncModifierPublic($m));
         $this->line(" ✓ Modifiers: {$mods->count()}");
 
         // Ingredients & Components
-        $ings = Ingredient::all();
+        $ings = Ingredient::withTrashed()->get();
         $this->withProgressBar($ings, fn($i) => $this->reportSyncService->syncIngredient($i));
         $this->line(" ✓ Ingredients: {$ings->count()}");
 
-        $comps = Component::all();
+        $comps = Component::withTrashed()->get();
         $this->withProgressBar($comps, fn($c) => $this->reportSyncService->syncComponent($c));
         $this->line(" ✓ Components: {$comps->count()}");
     }

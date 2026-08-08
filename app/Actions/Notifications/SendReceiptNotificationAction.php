@@ -94,6 +94,6 @@ class SendReceiptNotificationAction
             '{link}'    => route('receipt.show', $transaction->receipt_token),
         ]);
 
-        SendWhatsappReceiptJob::dispatch($phone, $message);
+        SendWhatsappReceiptJob::dispatch($phone, $message, $transaction->id);
     }
 }

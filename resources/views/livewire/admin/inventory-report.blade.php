@@ -277,11 +277,17 @@
             >
                 5. Mutasi Bahan Baku
             </button>
-            <button 
+            <button
                 wire:click="$set('activeTab', 'component_stock_logs')"
                 class="pb-3 text-xs font-bold uppercase tracking-wide whitespace-nowrap border-b-2 transition-colors {{ $activeTab === 'component_stock_logs' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700' }}"
             >
                 6. Mutasi Komponen
+            </button>
+            <button
+                wire:click="$set('activeTab', 'low_stock')"
+                class="pb-3 text-xs font-bold uppercase tracking-wide whitespace-nowrap border-b-2 transition-colors {{ $activeTab === 'low_stock' ? 'border-red-600 text-red-600' : 'border-transparent text-gray-500 hover:text-gray-700' }}"
+            >
+                7. Stok Menipis
             </button>
         </nav>
     </div>
@@ -584,6 +590,93 @@
                 {{ $componentStockLogsData->links() }}
             </div>
         @endif
+    </div>
+    @endif
+
+    <!-- TAB 7: STOK MENIPIS -->
+    @if($activeTab === 'low_stock')
+    <div class="space-y-6">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-x-auto">
+            <div class="px-6 py-3 border-b border-gray-100 bg-gray-50">
+                <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider">Bahan Baku Menipis / Habis</h3>
+            </div>
+            <table class="w-full text-left text-sm border-collapse">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 font-semibold text-gray-500 uppercase text-xs">Kode</th>
+                        <th class="px-6 py-3 font-semibold text-gray-500 uppercase text-xs">Bahan Baku</th>
+                        <th class="px-6 py-3 font-semibold text-gray-500 uppercase text-xs">Stok</th>
+                        <th class="px-6 py-3 font-semibold text-gray-500 uppercase text-xs">Stok Min.</th>
+                        <th class="px-6 py-3 text-center font-semibold text-gray-500 uppercase text-xs">Status</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    @forelse($lowStockIngredients as $ing)
+                        @php $status = $ing->getStockStatus(); @endphp
+                        <tr class="hover:bg-gray-50 transition-colors {{ $status === 'out' ? 'bg-red-50/40' : 'bg-yellow-50/40' }}">
+                            <td class="px-6 py-4 font-mono text-xs text-gray-500">{{ $ing->code }}</td>
+                            <td class="px-6 py-4 font-medium text-gray-900">{{ $ing->name }}</td>
+                            <td class="px-6 py-4 font-bold {{ $status === 'out' ? 'text-red-600' : 'text-yellow-700' }}">
+                                {{ number_format($ing->stock, 2, ',', '.') }} {{ $ing->unit }}
+                            </td>
+                            <td class="px-6 py-4 text-gray-500">{{ number_format($ing->minimum_stock, 2, ',', '.') }} {{ $ing->unit }}</td>
+                            <td class="px-6 py-4 text-center">
+                                @if($status === 'out')
+                                    <span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700">Habis</span>
+                                @else
+                                    <span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-700">Menipis</span>
+                                @endif
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="5" class="px-6 py-8 text-center text-gray-500">Tidak ada bahan baku yang menipis / habis 🎉</td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-x-auto">
+            <div class="px-6 py-3 border-b border-gray-100 bg-gray-50">
+                <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider">Komponen Menipis / Habis</h3>
+            </div>
+            <table class="w-full text-left text-sm border-collapse">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 font-semibold text-gray-500 uppercase text-xs">Kode</th>
+                        <th class="px-6 py-3 font-semibold text-gray-500 uppercase text-xs">Komponen</th>
+                        <th class="px-6 py-3 font-semibold text-gray-500 uppercase text-xs">Stok</th>
+                        <th class="px-6 py-3 font-semibold text-gray-500 uppercase text-xs">Stok Min.</th>
+                        <th class="px-6 py-3 text-center font-semibold text-gray-500 uppercase text-xs">Status</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    @forelse($lowStockComponents as $comp)
+                        @php $status = $comp->getStockStatus(); @endphp
+                        <tr class="hover:bg-gray-50 transition-colors {{ $status === 'out' ? 'bg-red-50/40' : 'bg-yellow-50/40' }}">
+                            <td class="px-6 py-4 font-mono text-xs text-blue-700 font-semibold">{{ $comp->code }}</td>
+                            <td class="px-6 py-4 font-medium text-gray-900">{{ $comp->name }}</td>
+                            <td class="px-6 py-4 font-bold {{ $status === 'out' ? 'text-red-600' : 'text-yellow-700' }}">
+                                {{ number_format($comp->stock, 2, ',', '.') }} {{ $comp->unit }}
+                            </td>
+                            <td class="px-6 py-4 text-gray-500">{{ number_format($comp->minimum_stock, 2, ',', '.') }} {{ $comp->unit }}</td>
+                            <td class="px-6 py-4 text-center">
+                                @if($status === 'out')
+                                    <span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700">Habis</span>
+                                @else
+                                    <span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-700">Menipis</span>
+                                @endif
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="5" class="px-6 py-8 text-center text-gray-500">Tidak ada komponen yang menipis / habis 🎉</td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
     </div>
     @endif
 </div>

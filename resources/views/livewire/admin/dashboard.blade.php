@@ -60,6 +60,33 @@
         </div>
     </div>
 
+    @php
+        $lowStock = $this->lowStockSummary;
+        $lowStockTotal = $lowStock['ingredients_low'] + $lowStock['ingredients_out'] + $lowStock['components_low'] + $lowStock['components_out'];
+    @endphp
+    @if($lowStockTotal > 0)
+        <a href="{{ route('reports.inventory', ['activeTab' => 'low_stock']) }}" class="block bg-red-50 border border-red-200 rounded-xl p-5 mb-8 hover:bg-red-100 transition-colors">
+            <div class="flex items-center justify-between flex-wrap gap-3">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center shrink-0">
+                        <i data-lucide="alert-triangle" class="w-5 h-5 text-red-600"></i>
+                    </div>
+                    <div>
+                        <p class="font-semibold text-red-800">{{ $lowStockTotal }} item stok menipis / habis</p>
+                        <p class="text-sm text-red-600">
+                            Bahan baku: {{ $lowStock['ingredients_low'] }} menipis, {{ $lowStock['ingredients_out'] }} habis ·
+                            Komponen: {{ $lowStock['components_low'] }} menipis, {{ $lowStock['components_out'] }} habis
+                        </p>
+                    </div>
+                </div>
+                <span class="text-red-700 hover:text-red-800 text-sm font-medium flex items-center gap-1 shrink-0">
+                    Lihat Detail
+                    <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                </span>
+            </div>
+        </a>
+    @endif
+
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <!-- Transaksi Terbaru -->
         <div class="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100">

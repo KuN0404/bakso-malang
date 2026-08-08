@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Component;
+use App\Models\Ingredient;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
@@ -101,6 +103,8 @@ class LoginController extends Controller
             cache()->forget($globalAttemptKey);
             cache()->forget($globalLockKey);
 
+            $this->flashLowStockAlert($request);
+
             return redirect()->intended('/admin');
         }
 
@@ -177,6 +181,22 @@ class LoginController extends Controller
         $request->session()->regenerateToken();
 
         return redirect()->route('login');
+    }
+
+    /**
+     * Flash jumlah item stok menipis/habis ke session sekali (satu-arah), untuk
+     * dibaca & ditampilkan sebagai toast oleh Dashboard::mount() setelah redirect.
+     */
+    protected function flashLowStockAlert(Request $request): void
+    {
+        // lowStock() (stock <= minimum_stock) sudah mencakup item yang habis (stock <= 0)
+        // selama minimum_stock >= 0, jadi TIDAK dijumlahkan dengan outOfStock() —
+        // menjumlahkan keduanya akan menghitung ganda item yang sekaligus habis & menipis.
+        $total = Ingredient::lowStock()->count() + Component::lowStock()->count();
+
+        if ($total > 0) {
+            $request->session()->flash('low_stock_alert_count', $total);
+        }
     }
 
     // ─── Helpers ────────────────────────────────────────────────────────────────

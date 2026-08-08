@@ -90,7 +90,7 @@
     </nav>
 
     <!-- Hero Section -->
-    <section id="beranda" class="relative bg-white pt-10 pb-16 md:pt-20 md:pb-28 border-b border-slate-100 overflow-hidden">
+    <section id="beranda" class="relative bg-white pt-10 pb-16 md:pt-20 md:pb-28 border-b border-slate-100 overflow-hidden scroll-mt-20">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-8 items-center">
                 <!-- Left Text Content -->
@@ -142,7 +142,7 @@
                 </div>
 
                 <!-- Right Visual Card Showcase -->
-                <div class="lg:col-span-5 relative flex justify-center">
+                <div class="lg:col-span-5 relative flex justify-center" data-reveal style="--reveal-delay:120ms">
                     <div class="relative w-full max-w-md bg-white rounded-3xl p-4 shadow-xl border border-slate-100">
                         @if($featuredProducts->first() && $featuredProducts->first()->image)
                             <div class="h-64 sm:h-72 w-full rounded-2xl overflow-hidden bg-slate-100 relative">
@@ -186,9 +186,9 @@
     </section>
 
     <!-- Keunggulan Section -->
-    <section id="keunggulan" class="py-16 md:py-24 bg-slate-50 border-b border-slate-100">
+    <section id="keunggulan" class="py-16 md:py-24 bg-slate-50 border-b border-slate-100 scroll-mt-20">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="text-center max-w-2xl mx-auto mb-14 space-y-3">
+            <div class="text-center max-w-2xl mx-auto mb-14 space-y-3" data-reveal>
                 <h2 class="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
                     Kualitas & Kelezatan yang Selalu Terjaga
                 </h2>
@@ -199,7 +199,7 @@
 
             <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
                 <!-- Feature 1 -->
-                <div class="bg-white p-8 rounded-3xl border border-slate-100 shadow-xs hover:shadow-md transition-all hover:-translate-y-1">
+                <div class="bg-white p-8 rounded-3xl border border-slate-100 shadow-xs hover:shadow-md transition-all hover:-translate-y-1" data-reveal style="--reveal-delay:0ms">
                     <div class="w-14 h-14 bg-primary-50 text-primary-600 rounded-2xl flex items-center justify-center mb-6">
                         <x-lucide name="soup" class="w-7 h-7" />
                     </div>
@@ -210,7 +210,7 @@
                 </div>
 
                 <!-- Feature 2 -->
-                <div class="bg-white p-8 rounded-3xl border border-slate-100 shadow-xs hover:shadow-md transition-all hover:-translate-y-1">
+                <div class="bg-white p-8 rounded-3xl border border-slate-100 shadow-xs hover:shadow-md transition-all hover:-translate-y-1" data-reveal style="--reveal-delay:100ms">
                     <div class="w-14 h-14 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center mb-6">
                         <x-lucide name="leaf" class="w-7 h-7" />
                     </div>
@@ -221,7 +221,7 @@
                 </div>
 
                 <!-- Feature 3 -->
-                <div class="bg-white p-8 rounded-3xl border border-slate-100 shadow-xs hover:shadow-md transition-all hover:-translate-y-1">
+                <div class="bg-white p-8 rounded-3xl border border-slate-100 shadow-xs hover:shadow-md transition-all hover:-translate-y-1" data-reveal style="--reveal-delay:200ms">
                     <div class="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center mb-6">
                         <x-lucide name="shield" class="w-7 h-7" />
                     </div>
@@ -235,9 +235,9 @@
     </section>
 
     <!-- Menu Preview Section -->
-    <section id="menu-preview" class="py-16 md:py-24 bg-white border-b border-slate-100">
+    <section id="menu-preview" class="py-16 md:py-24 bg-white border-b border-slate-100 scroll-mt-20">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex flex-col md:flex-row md:items-end justify-between mb-10 gap-4">
+            <div class="flex flex-col md:flex-row md:items-end justify-between mb-10 gap-4" data-reveal>
                 <div>
                     <h2 class="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
                         Hidangan Pilihan Pelanggan
@@ -262,7 +262,8 @@
                     Semua Menu
                 </button>
                 @foreach($categories as $cat)
-                    <button 
+                    <button
+                        wire:key="category-pill-{{ $cat->id }}"
                         wire:click="selectCategory({{ $cat->id }})"
                         class="px-5 py-2.5 rounded-xl font-bold text-xs whitespace-nowrap transition-all {{ $selectedCategory === $cat->id ? 'bg-primary-600 text-white shadow-sm' : 'bg-slate-100 text-slate-700 hover:bg-slate-200' }}"
                     >
@@ -274,9 +275,12 @@
             <!-- Menu Grid -->
             @if(count($menuProducts) > 0)
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                    @foreach($menuProducts as $product)
-                        <div 
+                    @foreach($menuProducts as $index => $product)
+                        <div
+                            wire:key="menu-product-{{ $product->id }}"
                             wire:click="openProductModal({{ $product->id }})"
+                            data-reveal
+                            style="--reveal-delay: {{ min($index * 70, 280) }}ms"
                             class="bg-white rounded-2xl border border-slate-100 shadow-xs hover:shadow-lg transition-all duration-300 overflow-hidden cursor-pointer flex flex-col group"
                         >
                             <div class="relative h-48 w-full bg-slate-100 overflow-hidden">
@@ -333,9 +337,9 @@
     </section>
 
     <!-- Location & Contact Section -->
-    <section id="lokasi" class="py-16 md:py-24 bg-slate-50">
+    <section id="lokasi" class="py-16 md:py-24 bg-slate-50 scroll-mt-20">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="text-center max-w-2xl mx-auto mb-14 space-y-3">
+            <div class="text-center max-w-2xl mx-auto mb-14 space-y-3" data-reveal>
                 <h2 class="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
                     Lokasi & Kontak
                 </h2>
@@ -346,7 +350,7 @@
 
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto mb-12">
                 <!-- Card Address -->
-                <div class="bg-white p-6 rounded-2xl border border-slate-100 shadow-xs flex flex-col items-center text-center">
+                <div class="bg-white p-6 rounded-2xl border border-slate-100 shadow-xs flex flex-col items-center text-center" data-reveal style="--reveal-delay:0ms">
                     <div class="w-12 h-12 bg-primary-50 text-primary-600 rounded-xl flex items-center justify-center mb-4">
                         <x-lucide name="map-pin" class="w-6 h-6" />
                     </div>
@@ -355,7 +359,7 @@
                 </div>
 
                 <!-- Card Hours -->
-                <div class="bg-white p-6 rounded-2xl border border-slate-100 shadow-xs flex flex-col items-center text-center">
+                <div class="bg-white p-6 rounded-2xl border border-slate-100 shadow-xs flex flex-col items-center text-center" data-reveal style="--reveal-delay:100ms">
                     <div class="w-12 h-12 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center mb-4">
                         <x-lucide name="clock" class="w-6 h-6" />
                     </div>
@@ -364,7 +368,7 @@
                 </div>
 
                 <!-- Card Contact -->
-                <div class="bg-white p-6 rounded-2xl border border-slate-100 shadow-xs flex flex-col items-center text-center">
+                <div class="bg-white p-6 rounded-2xl border border-slate-100 shadow-xs flex flex-col items-center text-center" data-reveal style="--reveal-delay:200ms">
                     <div class="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center mb-4">
                         <x-lucide name="phone" class="w-6 h-6" />
                     </div>
@@ -375,9 +379,9 @@
             </div>
 
             {{-- Google Maps Embed --}}
-            <div class="w-full rounded-2xl overflow-hidden border border-slate-200 shadow-sm" style="height:400px;">
+            <div class="w-full rounded-2xl overflow-hidden border border-slate-200 shadow-sm" data-reveal style="height:400px;">
                 <iframe
-                    src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d126732.48796553!2d112.5678!3d-7.9839!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x2dd627a8b5888893%3A0x3fa6b10a4e4f0a57!2sMalang%2C%20Jawa%20Timur!5e0!3m2!1sid!2sid!4v1690000000000"
+                    src="https://www.google.com/maps/embed?pb=!1m14!1m12!1m3!1d248.47260199074557!2d104.88919915217647!3d-4.8450672112316555!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!5e0!3m2!1sid!2sid!4v1786160042175!5m2!1sid!2sid"
                     width="100%"
                     height="100%"
                     style="border:0;"
@@ -542,11 +546,11 @@
                         <div class="space-y-3 pt-2">
                             <h4 class="text-xs font-bold text-slate-800 uppercase tracking-wider">Variasi / Toping</h4>
                             @foreach($selectedProduct->modifierGroups as $group)
-                                <div class="bg-slate-50 rounded-2xl p-4 border border-slate-100">
+                                <div wire:key="modal-group-{{ $group->id }}" class="bg-slate-50 rounded-2xl p-4 border border-slate-100">
                                     <span class="font-semibold text-xs text-slate-700 uppercase tracking-wider block mb-2">{{ $group->name }}</span>
                                     <div class="flex flex-wrap gap-2">
                                         @foreach($group->activeModifiers as $mod)
-                                            <div class="bg-white border border-slate-200 px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5">
+                                            <div wire:key="modal-mod-{{ $mod->id }}" class="bg-white border border-slate-200 px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5">
                                                 <span class="font-medium text-slate-800">{{ $mod->name }}</span>
                                                 @if($mod->price_adjustment > 0)
                                                     <span class="text-primary-600 font-bold">+Rp {{ number_format($mod->price_adjustment, 0, ',', '.') }}</span>

@@ -44,7 +44,7 @@ class InventoryReport extends Component
 
     // Tabs & Search
     #[Url(except: 'valuation')]
-    public string $activeTab = 'valuation'; // valuation, components, purchases, productions, stock_logs, component_stock_logs
+    public string $activeTab = 'valuation'; // valuation, components, purchases, productions, stock_logs, component_stock_logs, low_stock
 
     #[Url(except: '')]
     public string $search = '';
@@ -208,7 +208,7 @@ class InventoryReport extends Component
     {
         // Summary Stats
         $totalIngredients = Ingredient::count();
-        $criticalStockCount = Ingredient::whereColumn('stock', '<=', 'minimum_stock')->count();
+        $criticalStockCount = Ingredient::lowStock()->count();
         $totalAssetValue = Ingredient::select(DB::raw('SUM(stock * cost_price) as total_asset'))->value('total_asset') ?? 0;
 
         $purchaseStats = Purchase::query()
@@ -236,6 +236,8 @@ class InventoryReport extends Component
         $productionsData         = null;
         $stockLogsData           = null;
         $componentStockLogsData  = null;
+        $lowStockIngredients     = null;
+        $lowStockComponents      = null;
 
         if ($this->activeTab === 'valuation') {
             $valuationData = Ingredient::query()
@@ -281,6 +283,18 @@ class InventoryReport extends Component
                 })
                 ->orderByDesc('created_at')
                 ->paginate($this->perPage);
+        } elseif ($this->activeTab === 'low_stock') {
+            $lowStockIngredients = Ingredient::query()
+                ->where(fn($q) => $q->lowStock()->orWhere->outOfStock())
+                ->when($this->search, fn($q) => $q->where('name', 'like', "%{$this->search}%")->orWhere('code', 'like', "%{$this->search}%"))
+                ->orderBy('name')
+                ->get();
+
+            $lowStockComponents = ComponentModel::query()
+                ->where(fn($q) => $q->lowStock()->orWhere->outOfStock())
+                ->when($this->search, fn($q) => $q->where('name', 'like', "%{$this->search}%")->orWhere('code', 'like', "%{$this->search}%"))
+                ->orderBy('name')
+                ->get();
         }
 
         return view('livewire.admin.inventory-report', [
@@ -297,6 +311,8 @@ class InventoryReport extends Component
             'productionsData'        => $productionsData,
             'stockLogsData'          => $stockLogsData,
             'componentStockLogsData' => $componentStockLogsData,
+            'lowStockIngredients'    => $lowStockIngredients,
+            'lowStockComponents'     => $lowStockComponents,
             'months'                 => $this->months,
         ])->title('Laporan Inventori & Produksi');
     }

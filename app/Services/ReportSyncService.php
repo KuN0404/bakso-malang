@@ -448,7 +448,7 @@ class ReportSyncService
 
     private function ensureUserSynced(int $userId): void
     {
-        $user = \App\Models\User::find($userId);
+        $user = \App\Models\User::withTrashed()->find($userId);
         if ($user) {
             DB::connection(self::REPORT_CONNECTION)->table('users')->upsert(
                 [[
@@ -459,39 +459,47 @@ class ReportSyncService
                     'password'   => $user->password,
                     'created_at' => $user->created_at,
                     'updated_at' => $user->updated_at,
+                    'deleted_at' => $user->deleted_at,
                 ]],
                 ['id'],
-                ['name', 'username', 'email', 'password', 'updated_at']
+                ['name', 'username', 'email', 'password', 'updated_at', 'deleted_at']
             );
         }
     }
 
     private function ensurePaymentSourceSynced(int $paymentSourceId): void
     {
-        $ps = \App\Models\PaymentSource::find($paymentSourceId);
+        $ps = \App\Models\PaymentSource::withTrashed()->find($paymentSourceId);
         if ($ps) {
             DB::connection(self::REPORT_CONNECTION)->table('payment_sources')->upsert(
                 [[
-                    'id'             => $ps->id,
-                    'name'           => $ps->name,
-                    'type'           => $ps->type,
-                    'account_number' => $ps->account_number,
-                    'account_name'   => $ps->account_name,
-                    'icon'           => $ps->icon,
-                    'is_active'      => (int) $ps->is_active,
-                    'sort_order'     => $ps->sort_order,
-                    'created_at'     => $ps->created_at,
-                    'updated_at'     => $ps->updated_at,
+                    'id'                    => $ps->id,
+                    'name'                  => $ps->name,
+                    'type'                  => $ps->type,
+                    'account_number'        => $ps->account_number,
+                    'account_name'          => $ps->account_name,
+                    'icon'                  => $ps->icon,
+                    // NB: kolom 'is_active' di report adalah peninggalan skema lama sebelum
+                    // main app memisahkan visibilitas POS vs Self Order. Diisi true jika
+                    // salah satu aktif, agar tetap bermakna untuk kode/laporan report yang
+                    // masih membaca kolom tunggal ini.
+                    'is_active'             => (int) ($ps->is_active_pos || $ps->is_active_self_order),
+                    'is_active_pos'         => (int) $ps->is_active_pos,
+                    'is_active_self_order'  => (int) $ps->is_active_self_order,
+                    'sort_order'            => $ps->sort_order,
+                    'created_at'            => $ps->created_at,
+                    'updated_at'            => $ps->updated_at,
+                    'deleted_at'            => $ps->deleted_at,
                 ]],
                 ['id'],
-                ['name', 'type', 'account_number', 'account_name', 'icon', 'is_active', 'sort_order', 'updated_at']
+                ['name', 'type', 'account_number', 'account_name', 'icon', 'is_active', 'is_active_pos', 'is_active_self_order', 'sort_order', 'updated_at', 'deleted_at']
             );
         }
     }
 
     private function ensureServiceAreaSynced(int $serviceAreaId): void
     {
-        $sa = \App\Models\ServiceArea::find($serviceAreaId);
+        $sa = \App\Models\ServiceArea::withTrashed()->find($serviceAreaId);
         if ($sa) {
             DB::connection(self::REPORT_CONNECTION)->table('service_areas')->upsert(
                 [[
@@ -505,16 +513,17 @@ class ReportSyncService
                     'is_active'   => (int) $sa->is_active,
                     'created_at'  => $sa->created_at,
                     'updated_at'  => $sa->updated_at,
+                    'deleted_at'  => $sa->deleted_at,
                 ]],
                 ['id'],
-                ['name', 'code', 'description', 'type', 'capacity', 'sort_order', 'is_active', 'updated_at']
+                ['name', 'code', 'description', 'type', 'capacity', 'sort_order', 'is_active', 'updated_at', 'deleted_at']
             );
         }
     }
 
     private function ensurePagerSynced(int $pagerId): void
     {
-        $pager = \App\Models\Pager::find($pagerId);
+        $pager = \App\Models\Pager::withTrashed()->find($pagerId);
         if ($pager) {
             DB::connection(self::REPORT_CONNECTION)->table('pagers')->upsert(
                 [[
@@ -524,16 +533,17 @@ class ReportSyncService
                     'is_active'      => (int) $pager->is_active,
                     'created_at'     => $pager->created_at,
                     'updated_at'     => $pager->updated_at,
+                    'deleted_at'     => $pager->deleted_at,
                 ]],
                 ['id'],
-                ['number', 'docking_number', 'is_active', 'updated_at']
+                ['number', 'docking_number', 'is_active', 'updated_at', 'deleted_at']
             );
         }
     }
 
     private function ensureCategorySynced(int $categoryId): void
     {
-        $cat = \App\Models\Category::find($categoryId);
+        $cat = \App\Models\Category::withTrashed()->find($categoryId);
         if ($cat) {
             DB::connection(self::REPORT_CONNECTION)->table('categories')->upsert(
                 [[
@@ -547,9 +557,10 @@ class ReportSyncService
                     'target_kitchen' => $cat->target_kitchen ?? 'food',
                     'created_at'     => $cat->created_at,
                     'updated_at'     => $cat->updated_at,
+                    'deleted_at'     => $cat->deleted_at,
                 ]],
                 ['id'],
-                ['name', 'slug', 'description', 'icon', 'sort_order', 'is_active', 'target_kitchen', 'updated_at']
+                ['name', 'slug', 'description', 'icon', 'sort_order', 'is_active', 'target_kitchen', 'updated_at', 'deleted_at']
             );
         }
     }
@@ -589,7 +600,7 @@ class ReportSyncService
 
     private function ensureModifierGroupSynced(int $modifierGroupId): void
     {
-        $group = \App\Models\ModifierGroup::find($modifierGroupId);
+        $group = \App\Models\ModifierGroup::withTrashed()->find($modifierGroupId);
         if ($group) {
             DB::connection(self::REPORT_CONNECTION)->table('modifier_groups')->upsert(
                 [[
@@ -602,9 +613,10 @@ class ReportSyncService
                     'is_active'      => (int) $group->is_active,
                     'created_at'     => $group->created_at,
                     'updated_at'     => $group->updated_at,
+                    'deleted_at'     => $group->deleted_at,
                 ]],
                 ['id'],
-                ['name', 'selection_type', 'is_required', 'min_selections', 'max_selections', 'is_active', 'updated_at']
+                ['name', 'selection_type', 'is_required', 'min_selections', 'max_selections', 'is_active', 'updated_at', 'deleted_at']
             );
         }
     }
@@ -629,9 +641,10 @@ class ReportSyncService
                     'is_active'     => $ingredient->is_active,
                     'created_at'    => $ingredient->created_at,
                     'updated_at'    => $ingredient->updated_at,
+                    'deleted_at'    => $ingredient->deleted_at,
                 ]],
                 ['id'],
-                ['code', 'name', 'unit', 'stock', 'minimum_stock', 'cost_price', 'note', 'is_active', 'updated_at']
+                ['code', 'name', 'unit', 'stock', 'minimum_stock', 'cost_price', 'note', 'is_active', 'updated_at', 'deleted_at']
             );
         } catch (\Throwable $e) {
             Log::error('[ReportSync] Gagal sync ingredient ID ' . $ingredient->id . ': ' . $e->getMessage());
@@ -654,9 +667,10 @@ class ReportSyncService
                     'is_active'     => $component->is_active,
                     'created_at'    => $component->created_at,
                     'updated_at'    => $component->updated_at,
+                    'deleted_at'    => $component->deleted_at,
                 ]],
                 ['id'],
-                ['code', 'name', 'unit', 'stock', 'minimum_stock', 'cost_price', 'note', 'is_active', 'updated_at']
+                ['code', 'name', 'unit', 'stock', 'minimum_stock', 'cost_price', 'note', 'is_active', 'updated_at', 'deleted_at']
             );
         } catch (\Throwable $e) {
             Log::error('[ReportSync] Gagal sync component ID ' . $component->id . ': ' . $e->getMessage());
@@ -856,13 +870,13 @@ class ReportSyncService
 
     private function ensureModifierSynced(int $modifierId): void
     {
-        $mod = \App\Models\Modifier::find($modifierId);
+        $mod = \App\Models\Modifier::withTrashed()->find($modifierId);
         if ($mod) {
             if ($mod->modifier_group_id) {
                 $this->ensureModifierGroupSynced($mod->modifier_group_id);
             }
             if ($mod->component_id) {
-                $comp = \App\Models\Component::find($mod->component_id);
+                $comp = \App\Models\Component::withTrashed()->find($mod->component_id);
                 if ($comp) $this->syncComponent($comp);
             }
 
@@ -877,9 +891,10 @@ class ReportSyncService
                     'sort_order'        => $mod->sort_order,
                     'created_at'        => $mod->created_at,
                     'updated_at'        => $mod->updated_at,
+                    'deleted_at'        => $mod->deleted_at,
                 ]],
                 ['id'],
-                ['modifier_group_id', 'component_id', 'name', 'price_adjustment', 'is_active', 'sort_order', 'updated_at']
+                ['modifier_group_id', 'component_id', 'name', 'price_adjustment', 'is_active', 'sort_order', 'updated_at', 'deleted_at']
             );
         }
     }
@@ -900,9 +915,10 @@ class ReportSyncService
                     'password'   => $user->password,
                     'created_at' => $user->created_at,
                     'updated_at' => $user->updated_at,
+                    'deleted_at' => $user->deleted_at,
                 ]],
                 ['id'],
-                ['name', 'username', 'email', 'password', 'updated_at']
+                ['name', 'username', 'email', 'password', 'updated_at', 'deleted_at']
             );
         } catch (\Throwable $e) {
             Log::error('[ReportSync] Gagal sync User ID ' . $user->id . ': ' . $e->getMessage());
@@ -914,19 +930,22 @@ class ReportSyncService
         try {
             DB::connection(self::REPORT_CONNECTION)->table('payment_sources')->upsert(
                 [[
-                    'id'             => $ps->id,
-                    'name'           => $ps->name,
-                    'type'           => $ps->type,
-                    'account_number' => $ps->account_number,
-                    'account_name'   => $ps->account_name,
-                    'icon'           => $ps->icon,
-                    'is_active'      => (int) $ps->is_active,
-                    'sort_order'     => $ps->sort_order,
-                    'created_at'     => $ps->created_at,
-                    'updated_at'     => $ps->updated_at,
+                    'id'                    => $ps->id,
+                    'name'                  => $ps->name,
+                    'type'                  => $ps->type,
+                    'account_number'        => $ps->account_number,
+                    'account_name'          => $ps->account_name,
+                    'icon'                  => $ps->icon,
+                    'is_active'             => (int) ($ps->is_active_pos || $ps->is_active_self_order),
+                    'is_active_pos'         => (int) $ps->is_active_pos,
+                    'is_active_self_order'  => (int) $ps->is_active_self_order,
+                    'sort_order'            => $ps->sort_order,
+                    'created_at'            => $ps->created_at,
+                    'updated_at'            => $ps->updated_at,
+                    'deleted_at'            => $ps->deleted_at,
                 ]],
                 ['id'],
-                ['name', 'type', 'account_number', 'account_name', 'icon', 'is_active', 'sort_order', 'updated_at']
+                ['name', 'type', 'account_number', 'account_name', 'icon', 'is_active', 'is_active_pos', 'is_active_self_order', 'sort_order', 'updated_at', 'deleted_at']
             );
         } catch (\Throwable $e) {
             Log::error('[ReportSync] Gagal sync PaymentSource ID ' . $ps->id . ': ' . $e->getMessage());
@@ -948,9 +967,10 @@ class ReportSyncService
                     'is_active'   => (int) $sa->is_active,
                     'created_at'  => $sa->created_at,
                     'updated_at'  => $sa->updated_at,
+                    'deleted_at'  => $sa->deleted_at,
                 ]],
                 ['id'],
-                ['name', 'code', 'description', 'type', 'capacity', 'sort_order', 'is_active', 'updated_at']
+                ['name', 'code', 'description', 'type', 'capacity', 'sort_order', 'is_active', 'updated_at', 'deleted_at']
             );
         } catch (\Throwable $e) {
             Log::error('[ReportSync] Gagal sync ServiceArea ID ' . $sa->id . ': ' . $e->getMessage());
@@ -968,9 +988,10 @@ class ReportSyncService
                     'is_active'      => (int) $pager->is_active,
                     'created_at'     => $pager->created_at,
                     'updated_at'     => $pager->updated_at,
+                    'deleted_at'     => $pager->deleted_at,
                 ]],
                 ['id'],
-                ['number', 'docking_number', 'is_active', 'updated_at']
+                ['number', 'docking_number', 'is_active', 'updated_at', 'deleted_at']
             );
         } catch (\Throwable $e) {
             Log::error('[ReportSync] Gagal sync Pager ID ' . $pager->id . ': ' . $e->getMessage());
@@ -992,9 +1013,10 @@ class ReportSyncService
                     'target_kitchen' => $cat->target_kitchen ?? 'food',
                     'created_at'     => $cat->created_at,
                     'updated_at'     => $cat->updated_at,
+                    'deleted_at'     => $cat->deleted_at,
                 ]],
                 ['id'],
-                ['name', 'slug', 'description', 'icon', 'sort_order', 'is_active', 'target_kitchen', 'updated_at']
+                ['name', 'slug', 'description', 'icon', 'sort_order', 'is_active', 'target_kitchen', 'updated_at', 'deleted_at']
             );
         } catch (\Throwable $e) {
             Log::error('[ReportSync] Gagal sync Category ID ' . $cat->id . ': ' . $e->getMessage());
@@ -1048,9 +1070,10 @@ class ReportSyncService
                     'is_active'      => (int) $group->is_active,
                     'created_at'     => $group->created_at,
                     'updated_at'     => $group->updated_at,
+                    'deleted_at'     => $group->deleted_at,
                 ]],
                 ['id'],
-                ['name', 'selection_type', 'is_required', 'min_selections', 'max_selections', 'is_active', 'updated_at']
+                ['name', 'selection_type', 'is_required', 'min_selections', 'max_selections', 'is_active', 'updated_at', 'deleted_at']
             );
         } catch (\Throwable $e) {
             Log::error('[ReportSync] Gagal sync ModifierGroup ID ' . $group->id . ': ' . $e->getMessage());
@@ -1064,7 +1087,7 @@ class ReportSyncService
                 $this->ensureModifierGroupSynced($mod->modifier_group_id);
             }
             if ($mod->component_id) {
-                $comp = \App\Models\Component::find($mod->component_id);
+                $comp = \App\Models\Component::withTrashed()->find($mod->component_id);
                 if ($comp) $this->syncComponent($comp);
             }
             DB::connection(self::REPORT_CONNECTION)->table('modifiers')->upsert(
@@ -1078,9 +1101,10 @@ class ReportSyncService
                     'sort_order'        => $mod->sort_order,
                     'created_at'        => $mod->created_at,
                     'updated_at'        => $mod->updated_at,
+                    'deleted_at'        => $mod->deleted_at,
                 ]],
                 ['id'],
-                ['modifier_group_id', 'component_id', 'name', 'price_adjustment', 'is_active', 'sort_order', 'updated_at']
+                ['modifier_group_id', 'component_id', 'name', 'price_adjustment', 'is_active', 'sort_order', 'updated_at', 'deleted_at']
             );
         } catch (\Throwable $e) {
             Log::error('[ReportSync] Gagal sync Modifier ID ' . $mod->id . ': ' . $e->getMessage());

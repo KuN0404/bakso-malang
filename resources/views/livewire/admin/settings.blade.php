@@ -52,6 +52,28 @@
                         </div>
                     </div>
 
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1.5">Email Toko</label>
+                        <div class="relative">
+                            <i data-lucide="mail" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"></i>
+                            <input type="email" wire:model="store_email"
+                                class="w-full pl-9 pr-3.5 py-2.5 text-sm border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:border-primary-400 focus:ring-2 focus:ring-primary-100 outline-none transition"
+                                placeholder="info@tokoanda.com">
+                        </div>
+                        @error('store_email') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1.5">Jam Operasional</label>
+                        <div class="relative">
+                            <i data-lucide="clock" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"></i>
+                            <input type="text" wire:model="store_hours"
+                                class="w-full pl-9 pr-3.5 py-2.5 text-sm border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:border-primary-400 focus:ring-2 focus:ring-primary-100 outline-none transition"
+                                placeholder="Setiap Hari: 09.00 - 21.00 WIB">
+                        </div>
+                        <p class="text-xs text-gray-400 mt-1.5">Ditampilkan di halaman utama & footer publik.</p>
+                    </div>
+
                     {{-- Logo Aktif --}}
                     <div>
                         <label class="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Logo Aktif</label>
@@ -442,80 +464,23 @@
             </div>
         </div>
 
-        {{-- ── Row 3: WhatsApp (Fonnte) ───────────────────────────────── --}}
+        {{-- ── Row 3: Notifikasi Struk ───────────────────────────────── --}}
         <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-            <div class="px-6 py-4 border-b border-gray-50 flex items-center justify-between">
+            <div class="px-6 py-4 border-b border-gray-50 flex items-center justify-between gap-3">
                 <div class="flex items-center gap-3">
-                    <div class="w-8 h-8 bg-emerald-50 rounded-lg flex items-center justify-center">
-                        <i data-lucide="message-circle" class="w-4 h-4 text-emerald-600"></i>
+                    <div class="w-8 h-8 bg-purple-50 rounded-lg flex items-center justify-center">
+                        <i data-lucide="send" class="w-4 h-4 text-purple-600"></i>
                     </div>
                     <div>
-                        <h3 class="font-semibold text-gray-800 text-sm">WhatsApp (Fonnte)</h3>
-                        <p class="text-xs text-gray-400">Sambungkan nomor WhatsApp toko untuk kirim struk</p>
+                        <h3 class="font-semibold text-gray-800 text-sm">Notifikasi Struk</h3>
+                        <p class="text-xs text-gray-400">Kanal pengiriman struk digital ke pelanggan</p>
                     </div>
                 </div>
-                @if(!$fonnteConfigured)
-                    <span class="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-600 bg-gray-100 border border-gray-200 px-2.5 py-1 rounded-full">
-                        <span class="w-1.5 h-1.5 bg-gray-400 rounded-full"></span>Token Belum Diset
-                    </span>
-                @elseif($waDeviceStatus === 'connect')
-                    <span class="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full">
-                        <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>Terhubung
-                    </span>
-                @else
-                    <span class="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full">
-                        <span class="w-1.5 h-1.5 bg-amber-400 rounded-full"></span>Tidak Terhubung
-                    </span>
-                @endif
-            </div>
-
-            <div class="p-6 space-y-4">
-                @if(!$fonnteConfigured)
-                    <div class="flex gap-2.5 p-3.5 bg-gray-50 border border-gray-200 rounded-xl">
-                        <i data-lucide="info" class="w-4 h-4 text-gray-400 shrink-0 mt-0.5"></i>
-                        <p class="text-xs text-gray-600">
-                            Token Fonnte belum diset di server (<code class="bg-gray-200 px-1 rounded">FONNTE_TOKEN</code> di <code class="bg-gray-200 px-1 rounded">.env</code>).
-                            Hubungi yang mengelola server untuk mengisinya, baru fitur WhatsApp bisa dipakai.
-                        </p>
-                    </div>
-                @else
-                    <div class="border border-gray-100 rounded-xl p-4 bg-gray-50 text-center">
-                        @if($waDeviceStatus === 'connect')
-                            <div class="w-14 h-14 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                                <i data-lucide="check-circle" class="w-7 h-7 text-emerald-600"></i>
-                            </div>
-                            <p class="text-sm font-semibold text-gray-700">WhatsApp sudah tersambung</p>
-                            <p class="text-xs text-gray-400 mt-1">Struk WhatsApp siap dikirim ke pelanggan.</p>
-                        @else
-                            @if($waQrImage)
-                                <img src="data:image/png;base64,{{ $waQrImage }}" class="w-48 h-48 mx-auto rounded-xl border border-gray-200 bg-white p-2" alt="QR WhatsApp">
-                                <p class="text-xs text-gray-500 mt-3">Buka WhatsApp di HP → Perangkat Tertaut → Tautkan Perangkat, lalu scan QR di atas.</p>
-                            @else
-                                <p class="text-sm text-gray-500 mb-3">Nomor WhatsApp toko belum tersambung ke Fonnte.</p>
-                            @endif
-                            <button type="button" wire:click="connectWhatsapp"
-                                class="mt-3 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white text-sm font-semibold rounded-xl transition inline-flex items-center gap-1.5">
-                                <span wire:loading.remove wire:target="connectWhatsapp">
-                                    <i data-lucide="qr-code" class="w-4 h-4 inline -mt-0.5 mr-1"></i>{{ $waQrImage ? 'Muat Ulang QR' : 'Tampilkan QR untuk Hubungkan' }}
-                                </span>
-                                <span wire:loading wire:target="connectWhatsapp">Memuat...</span>
-                            </button>
-                        @endif
-                    </div>
-                @endif
-            </div>
-        </div>
-
-        {{-- ── Row 4: Notifikasi Struk ───────────────────────────────── --}}
-        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-            <div class="px-6 py-4 border-b border-gray-50 flex items-center gap-3">
-                <div class="w-8 h-8 bg-purple-50 rounded-lg flex items-center justify-center">
-                    <i data-lucide="send" class="w-4 h-4 text-purple-600"></i>
-                </div>
-                <div>
-                    <h3 class="font-semibold text-gray-800 text-sm">Notifikasi Struk</h3>
-                    <p class="text-xs text-gray-400">Kanal pengiriman struk digital ke pelanggan</p>
-                </div>
+                @can('manage_whatsapp')
+                    <a href="{{ route('admin.whatsapp.index') }}" wire:navigate class="text-xs font-semibold text-emerald-600 hover:text-emerald-700 inline-flex items-center gap-1 shrink-0">
+                        <i data-lucide="message-circle" class="w-3.5 h-3.5"></i>Kelola Koneksi WhatsApp
+                    </a>
+                @endcan
             </div>
             <form wire:submit="saveNotification" class="p-6 space-y-5">
                 <div>

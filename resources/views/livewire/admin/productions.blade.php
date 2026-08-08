@@ -127,7 +127,30 @@
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-gray-700 mb-1">Tanggal Produksi</label>
-                        <input wire:model="production_date" type="date" class="w-full text-sm border border-gray-200 rounded-lg p-2.5">
+                        <div
+                            wire:ignore
+                            wire:key="production-date-picker-{{ $showModal ? 'open' : 'closed' }}"
+                            x-data="{
+                                init() {
+                                    flatpickr(this.$refs.dateInput, {
+                                        locale: 'id',
+                                        dateFormat: 'Y-m-d',
+                                        altInput: true,
+                                        altFormat: 'j F Y',
+                                        defaultDate: @js($production_date),
+                                        animate: true,
+                                        onChange: (selectedDates, dateStr) => {
+                                            // false = jangan kirim request Livewire terpisah di sini (hindari race
+                                            // condition dgn klik lain seperti tombol X) — nilai ikut terkirim saat submit.
+                                            $wire.set('production_date', dateStr, false);
+                                        }
+                                    });
+                                }
+                            }"
+                            x-init="init()"
+                        >
+                            <input x-ref="dateInput" type="text" placeholder="Pilih tanggal" class="w-full text-sm border border-gray-200 rounded-lg p-2.5">
+                        </div>
                         @error('production_date') <span class="text-xs text-red-500">{{ $message }}</span> @enderror
                     </div>
                 </div>

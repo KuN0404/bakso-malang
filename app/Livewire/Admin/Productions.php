@@ -11,6 +11,7 @@ use App\Models\ProductionOutput;
 use App\Services\ComponentStockService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -177,6 +178,25 @@ class Productions extends Component
             }
         }
 
+        // Jaring fat-finger: HPP hasil repacking (dihitung dari total input cost / total qty
+        // output) yang berbeda drastis dari HPP komponen saat ini biasanya berarti jumlah
+        // output salah ketik (mis. kurang/lebih nol), bukan aturan bisnis ketat.
+        $this->recalculateOutputs();
+        foreach ($this->outputItems as $item) {
+            if (empty($item['component_id'])) {
+                continue;
+            }
+            $component        = ComponentModel::find($item['component_id']);
+            $computedUnitCost = (float) ($item['unit_cost'] ?? 0);
+            if ($component && $component->cost_price > 0 && $computedUnitCost > 0) {
+                $ratio = max($computedUnitCost, $component->cost_price) / min($computedUnitCost, $component->cost_price);
+                if ($ratio > 20) {
+                    $this->dispatch('notify', type: 'error', message: "HPP hasil repacking komponen '{$component->name}' (Rp " . number_format($computedUnitCost, 0, ',', '.') . ") berbeda drastis dari HPP saat ini (Rp " . number_format($component->cost_price, 0, ',', '.') . ") — cek kembali jumlah output, kemungkinan salah input.");
+                    return;
+                }
+            }
+        }
+
         $production = null;
         try {
             DB::transaction(function () use (&$production) {
@@ -261,6 +281,11 @@ class Productions extends Component
             $this->dispatch('notify', type: 'success', message: 'Batch Repacking berhasil diproses. Stok komponen telah ditambahkan.');
 
         } catch (\Exception $e) {
+            Log::error('Production save failed', [
+                'production_code' => $this->production_code,
+                'error'            => $e->getMessage(),
+                'user_id'          => Auth::id(),
+            ]);
             $this->dispatch('notify', type: 'error', message: 'Gagal memproses: ' . $e->getMessage());
         }
     }

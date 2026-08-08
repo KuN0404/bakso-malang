@@ -65,12 +65,14 @@ class RolesAndPermissionsSeeder extends Seeder
             'manage_payment_sources',
             'manage_service_areas',
             'manage_pagers',
+            'manage_whatsapp',
 
             // Users & Roles
             'view_users',
             'create_users',
             'edit_users',
             'delete_users',
+            'activate_users',
             'manage_roles',
             
             // Kitchen / Service Display

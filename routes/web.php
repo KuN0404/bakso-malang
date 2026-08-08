@@ -21,6 +21,7 @@ use App\Livewire\Admin\ShiftReport;
 use App\Livewire\Admin\Shifts;
 use App\Livewire\Admin\TransactionHistory;
 use App\Livewire\Admin\Users;
+use App\Livewire\Admin\Whatsapp;
 use App\Livewire\PosCheckout;
 use Illuminate\Support\Facades\Route;
 
@@ -82,6 +83,7 @@ Route::middleware(['auth', 'throttle:admin'])->prefix('admin')->name('admin.')->
     Route::get('/users', Users::class)->name('users.index')->middleware('can:view_users');
     Route::get('/roles', Roles::class)->name('roles.index')->middleware('can:manage_roles');
     Route::get('/settings', Settings::class)->name('settings.index')->middleware('can:manage_settings');
+    Route::get('/whatsapp', Whatsapp::class)->name('whatsapp.index')->middleware('can:manage_whatsapp');
 });
 
 // Print Routes
@@ -98,13 +100,6 @@ Route::middleware(['auth'])->prefix('print')->name('print.')->group(function () 
     Route::get('/shifts/table', [App\Http\Controllers\PrintController::class, 'shiftsTable'])->name('shifts.table')->middleware('can:view_all_shifts');
     Route::get('/shift/{shift}', [App\Http\Controllers\PrintController::class, 'shiftDetail'])->name('shift.detail')->middleware('can:view_all_shifts');
     Route::get('/shift/{shift}/custom', [App\Http\Controllers\PrintController::class, 'shiftCustom'])->name('shift.custom')->middleware('can:view_all_shifts');
-
-    // Halaman uji sementara: garis penggaris polos (tanpa Tailwind/Livewire) untuk
-    // memastikan apakah masalah lebar cetak ada di driver/printer atau di kode
-    // struk aplikasi. Aman dihapus setelah diagnosis selesai.
-    Route::get('/test-ruler/{mm?}', function (int $mm = 80) {
-        return view('print.test-ruler', ['mm' => $mm]);
-    })->name('test-ruler');
 });
 
 // Export Routes (separate for streaming)
@@ -139,6 +134,19 @@ Route::middleware(['auth', 'can:view_kitchen_display'])->group(function () {
 Route::post('/api/webhook/midtrans', App\Http\Controllers\Payment\MidtransWebhookController::class)
     ->middleware(['midtrans.signature', 'throttle:midtrans-webhook'])
     ->name('payment.webhook.midtrans');
+
+// ─── Fonnte (WhatsApp) Webhook ─────────────────────────────────────────────────
+// No auth, CSRF excluded in bootstrap/app.php. Fonnte tidak punya signature/HMAC
+// sendiri, jadi diverifikasi lewat secret token di URL (VerifyFonnteWebhookSecret).
+Route::post('/api/webhook/fonnte/{secret}/device-status', [App\Http\Controllers\Webhook\FonnteWebhookController::class, 'deviceStatus'])
+    ->where('secret', '[A-Za-z0-9]{32,64}')
+    ->middleware(['fonnte.webhook.secret', 'throttle:fonnte-webhook'])
+    ->name('webhook.fonnte.device-status');
+
+Route::post('/api/webhook/fonnte/{secret}/message-status', [App\Http\Controllers\Webhook\FonnteWebhookController::class, 'messageStatus'])
+    ->where('secret', '[A-Za-z0-9]{32,64}')
+    ->middleware(['fonnte.webhook.secret', 'throttle:fonnte-webhook'])
+    ->name('webhook.fonnte.message-status');
 
 // QRIS Status SSE — auth required, polling database status setiap 2 detik
 Route::middleware(['auth'])->group(function () {

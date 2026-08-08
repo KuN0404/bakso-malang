@@ -50,6 +50,7 @@ class AdminAccessControlTest extends TestCase
             'users'                => ['admin.users.index', 'view_users'],
             'roles'                => ['admin.roles.index', 'manage_roles'],
             'settings'             => ['admin.settings.index', 'manage_settings'],
+            'whatsapp'             => ['admin.whatsapp.index', 'manage_whatsapp'],
         ];
     }
 

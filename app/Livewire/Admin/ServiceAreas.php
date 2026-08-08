@@ -111,9 +111,10 @@ class ServiceAreas extends Component
 
     public function save(): void
     {
+        $exceptId = $this->editingId ?: 'NULL';
         $this->validate([
             'name' => 'required|min:2|max:50',
-            'code' => 'required|min:1|max:20|unique:service_areas,code' . ($this->editingId ? ",{$this->editingId}" : ''),
+            'code' => "required|min:1|max:20|unique:service_areas,code,{$exceptId},id,deleted_at,NULL",
             'description' => 'nullable|max:255',
             'type' => 'required|in:table,room,zone,other',
             'capacity' => 'required|integer|min:1|max:100',

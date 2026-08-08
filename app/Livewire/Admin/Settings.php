@@ -18,6 +18,8 @@ class Settings extends Component
     public string $store_name = '';
     public string $store_address = '';
     public string $store_phone = '';
+    public string $store_email = '';
+    public string $store_hours = '';
     public float $tax_percentage = 0;
     public string $currency_symbol = 'Rp';
     public string $header_text = '';
@@ -50,14 +52,10 @@ class Settings extends Component
     // Email Test
     public string $test_email_address = '';
 
-    // Notifikasi Struk (Email/WhatsApp)
+    // Notifikasi Struk (Email/WhatsApp) — pairing/status device WA sendiri
+    // sekarang ada di halaman admin.whatsapp.index (App\Livewire\Admin\Whatsapp).
     public string $receipt_channel = 'email_only';
     public string $whatsapp_template = '';
-
-    // WhatsApp (Fonnte) — status koneksi & QR pairing
-    public bool $fonnteConfigured = false;
-    public ?string $waDeviceStatus = null;
-    public ?string $waQrImage = null;
 
     public function mount(): void
     {
@@ -65,6 +63,8 @@ class Settings extends Component
         $this->store_name = Setting::get('store_name', 'Bakso Malang', 'general');
         $this->store_address = Setting::get('store_address', '', 'general');
         $this->store_phone = Setting::get('store_phone', '', 'general');
+        $this->store_email = Setting::get('store_email', '', 'general');
+        $this->store_hours = Setting::get('store_hours', '', 'general');
         $this->tax_percentage = (float) Setting::get('tax_percentage', 0, 'general');
         $this->currency_symbol = Setting::get('currency_symbol', 'Rp', 'general');
         $this->font_family_web = Setting::get('font_family_web', 'Poppins', 'general');
@@ -95,62 +95,11 @@ class Settings extends Component
 
         $this->receipt_channel = Setting::get('receipt_channel', 'email_only', 'notification');
         $this->whatsapp_template = Setting::get('whatsapp_template', $this->defaultWhatsappTemplate(), 'notification');
-
-        $this->fonnteConfigured = filled(config('services.fonnte.token'));
-        if ($this->fonnteConfigured) {
-            $this->checkWhatsappStatus();
-        }
     }
 
     protected function defaultWhatsappTemplate(): string
     {
         return "Halo {nama}, terima kasih sudah berbelanja di {toko}!\n\nStruk pesanan Anda (#{invoice}):\n{link}";
-    }
-
-    /**
-     * Cek status koneksi device Fonnte. Di-cache singkat supaya tidak
-     * memanggil API Fonnte di setiap render halaman Pengaturan.
-     */
-    public function checkWhatsappStatus(): void
-    {
-        if (!$this->fonnteConfigured) {
-            $this->waDeviceStatus = null;
-            return;
-        }
-
-        $status = \Illuminate\Support\Facades\Cache::remember('fonnte_device_status', 30, function () {
-            return app(\App\Services\FonnteService::class)->getDeviceStatus();
-        });
-
-        $this->waDeviceStatus = $status['device_status'] ?? 'disconnect';
-    }
-
-    /**
-     * Minta QR baru dari Fonnte untuk dipindai lewat WhatsApp di HP.
-     */
-    public function connectWhatsapp(): void
-    {
-        if (!$this->fonnteConfigured) {
-            $this->dispatch('notify', type: 'error', message: 'Token Fonnte belum diset di server (.env)');
-            return;
-        }
-
-        $result = app(\App\Services\FonnteService::class)->getQrCode();
-
-        if (!($result['status'] ?? false)) {
-            $this->waQrImage = null;
-            $reason = $result['reason'] ?? 'Gagal mengambil QR';
-            if (str_contains(strtolower($reason), 'already connect')) {
-                \Illuminate\Support\Facades\Cache::forget('fonnte_device_status');
-                $this->checkWhatsappStatus();
-                $this->dispatch('notify', type: 'success', message: 'WhatsApp sudah terhubung');
-            } else {
-                $this->dispatch('notify', type: 'error', message: $reason);
-            }
-            return;
-        }
-
-        $this->waQrImage = $result['url'] ?? null;
     }
 
     public function saveNotification(): void
@@ -298,6 +247,11 @@ class Settings extends Component
     public function saveGeneral(): void
     {
         $this->validate([
+            'store_name' => 'required|min:2|max:100',
+            'store_address' => 'nullable|max:255',
+            'store_phone' => 'nullable|max:30',
+            'store_email' => 'nullable|email|max:100',
+            'store_hours' => 'nullable|max:100',
             'logo_web' => 'nullable|file|mimes:png,jpg,jpeg,svg,webp|max:2048',
             'site_logo' => 'nullable|file|mimes:png,jpg,jpeg,svg,webp,ico|max:1024',
             'logo_full' => 'nullable|file|mimes:png,jpg,jpeg,svg,webp|max:2048',
@@ -307,6 +261,8 @@ class Settings extends Component
         Setting::set('store_name', $this->store_name, 'general');
         Setting::set('store_address', $this->store_address, 'general');
         Setting::set('store_phone', $this->store_phone, 'general');
+        Setting::set('store_email', $this->store_email, 'general');
+        Setting::set('store_hours', $this->store_hours, 'general');
         Setting::set('tax_percentage', $this->tax_percentage, 'general', 'float');
         Setting::set('currency_symbol', $this->currency_symbol, 'general');
         Setting::set('font_family_web', $this->font_family_web, 'general');

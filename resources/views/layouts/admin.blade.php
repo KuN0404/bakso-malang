@@ -578,11 +578,12 @@
 
                 <!-- Group: Pengaturan -->
                 @php
-                    $isSettingsActive = request()->routeIs('admin.users.*') || 
-                                        request()->routeIs('admin.roles.*') || 
-                                        request()->routeIs('admin.settings.*');
+                    $isSettingsActive = request()->routeIs('admin.users.*') ||
+                                        request()->routeIs('admin.roles.*') ||
+                                        request()->routeIs('admin.settings.*') ||
+                                        request()->routeIs('admin.whatsapp.*');
                 @endphp
-                @canany(['view_users', 'manage_roles', 'manage_settings'])
+                @canany(['view_users', 'manage_roles', 'manage_settings', 'manage_whatsapp'])
                 <div x-data="{ open: {{ $isSettingsActive ? 'true' : 'false' }} }" class="mt-2">
                     <button @click="open = !open" class="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-blue-300 uppercase tracking-wider hover:text-white transition-colors group whitespace-nowrap text-left">
                          <div class="flex items-center gap-3">
@@ -618,6 +619,13 @@
                         <a href="{{ route('admin.settings.index') }}" wire:navigate class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.settings.*') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
                             <div class="flex-shrink-0 w-6 flex justify-center"><x-lucide name="settings" class="w-4 h-4" /></div>
                             <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Pengaturan</span></div>
+                        </a>
+                        @endcan
+
+                        @can('manage_whatsapp')
+                        <a href="{{ route('admin.whatsapp.index') }}" wire:navigate class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.whatsapp.*') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
+                            <div class="flex-shrink-0 w-6 flex justify-center"><x-lucide name="message-circle" class="w-4 h-4" /></div>
+                            <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>WhatsApp</span></div>
                         </a>
                         @endcan
                     </div>
@@ -1207,45 +1215,54 @@
             document.addEventListener('alpine:init', initAlpineComponents);
         }
 
-        // Global Lucide Icon re-creation for Livewire SPA navigation and updates
-        let lucideDebounce;
-        const lucideObserver = new MutationObserver((mutations) => {
-            let needsRebuild = false;
-            for (const mutation of mutations) {
-                if (mutation.addedNodes.length) {
-                    for (const node of mutation.addedNodes) {
-                        if (node.nodeType === 1) { // ELEMENT_NODE
-                            if (node.hasAttribute('data-lucide') || node.querySelector('[data-lucide]')) {
-                                needsRebuild = true;
-                                break;
+        // Global Lucide Icon re-creation for Livewire SPA navigation and updates.
+        // wire:navigate mengganti <body> secara penuh dan mengeksekusi ulang <script>
+        // inline ini di setiap navigasi — tanpa guard ini, `let lucideDebounce` akan
+        // redeclare pada navigasi kedua dan seterusnya, memicu SyntaxError yang
+        // menghentikan sisa eksekusi script (termasuk observer/listener di bawahnya)
+        // dan bisa membuat halaman jadi tidak responsif setelah navigasi sidebar.
+        if (!window.__lucideNavObserverSetup) {
+            window.__lucideNavObserverSetup = true;
+
+            let lucideDebounce;
+            const lucideObserver = new MutationObserver((mutations) => {
+                let needsRebuild = false;
+                for (const mutation of mutations) {
+                    if (mutation.addedNodes.length) {
+                        for (const node of mutation.addedNodes) {
+                            if (node.nodeType === 1) { // ELEMENT_NODE
+                                if (node.hasAttribute('data-lucide') || node.querySelector('[data-lucide]')) {
+                                    needsRebuild = true;
+                                    break;
+                                }
                             }
                         }
                     }
+                    if (needsRebuild) break;
                 }
-                if (needsRebuild) break;
-            }
-            if (needsRebuild) {
-                clearTimeout(lucideDebounce);
-                lucideDebounce = setTimeout(() => {
-                    if (window.lucide) lucide.createIcons();
-                }, 10);
-            }
-        });
-        lucideObserver.observe(document.body, { childList: true, subtree: true });
-
-        document.addEventListener('livewire:navigated', () => {
-            if (window.lucide) lucide.createIcons();
-        });
-
-        // Tangani update in-place Livewire (seperti pengetikan pada input pencarian)
-        document.addEventListener('livewire:init', () => {
-            Livewire.hook('morph.updated', () => {
-                clearTimeout(lucideDebounce);
-                lucideDebounce = setTimeout(() => {
-                    if (window.lucide) lucide.createIcons();
-                }, 15);
+                if (needsRebuild) {
+                    clearTimeout(lucideDebounce);
+                    lucideDebounce = setTimeout(() => {
+                        if (window.lucide) lucide.createIcons();
+                    }, 10);
+                }
             });
-        });
+            lucideObserver.observe(document.body, { childList: true, subtree: true });
+
+            document.addEventListener('livewire:navigated', () => {
+                if (window.lucide) lucide.createIcons();
+            });
+
+            // Tangani update in-place Livewire (seperti pengetikan pada input pencarian)
+            document.addEventListener('livewire:init', () => {
+                Livewire.hook('morph.updated', () => {
+                    clearTimeout(lucideDebounce);
+                    lucideDebounce = setTimeout(() => {
+                        if (window.lucide) lucide.createIcons();
+                    }, 15);
+                });
+            });
+        }
     </script>
 </body>
 </html>

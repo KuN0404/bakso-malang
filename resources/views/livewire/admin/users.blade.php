@@ -10,10 +10,24 @@
         </button>
     </div>
 
-    <div class="bg-white rounded-xl shadow-sm border border-gray-100 mb-6 p-4">
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 mb-6 p-4 space-y-3">
         <div class="relative">
             <input type="text" wire:model.live.debounce.300ms="search" placeholder="Cari user..." class="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg">
             <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400"></i>
+        </div>
+        <div class="flex items-center gap-2">
+            <button
+                wire:click="$set('statusFilter', 'active')"
+                class="px-4 py-1.5 rounded-lg font-semibold text-xs whitespace-nowrap transition-all {{ $statusFilter === 'active' ? 'bg-primary-600 text-white shadow-sm' : 'bg-slate-100 text-slate-700 hover:bg-slate-200' }}"
+            >Aktif</button>
+            <button
+                wire:click="$set('statusFilter', 'inactive')"
+                class="px-4 py-1.5 rounded-lg font-semibold text-xs whitespace-nowrap transition-all {{ $statusFilter === 'inactive' ? 'bg-primary-600 text-white shadow-sm' : 'bg-slate-100 text-slate-700 hover:bg-slate-200' }}"
+            >Nonaktif</button>
+            <button
+                wire:click="$set('statusFilter', 'all')"
+                class="px-4 py-1.5 rounded-lg font-semibold text-xs whitespace-nowrap transition-all {{ $statusFilter === 'all' ? 'bg-primary-600 text-white shadow-sm' : 'bg-slate-100 text-slate-700 hover:bg-slate-200' }}"
+            >Semua</button>
         </div>
     </div>
 
@@ -24,12 +38,13 @@
                     <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">User</th>
                     <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Username</th>
                     <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Role</th>
+                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Status</th>
                     <th class="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Aksi</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-gray-100">
                 @forelse($users as $user)
-                    <tr class="hover:bg-gray-50">
+                    <tr class="hover:bg-gray-50 {{ !$user->isActive() ? 'opacity-60' : '' }}">
                         <td class="px-6 py-4">
                             <div class="flex items-center gap-3">
                                 <div class="w-10 h-10 {{ $user->hasRole('Super Admin') ? 'bg-purple-100' : 'bg-primary-100' }} rounded-full flex items-center justify-center">
@@ -47,8 +62,19 @@
                                 <span class="inline-flex px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">{{ $role->name }}</span>
                             @endforeach
                         </td>
+                        <td class="px-6 py-4">
+                            @if($user->isActive())
+                                <span class="inline-flex px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">Aktif</span>
+                            @else
+                                <span class="inline-flex px-2.5 py-1 rounded-full text-xs font-medium bg-gray-200 text-gray-600">Nonaktif</span>
+                            @endif
+                        </td>
                         <td class="px-6 py-4 text-right">
-                            @if(!$user->hasRole('Super Admin') || auth()->user()->hasRole('Super Admin'))
+                            @if(!$user->isActive())
+                                <button disabled class="p-2 text-gray-300 rounded-lg cursor-not-allowed" title="Aktifkan user ini terlebih dahulu untuk mengubah datanya">
+                                    <i data-lucide="edit" class="w-4 h-4"></i>
+                                </button>
+                            @elseif(!$user->hasRole('Super Admin') || $isSuperAdmin)
                                 <button wire:click="edit({{ $user->id }})" class="p-2 text-gray-400 hover:text-primary-600 rounded-lg hover:bg-gray-100" title="Edit User">
                                     <i data-lucide="edit" class="w-4 h-4"></i>
                                 </button>
@@ -58,31 +84,50 @@
                                 </button>
                             @endif
 
-                            @if($user->id !== auth()->id() && !$user->hasRole('Super Admin'))
-                                <button 
+                            @if($user->hasRole('Super Admin'))
+                                <button disabled class="p-2 text-gray-300 rounded-lg cursor-not-allowed" title="User Super Admin tidak dapat dinonaktifkan">
+                                    <i data-lucide="ban" class="w-4 h-4"></i>
+                                </button>
+                            @elseif(!$user->isActive())
+                                <button
                                     @click="$dispatch('confirm-action', {
-                                        title: 'Hapus User',
-                                        message: 'Apakah Anda yakin ingin menghapus user {{ $user->name }}?',
-                                        confirmText: 'Ya, Hapus',
+                                        title: 'Aktifkan User',
+                                        message: 'Aktifkan kembali user {{ $user->name }}?',
+                                        confirmText: 'Ya, Aktifkan',
+                                        type: 'info',
+                                        action: { componentId: $wire.__instance.id, method: 'activate' },
+                                        params: {{ $user->id }}
+                                    })"
+                                    class="p-2 text-gray-400 hover:text-green-600 rounded-lg hover:bg-gray-100"
+                                    title="Aktifkan User"
+                                >
+                                    <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+                                </button>
+                            @elseif($user->id !== auth()->id())
+                                <button
+                                    @click="$dispatch('confirm-action', {
+                                        title: 'Nonaktifkan User',
+                                        message: 'Apakah Anda yakin ingin menonaktifkan user {{ $user->name }}? User akan langsung dikeluarkan dari sesi yang sedang aktif dan dapat diaktifkan kembali kapan saja.',
+                                        confirmText: 'Ya, Nonaktifkan',
                                         type: 'danger',
-                                        action: { componentId: $wire.__instance.id, method: 'delete' },
+                                        action: { componentId: $wire.__instance.id, method: 'deactivate' },
                                         params: {{ $user->id }}
                                     })"
                                     class="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-gray-100"
-                                    title="Hapus User"
+                                    title="Nonaktifkan User"
                                 >
-                                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                    <i data-lucide="ban" class="w-4 h-4"></i>
                                 </button>
                             @else
-                                <button disabled class="p-2 text-gray-300 rounded-lg cursor-not-allowed" title="{{ $user->hasRole('Super Admin') ? 'User Super Admin tidak dapat dihapus' : 'Tidak dapat menghapus akun sendiri' }}">
-                                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                <button disabled class="p-2 text-gray-300 rounded-lg cursor-not-allowed" title="Tidak dapat menonaktifkan akun sendiri">
+                                    <i data-lucide="ban" class="w-4 h-4"></i>
                                 </button>
                             @endif
                         </td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="4" class="px-6 py-12 text-center text-gray-500">Belum ada user</td>
+                        <td colspan="5" class="px-6 py-12 text-center text-gray-500">Belum ada user</td>
                     </tr>
                 @endforelse
             </tbody>
