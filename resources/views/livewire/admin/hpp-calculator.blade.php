@@ -127,7 +127,7 @@
                                             <option value="">-- Pilih Bahan Baku --</option>
                                             @foreach($this->availableIngredients as $ing)
                                                 <option value="{{ $ing->id }}" {{ ($row['ingredient_id'] ?? null) == $ing->id ? 'selected' : '' }}>
-                                                    {{ $ing->name }} (Rp {{ number_format($ing->cost_price, 0, ',', '.') }}/{{ $ing->unit }})
+                                                    {{ $ing->name }} (Rp {{ number_format($ing->cost_price, 0, ',', '.') }}/{{ $ing->unit?->symbol }})
                                                 </option>
                                             @endforeach
                                         </select>

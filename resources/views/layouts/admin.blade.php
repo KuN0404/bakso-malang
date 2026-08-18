@@ -80,7 +80,18 @@
     
     <style>
         [x-cloak] { display: none !important; }
-        
+
+        /* Hilangkan spinner bawaan browser di semua input number — spinner ini
+           mudah tersenggol drag/scroll mouse dan mengubah angka tanpa sengaja. */
+        input[type="number"]::-webkit-inner-spin-button,
+        input[type="number"]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type="number"] {
+            -moz-appearance: textfield;
+        }
+
         /* Static preload widths to prevent sidebar flash/animation on hard refresh */
         .sidebar-collapsed aside {
             width: 5rem !important; /* lg:w-20 */
@@ -305,13 +316,15 @@
                 <!-- Group: Master Data -->
                 @php
                     $isMasterActive = request()->routeIs('admin.categories.*') ||
+                                      request()->routeIs('admin.units.*') ||
                                       request()->routeIs('admin.products.*') ||
                                       request()->routeIs('admin.modifiers.*') ||
                                       request()->routeIs('admin.payment-sources.*') ||
                                       request()->routeIs('admin.service-areas.*') ||
+                                      request()->routeIs('admin.pagers.*') ||
                                       request()->routeIs('admin.customers.*');
                 @endphp
-                @canany(['view_categories', 'view_products', 'view_modifiers', 'manage_payment_sources', 'manage_settings', 'manage_pagers', 'view_customers'])
+                @canany(['view_categories', 'view_units', 'view_products', 'view_modifiers', 'manage_payment_sources', 'manage_settings', 'manage_pagers', 'view_customers'])
                 <div x-data="{ open: {{ $isMasterActive ? 'true' : 'false' }} }" class="mt-4">
                     <button @click="open = !open" class="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-blue-300 uppercase tracking-wider hover:text-white transition-colors group whitespace-nowrap text-left">
                         <div class="flex items-center gap-3">
@@ -336,7 +349,14 @@
                             <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Kategori</span></div>
                         </a>
                         @endcan
-                        
+
+                        @can('view_units')
+                        <a href="{{ route('admin.units.index') }}" wire:navigate class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.units.*') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
+                            <div class="flex-shrink-0 w-6 flex justify-center"><x-lucide name="ruler" class="w-4 h-4" /></div>
+                            <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Satuan</span></div>
+                        </a>
+                        @endcan
+
                         @can('view_products')
                         <a href="{{ route('admin.products.index') }}" wire:navigate class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.products.*') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
                             <div class="flex-shrink-0 w-6 flex justify-center"><x-lucide name="package" class="w-4 h-4" /></div>
@@ -384,12 +404,14 @@
 
                 <!-- Group: Inventori & Stok -->
                 @php
-                    $isInventoryActive = request()->routeIs('admin.ingredients.*') || 
-                                         request()->routeIs('admin.purchases.*') || 
+                    $isInventoryActive = request()->routeIs('admin.ingredients.*') ||
+                                         request()->routeIs('admin.components.*') ||
+                                         request()->routeIs('admin.purchases.*') ||
+                                         request()->routeIs('admin.suppliers.*') ||
                                          request()->routeIs('admin.productions.*') ||
                                          request()->routeIs('admin.hpp-calculator.*');
                 @endphp
-                @canany(['view_ingredients', 'view_purchases', 'view_productions'])
+                @canany(['view_ingredients', 'view_purchases', 'view_suppliers', 'view_productions'])
                 <div x-data="{ open: {{ $isInventoryActive ? 'true' : 'false' }} }" class="mt-2">
                     <button @click="open = !open" class="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-blue-300 uppercase tracking-wider hover:text-white transition-colors group whitespace-nowrap text-left">
                         <div class="flex items-center gap-3">
@@ -433,6 +455,13 @@
                         </a>
                         @endcan
 
+                        @can('view_suppliers')
+                        <a href="{{ route('admin.suppliers.index') }}" wire:navigate class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.suppliers.*') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
+                            <div class="flex-shrink-0 w-6 flex justify-center"><x-lucide name="truck" class="w-4 h-4" /></div>
+                            <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Supplier</span></div>
+                        </a>
+                        @endcan
+
                         @can('view_productions')
                         <a href="{{ route('admin.productions.index') }}" wire:navigate class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.productions.*') ? 'bg-sidebar-light text-white' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
                             <div class="flex-shrink-0 w-6 flex justify-center"><x-lucide name="utensils-crossed" class="w-4 h-4" /></div>
@@ -445,7 +474,7 @@
 
                 <!-- Group: Transaksi -->
                 @php
-                    $isTransActive = request()->routeIs('pos') || request()->routeIs('admin.shifts.*');
+                    $isTransActive = request()->routeIs('pos') || request()->routeIs('admin.shifts.*') || request()->routeIs('kitchen.display');
                 @endphp
                 @canany(['access_pos', 'view_all_shifts', 'view_kitchen_display'])
                 <div x-data="{ open: {{ $isTransActive ? 'true' : 'false' }} }" class="mt-2">
@@ -570,6 +599,11 @@
                         <a href="{{ route('admin.reports.inventory', ['activeTab' => 'component_stock_logs']) }}" wire:navigate class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.reports.inventory') && request('activeTab') === 'component_stock_logs' ? 'bg-sidebar-light text-white font-semibold' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
                             <div class="flex-shrink-0 w-6 flex justify-center"><x-lucide name="file-clock" class="w-4 h-4" /></div>
                             <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Mutasi Komponen</span></div>
+                        </a>
+
+                        <a href="{{ route('admin.reports.inventory', ['activeTab' => 'low_stock']) }}" wire:navigate class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm {{ request()->routeIs('admin.reports.inventory') && request('activeTab') === 'low_stock' ? 'bg-sidebar-light text-white font-semibold' : 'text-blue-200 hover:bg-sidebar-light hover:text-white' }} transition-colors">
+                            <div class="flex-shrink-0 w-6 flex justify-center"><x-lucide name="alert-triangle" class="w-4 h-4" /></div>
+                            <div class="transition-all duration-300 overflow-hidden" :class="isCompact ? 'w-0 opacity-0' : 'w-32 opacity-100'"><span>Stok Menipis</span></div>
                         </a>
                         @endcan
                     </div>
@@ -844,47 +878,6 @@
         </div>
     </div>
     
-    <!-- Toast Notifications -->
-    <div 
-        x-data="notificationHandler"
-        class="fixed top-4 right-4 z-50 space-y-2 pointer-events-none"
-    >
-        <template x-for="notification in notifications" :key="notification.id">
-            <div 
-                x-show="notification.show"
-                x-transition:enter="transition transform ease-out duration-300"
-                x-transition:enter-start="translate-x-full opacity-0"
-                x-transition:enter-end="translate-x-0 opacity-100"
-                x-transition:leave="transition transform ease-in duration-300"
-                x-transition:leave-start="translate-x-0 opacity-100"
-                x-transition:leave-end="translate-x-full opacity-0"
-                class="bg-white rounded-lg shadow-lg border-l-4 p-4 pointer-events-auto min-w-[300px] flex items-start gap-3"
-                :class="{
-                    'border-green-500': notification.type === 'success',
-                    'border-red-500': notification.type === 'error',
-                    'border-blue-500': notification.type === 'info'
-                }"
-            >
-                <!-- Icon -->
-                <div class="flex-shrink-0">
-                    <svg x-show="notification.type === 'success'" class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                    <svg x-show="notification.type === 'error'" class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                    <svg x-show="notification.type === 'info'" class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                </div>
-                
-                <!-- Content -->
-                <div class="flex-1">
-                    <p class="text-sm font-medium text-gray-900" x-text="notification.message"></p>
-                </div>
-                
-                <!-- Close -->
-                <button @click="remove(notification.id)" class="text-gray-400 hover:text-gray-600">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                </button>
-            </div>
-        </template>
-    </div>
-
     <!-- Livewire Scripts -->
     @livewireScripts
     
@@ -895,16 +888,26 @@
                     window.location.href = "{{ route('login') }}?expired=1";
                     return false;
                 });
-            } else if (Livewire.hook) {
-                Livewire.hook('request', ({ fail }) => {
-                    fail(({ status, preventDefault }) => {
-                        if (status === 419) {
-                            preventDefault();
-                            window.location.href = "{{ route('login') }}?expired=1";
-                        }
-                    });
-                });
             }
+            // Livewire.onPageExpired hanya menangani 419 (sesi habis). Tanpa hook di bawah
+            // ini, request yang gagal karena sebab lain (500 dari exception tak terduga, dll)
+            // sama sekali tidak terlihat oleh user — spinner berhenti tapi tidak ada notifikasi
+            // apapun, terlihat seperti tombol tidak berfungsi.
+            Livewire.hook('request', ({ fail }) => {
+                fail(({ status, preventDefault }) => {
+                    if (status === 419) {
+                        preventDefault();
+                        window.location.href = "{{ route('login') }}?expired=1";
+                        return;
+                    }
+                    if (status && status !== 200) {
+                        preventDefault();
+                        window.dispatchEvent(new CustomEvent('notify', {
+                            detail: { type: 'error', message: 'Terjadi kesalahan saat memproses permintaan (kode ' + status + '). Silakan coba lagi.' }
+                        }));
+                    }
+                });
+            });
         });
 
         // Dynamic Font Applier
@@ -949,9 +952,20 @@
 
         // Initialize on DOMContentLoaded (hard refresh)
         document.addEventListener('DOMContentLoaded', initLayoutTheme);
-        
+
         // Re-initialize on Livewire navigation
         document.addEventListener('livewire:navigated', initLayoutTheme);
+
+        // Cegah scroll wheel mouse mengubah nilai input number saat kursor
+        // kebetulan berada di atasnya (browser secara default mengubah nilai
+        // jika input number sedang fokus lalu di-scroll — risiko salah input
+        // tanpa sengaja). Event delegation di document, jadi otomatis berlaku
+        // untuk semua input number termasuk yang dirender ulang oleh Livewire.
+        document.addEventListener('wheel', function (e) {
+            if (document.activeElement && document.activeElement.tagName === 'INPUT' && document.activeElement.type === 'number') {
+                document.activeElement.blur();
+            }
+        }, { passive: true });
 
         // Handle Real-Time Settings Updates for SPA/wire:navigate
         window.addEventListener('settings-updated', event => {
@@ -1169,41 +1183,6 @@
                 destroy() {
                     if (this.interval) {
                         clearInterval(this.interval);
-                    }
-                }
-            }));
-
-            // Notification Handler
-            Alpine.data('notificationHandler', () => ({
-                notifications: [],
-                
-                init() {
-                    window.addEventListener('notify', (event) => {
-                        this.add(event.detail);
-                    });
-                },
-                
-                add(notification) {
-                    const id = Date.now();
-                    this.notifications.push({
-                        id: id,
-                        type: notification.type || 'info',
-                        message: notification.message,
-                        show: true,
-                    });
-                    
-                    setTimeout(() => {
-                        this.remove(id);
-                    }, 3000);
-                },
-                
-                remove(id) {
-                    const index = this.notifications.findIndex(n => n.id === id);
-                    if (index > -1) {
-                        this.notifications[index].show = false;
-                        setTimeout(() => {
-                            this.notifications = this.notifications.filter(n => n.id !== id);
-                        }, 300);
                     }
                 }
             }));

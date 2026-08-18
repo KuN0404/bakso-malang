@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\PhoneNumber;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -50,13 +51,7 @@ class BlockedPhoneNumber extends Model
      */
     public static function normalizePhone(string $phone): string
     {
-        $digits = preg_replace('/\D/', '', $phone) ?? '';
-
-        if (str_starts_with($digits, '0')) {
-            $digits = '62' . substr($digits, 1);
-        }
-
-        return $digits;
+        return PhoneNumber::normalize($phone);
     }
 
     /**
@@ -69,12 +64,15 @@ class BlockedPhoneNumber extends Model
     }
 
     /**
-     * Paginated list untuk halaman admin, dengan pencarian nomor/alasan.
+     * Paginated list untuk halaman admin, dengan pencarian nomor/alasan
+     * dan filter status ('blocked'/'unblocked'/'all').
      */
-    public static function getPaginated(string $search = '', int $perPage = 15): LengthAwarePaginator
+    public static function getPaginated(string $search = '', int $perPage = 15, string $status = 'blocked'): LengthAwarePaginator
     {
         return static::query()
             ->with(['blockedBy', 'unblockedBy'])
+            ->when($status === 'blocked', fn ($q) => $q->where('is_blocked', true))
+            ->when($status === 'unblocked', fn ($q) => $q->where('is_blocked', false))
             ->when($search, fn ($q) => $q->where(function ($q) use ($search) {
                 $q->where('phone', 'like', "%{$search}%")
                   ->orWhere('reason', 'like', "%{$search}%");

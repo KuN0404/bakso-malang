@@ -157,23 +157,24 @@ class PrintController extends Controller
         $criticalStockCount = \App\Models\Ingredient::lowStock()->count();
         $totalAssetValue = \App\Models\Ingredient::select(\Illuminate\Support\Facades\DB::raw('SUM(stock * cost_price) as total_asset'))->value('total_asset') ?? 0;
 
-        $ingredients = \App\Models\Ingredient::when($search, fn($q) => $q->where('name', 'like', "%{$search}%")->orWhere('code', 'like', "%{$search}%"))->orderBy('name')->get();
+        $ingredients = \App\Models\Ingredient::with('unit')->when($search, fn($q) => $q->where('name', 'like', "%{$search}%")->orWhere('code', 'like', "%{$search}%"))->orderBy('name')->get();
 
-        $components = \App\Models\Component::when($search, fn($q) => $q->where('name', 'like', "%{$search}%")->orWhere('code', 'like', "%{$search}%"))->orderBy('name')->get();
+        $components = \App\Models\Component::with('unit')->when($search, fn($q) => $q->where('name', 'like', "%{$search}%")->orWhere('code', 'like', "%{$search}%"))->orderBy('name')->get();
 
-        $purchases = \App\Models\Purchase::with(['items.ingredient', 'items.product', 'user'])
+        $purchases = \App\Models\Purchase::with(['items.ingredient.unit', 'items.product', 'user', 'supplier'])
             ->whereBetween('purchase_date', [$start->format('Y-m-d'), $end->format('Y-m-d')])
-            ->when($search, fn($q) => $q->where('invoice_number', 'like', "%{$search}%")->orWhere('supplier_name', 'like', "%{$search}%"))
+            ->when($search, fn($q) => $q->where('invoice_number', 'like', "%{$search}%")
+                ->orWhereHas('supplier', fn ($sq) => $sq->where('name', 'like', "%{$search}%")))
             ->orderByDesc('purchase_date')
             ->get();
 
-        $productions = \App\Models\Production::with(['inputs.ingredient', 'outputs.component', 'outputs.product', 'user'])
+        $productions = \App\Models\Production::with(['inputs.ingredient.unit', 'outputs.component.unit', 'outputs.product', 'user'])
             ->whereBetween('production_date', [$start->format('Y-m-d'), $end->format('Y-m-d')])
             ->when($search, fn($q) => $q->where('production_code', 'like', "%{$search}%"))
             ->orderByDesc('production_date')
             ->get();
 
-        $stockLogs = \App\Models\IngredientStockLog::with(['ingredient', 'user'])
+        $stockLogs = \App\Models\IngredientStockLog::with(['ingredient.unit', 'user'])
             ->whereBetween('created_at', [$start, $end])
             ->when($search, function ($q) use ($search) {
                 $q->whereHas('ingredient', fn($ing) => $ing->where('name', 'like', "%{$search}%")->orWhere('code', 'like', "%{$search}%"));
@@ -181,7 +182,7 @@ class PrintController extends Controller
             ->orderByDesc('created_at')
             ->get();
 
-        $componentStockLogs = \App\Models\ComponentStockLog::with(['component', 'user'])
+        $componentStockLogs = \App\Models\ComponentStockLog::with(['component.unit', 'user'])
             ->whereBetween('created_at', [$start, $end])
             ->when($search, function ($q) use ($search) {
                 $q->whereHas('component', fn($comp) => $comp->where('name', 'like', "%{$search}%")->orWhere('code', 'like', "%{$search}%"));

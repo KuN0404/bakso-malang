@@ -69,7 +69,7 @@
                             <tr>
                                 <td class="py-1.5 px-2 font-mono">{{ $ing->code }}</td>
                                 <td class="py-1.5 px-2 font-medium">{{ $ing->name }}</td>
-                                <td class="py-1.5 px-2 text-right font-bold">{{ number_format($ing->stock, 2, ',', '.') }} {{ $ing->unit }}</td>
+                                <td class="py-1.5 px-2 text-right font-bold">{{ number_format($ing->stock, 2, ',', '.') }} {{ $ing->unit?->symbol }}</td>
                                 <td class="py-1.5 px-2 text-right">Rp {{ number_format($ing->cost_price, 0, ',', '.') }}</td>
                                 <td class="py-1.5 px-2 text-right font-extrabold">Rp {{ number_format($ing->stock * $ing->cost_price, 0, ',', '.') }}</td>
                             </tr>
@@ -95,7 +95,7 @@
                             <tr>
                                 <td class="py-1.5 px-2 font-mono">{{ $comp->code }}</td>
                                 <td class="py-1.5 px-2 font-medium">{{ $comp->name }}</td>
-                                <td class="py-1.5 px-2 text-right font-bold">{{ number_format($comp->stock, 2, ',', '.') }} {{ $comp->unit }}</td>
+                                <td class="py-1.5 px-2 text-right font-bold">{{ number_format($comp->stock, 2, ',', '.') }} {{ $comp->unit?->symbol }}</td>
                                 <td class="py-1.5 px-2 text-right">Rp {{ number_format($comp->cost_price, 0, ',', '.') }}</td>
                                 <td class="py-1.5 px-2 text-right font-extrabold">Rp {{ number_format($comp->stock * $comp->cost_price, 0, ',', '.') }}</td>
                             </tr>
@@ -120,7 +120,7 @@
                             <tr>
                                 <td class="py-1.5 px-2 font-mono">{{ $p->invoice_number }}</td>
                                 <td class="py-1.5 px-2">{{ $p->purchase_date->format('d/m/Y') }}</td>
-                                <td class="py-1.5 px-2">{{ $p->supplier_name ?: '-' }}</td>
+                                <td class="py-1.5 px-2">{{ $p->supplier?->name ?: '-' }}</td>
                                 <td class="py-1.5 px-2 text-right font-bold">Rp {{ number_format($p->total_amount, 0, ',', '.') }}</td>
                             </tr>
                         @endforeach
@@ -147,7 +147,7 @@
                                 <td class="py-1.5 px-2">{{ $prod->production_date->format('d/m/Y') }}</td>
                                 <td class="py-1.5 px-2">
                                     @foreach($prod->inputs as $in)
-                                        <div>{{ $in->ingredient?->name }}: {{ number_format($in->quantity, 2, ',', '.') }} {{ $in->ingredient?->unit }}</div>
+                                        <div>{{ $in->ingredient?->name }}: {{ number_format($in->quantity, 2, ',', '.') }} {{ $in->ingredient?->unit?->symbol }}</div>
                                     @endforeach
                                 </td>
                                 <td class="py-1.5 px-2 font-medium">
@@ -206,8 +206,8 @@
                                 <td class="py-1.5 px-2">{{ $log->created_at->format('d/m/Y H:i') }}</td>
                                 <td class="py-1.5 px-2 font-medium">{{ $log->component?->name }}</td>
                                 <td class="py-1.5 px-2 font-semibold">{{ strtoupper($log->type) }}</td>
-                                <td class="py-1.5 px-2 text-right font-bold">{{ $log->amount > 0 ? '+' : '' }}{{ number_format($log->amount, 2, ',', '.') }} {{ $log->component?->unit }}</td>
-                                <td class="py-1.5 px-2 text-right font-bold">{{ number_format($log->final_stock, 2, ',', '.') }} {{ $log->component?->unit }}</td>
+                                <td class="py-1.5 px-2 text-right font-bold">{{ $log->amount > 0 ? '+' : '' }}{{ number_format($log->amount, 2, ',', '.') }} {{ $log->component?->unit?->symbol }}</td>
+                                <td class="py-1.5 px-2 text-right font-bold">{{ number_format($log->final_stock, 2, ',', '.') }} {{ $log->component?->unit?->symbol }}</td>
                             </tr>
                         @endforeach
                     </tbody>

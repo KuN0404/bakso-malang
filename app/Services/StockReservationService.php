@@ -160,7 +160,7 @@ class StockReservationService
         if ($availableStock < $quantity) {
             throw new InsufficientStockException(
                 "Stok komponen '{$component->name}' tidak cukup. " .
-                "Tersedia: {$availableStock} {$component->unit}, Dibutuhkan: {$quantity} {$component->unit}."
+                "Tersedia: {$availableStock} {$component->unit?->symbol}, Dibutuhkan: {$quantity} {$component->unit?->symbol}."
             );
         }
 
@@ -214,7 +214,14 @@ class StockReservationService
         ?int $actorUserId,
         int $transactionId,
         string $invoiceNumber
-    ): void {
+    ): array {
+        // Kumpulkan berapa yang BENAR-BENAR terpotong per komponen. Pada jalur normal
+        // ini sama dengan yang direservasi, tapi pada settlement terlambat (best-effort)
+        // potongannya di-clamp di 0 sehingga bisa lebih kecil. Pemanggil memakai angka
+        // ini untuk menulis snapshot transaction_detail_components — tanpa itu, retur
+        // akan mengembalikan lebih banyak daripada yang pernah keluar (stok hantu).
+        $this->actualDeducted = [];
+
         // Ambil dan lock semua reservation aktif
         $reservations = StockReservation::getActiveForOrderLocked(SelfOrder::class, $selfOrder->id);
 
@@ -227,7 +234,7 @@ class StockReservationService
             // dari item yang tersimpan permanen di self_order_items (bukan dari reservasi yang
             // sudah hilang), dan catat CRITICAL kalau ternyata stok sudah tidak cukup (oversold).
             $this->convertLateSettlementFromItems($selfOrder, $actorUserId, $transactionId, $invoiceNumber);
-            return;
+            return $this->actualDeducted;
         }
 
         foreach ($reservations as $reservation) {
@@ -244,6 +251,19 @@ class StockReservationService
         Log::channel('self_order')->info(
             "StockReservation: {$reservations->count()} reservation dikonversi untuk SelfOrder [{$selfOrder->id}], Transaction [{$transactionId}]."
         );
+
+        return $this->actualDeducted;
+    }
+
+    /**
+     * Akumulator [component_id => total benar-benar terpotong] selama satu pemanggilan
+     * convertForSelfOrder(). Di-reset di awal tiap pemanggilan.
+     */
+    private array $actualDeducted = [];
+
+    private function recordDeducted(int $componentId, float $amount): void
+    {
+        $this->actualDeducted[$componentId] = ($this->actualDeducted[$componentId] ?? 0) + $amount;
     }
 
     private function hadReleasedReservations(SelfOrder $selfOrder): bool
@@ -339,13 +359,15 @@ class StockReservationService
 
         if ($deduct < $qty) {
             Log::channel('self_order')->critical(
-                "OVERSOLD (settlement terlambat): Komponen '{$component->name}' butuh {$qty} {$component->unit}, tersisa hanya {$current} {$component->unit}. " .
+                "OVERSOLD (settlement terlambat): Komponen '{$component->name}' butuh {$qty} {$component->unit?->symbol}, tersisa hanya {$current} {$component->unit?->symbol}. " .
                 "SelfOrder [{$selfOrderId}] — barang tetap harus dibuatkan, cek ketersediaan fisik secara manual."
             );
         }
 
         $newStock = $current - $deduct;
         $component->update(['stock' => $newStock]);
+
+        $this->recordDeducted((int) $component->id, (float) $deduct);
 
         ComponentStockLog::record(
             componentId:   $component->id,
@@ -396,7 +418,8 @@ class StockReservationService
             return;
         }
 
-        $newStock = $component->stock - $reservation->quantity;
+        $currentStock = (float) $component->stock;
+        $newStock     = $currentStock - $reservation->quantity;
 
         if ($newStock < 0) {
             // Race condition: stok sudah habis (sangat jarang terjadi karena ada reservation)
@@ -406,6 +429,10 @@ class StockReservationService
             );
             $newStock = 0;
         }
+
+        // Yang benar-benar terpotong bisa lebih kecil dari yang direservasi kalau
+        // stok sempat di-clamp di 0 — snapshot retur harus memakai angka ini.
+        $this->recordDeducted((int) $component->id, $currentStock - $newStock);
 
         $component->update(['stock' => $newStock]);
 
@@ -421,45 +448,9 @@ class StockReservationService
         );
     }
 
-    // -----------------------------------------------------------------
-    // Validation Helpers (tanpa lock, untuk UI check saja)
-    // -----------------------------------------------------------------
-
-    /**
-     * Cek apakah cart bisa direservasi (soft check, tanpa lock).
-     * Gunakan ini untuk validasi tampilan, bukan untuk proses checkout.
-     *
-     * @return array [product_id => error_message]
-     */
-    public function validateCartAvailability(array $cartItems): array
-    {
-        $errors = [];
-
-        foreach ($cartItems as $item) {
-            $product = Product::with('bom.component')->find($item['product_id']);
-
-            if (!$product || !$product->is_active) {
-                $errors[$item['product_id']] = "Produk tidak tersedia.";
-                continue;
-            }
-
-            if ($product->hasBom()) {
-                // Cek stok komponen BOM
-                foreach ($product->bom as $bom) {
-                    $needed    = $bom->quantity * $item['quantity'];
-                    $available = $bom->component->stock - StockReservation::getTotalActiveForComponent($bom->component_id);
-                    if ($available < $needed) {
-                        $errors[$item['product_id']] = "Stok '{$product->name}' tidak cukup.";
-                    }
-                }
-            } elseif ($product->track_stock) {
-                $available = $product->getAvailableStock();
-                if ($available < $item['quantity']) {
-                    $errors[$item['product_id']] = "Stok '{$product->name}' hanya tersisa {$available}.";
-                }
-            }
-        }
-
-        return $errors;
-    }
+    // Catatan: validateCartAvailability() dihapus — tidak pernah dipanggil dari mana pun,
+    // dan perhitungannya per baris BOM (bukan agregat per komponen) sehingga bisa
+    // berbeda jawaban dengan tampilan. Pengecekan ketersediaan sekarang memakai
+    // \App\Services\ComponentDemandResolver::shortfalls(), yang dipakai bersama oleh
+    // POS maupun Self Order.
 }

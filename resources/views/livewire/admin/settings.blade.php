@@ -181,6 +181,66 @@
                         </div>
                     </div>
 
+                    {{-- Logo Latar Terang & Gelap --}}
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Logo Latar Terang &amp; Gelap</label>
+                        <p class="text-xs text-gray-400 mb-2">Dipakai di halaman error (404, 500, dll) dan akan otomatis dipakai juga di sidebar, login, serta halaman publik pada pembaruan berikutnya.</p>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-[11px] font-semibold text-gray-500 mb-1.5">Untuk Latar Terang</label>
+                                <div class="space-y-2">
+                                    @if ($logo_light)
+                                        <div class="w-20 h-20 border-2 border-primary-200 border-dashed rounded-xl bg-primary-50 flex items-center justify-center p-1">
+                                            <img src="{{ $logo_light->temporaryUrl() }}" class="max-w-full max-h-full object-contain">
+                                        </div>
+                                    @elseif ($existing_logo_light)
+                                        <div class="relative w-20 h-20 border border-gray-200 rounded-xl overflow-hidden group bg-gray-50 flex items-center justify-center p-1">
+                                            <img src="{{ asset('storage/' . $existing_logo_light) }}" class="max-w-full max-h-full object-contain">
+                                            <button type="button" wire:click="removeLogoLight"
+                                                class="absolute inset-0 bg-red-500/80 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-xl">
+                                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                            </button>
+                                        </div>
+                                    @else
+                                        <div class="w-20 h-20 border-2 border-dashed border-gray-200 rounded-xl bg-gray-50 flex items-center justify-center">
+                                            <i data-lucide="sun" class="w-6 h-6 text-gray-300"></i>
+                                        </div>
+                                    @endif
+                                    <input type="file" wire:model="logo_light"
+                                        class="block w-full text-xs text-gray-500 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100">
+                                    <p class="text-[10px] text-gray-400">Logo versi gelap, untuk latar belakang terang</p>
+                                    @error('logo_light') <span class="text-xs text-red-500 block">{{ $message }}</span> @enderror
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-gray-500 mb-1.5">Untuk Latar Gelap</label>
+                                <div class="space-y-2">
+                                    @if ($logo_dark)
+                                        <div class="w-20 h-20 border-2 border-primary-200 border-dashed rounded-xl bg-sidebar flex items-center justify-center p-1">
+                                            <img src="{{ $logo_dark->temporaryUrl() }}" class="max-w-full max-h-full object-contain">
+                                        </div>
+                                    @elseif ($existing_logo_dark)
+                                        <div class="relative w-20 h-20 border border-gray-200 rounded-xl overflow-hidden group bg-sidebar flex items-center justify-center p-1">
+                                            <img src="{{ asset('storage/' . $existing_logo_dark) }}" class="max-w-full max-h-full object-contain">
+                                            <button type="button" wire:click="removeLogoDark"
+                                                class="absolute inset-0 bg-red-500/80 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-xl">
+                                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                            </button>
+                                        </div>
+                                    @else
+                                        <div class="w-20 h-20 border-2 border-dashed border-gray-200 rounded-xl bg-gray-50 flex items-center justify-center">
+                                            <i data-lucide="moon" class="w-6 h-6 text-gray-300"></i>
+                                        </div>
+                                    @endif
+                                    <input type="file" wire:model="logo_dark"
+                                        class="block w-full text-xs text-gray-500 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100">
+                                    <p class="text-[10px] text-gray-400">Logo versi terang, untuk latar belakang gelap</p>
+                                    @error('logo_dark') <span class="text-xs text-red-500 block">{{ $message }}</span> @enderror
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="grid grid-cols-2 gap-4">
                         <div>
                             <label class="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1.5">Pajak (PPN)</label>
@@ -244,7 +304,7 @@
                         </div>
                     </div>
 
-                    <button type="submit" wire:loading.attr="disabled" wire:target="logo_web, site_logo, saveGeneral"
+                    <button type="submit" wire:loading.attr="disabled" wire:target="logo_web, site_logo, logo_light, logo_dark, saveGeneral"
                         class="w-full py-2.5 bg-primary-600 hover:bg-primary-700 active:scale-[0.99] text-white text-sm font-semibold rounded-xl disabled:opacity-60 transition flex items-center justify-center gap-2">
                         <span wire:loading.remove wire:target="saveGeneral">
                             <i data-lucide="save" class="w-4 h-4 inline -mt-0.5 mr-1"></i>Simpan Informasi Toko
@@ -514,6 +574,40 @@
                 </button>
             </form>
         </div>
+
+        {{-- ── Row 4: Self Order ───────────────────────────────── --}}
+        @can('manage_self_order_settings')
+            <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-50 flex items-center gap-3">
+                    <div class="w-8 h-8 bg-amber-50 rounded-lg flex items-center justify-center">
+                        <i data-lucide="qr-code" class="w-4 h-4 text-amber-600"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-semibold text-gray-800 text-sm">Self Order</h3>
+                        <p class="text-xs text-gray-400">Aktif/nonaktifkan pemesanan mandiri lewat QR code</p>
+                    </div>
+                </div>
+                <div class="p-6 flex items-center justify-between gap-4">
+                    <div>
+                        <p class="text-sm font-medium text-gray-700">
+                            Status saat ini:
+                            <span class="{{ $selfOrderEnabled ? 'text-emerald-600' : 'text-red-600' }} font-semibold">
+                                {{ $selfOrderEnabled ? 'Aktif' : 'Nonaktif' }}
+                            </span>
+                        </p>
+                        <p class="text-xs text-gray-400 mt-1">
+                            Jika dinonaktifkan, pelanggan tidak bisa membuka halaman pemesanan lewat QR code. Tidak bisa dinonaktifkan selagi masih ada order self-order yang aktif.
+                        </p>
+                    </div>
+                    <button type="button"
+                        wire:click="toggleSelfOrder"
+                        @if($selfOrderEnabled) wire:confirm="Yakin ingin menonaktifkan Self Order? Pelanggan tidak akan bisa memesan lewat QR code sampai diaktifkan kembali." @endif
+                        class="shrink-0 px-4 py-2 text-sm font-semibold rounded-xl transition {{ $selfOrderEnabled ? 'bg-red-50 text-red-600 hover:bg-red-100' : 'bg-emerald-600 text-white hover:bg-emerald-700' }}">
+                        {{ $selfOrderEnabled ? 'Nonaktifkan' : 'Aktifkan' }}
+                    </button>
+                </div>
+            </div>
+        @endcan
 
     </div>
 </div>

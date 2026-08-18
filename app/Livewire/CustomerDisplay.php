@@ -40,7 +40,7 @@ class CustomerDisplay extends Component
         }])->get();
 
         $products = Product::where('is_active', true)
-            ->with(['category', 'modifierGroups.activeModifiers'])
+            ->with(['category', 'modifierGroups.activeModifiers', 'bom.component'])
             ->orderBy('is_featured', 'desc')
             ->orderBy('name', 'asc')
             ->get();

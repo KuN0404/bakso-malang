@@ -173,7 +173,7 @@ class Productions extends Component
             $ing = Ingredient::find($item['ingredient_id']);
             $qty = (float) $item['quantity'];
             if ($ing->stock < $qty) {
-                $this->dispatch('notify', type: 'error', message: "Stok bahan baku '{$ing->name}' tidak cukup (Stok: {$ing->stock} {$ing->unit}, Dibutuhkan: {$qty} {$ing->unit}).");
+                $this->dispatch('notify', type: 'error', message: "Stok bahan baku '{$ing->name}' tidak cukup (Stok: {$ing->stock} {$ing->unit?->symbol}, Dibutuhkan: {$qty} {$ing->unit?->symbol}).");
                 return;
             }
         }
@@ -305,8 +305,8 @@ class Productions extends Component
     {
         $productions = Production::query()
             ->with([
-                'inputs.ingredient',
-                'outputs.component',
+                'inputs.ingredient.unit',
+                'outputs.component.unit',
                 'outputs.product',
                 'user',
             ])
@@ -317,6 +317,7 @@ class Productions extends Component
 
         $ingredients = Ingredient::where('is_active', true)
             ->where('stock', '>', 0)
+            ->with('unit')
             ->orderBy('name')
             ->get();
 

@@ -172,7 +172,7 @@ class SyncReportData extends Command
         $this->line(" ✓ Self Orders: {$soTotal}");
 
         // Sync Transaksi POS
-        Transaction::with('details.modifiers')->chunkById($chunk, function ($transactions) use (&$total) {
+        Transaction::with(['details.modifiers', 'details.components'])->chunkById($chunk, function ($transactions) use (&$total) {
             foreach ($transactions as $transaction) {
                 $this->reportSyncService->syncTransaction($transaction);
                 $total++;

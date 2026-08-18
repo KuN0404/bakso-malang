@@ -70,7 +70,18 @@
     
     <style>
         [x-cloak] { display: none !important; }
-        
+
+        /* Hilangkan spinner bawaan browser di semua input number — spinner ini
+           mudah tersenggol drag/scroll mouse dan mengubah angka tanpa sengaja. */
+        input[type="number"]::-webkit-inner-spin-button,
+        input[type="number"]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type="number"] {
+            -moz-appearance: textfield;
+        }
+
         /* Custom scrollbar */
         .custom-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
         .custom-scroll::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 3px; }
@@ -142,16 +153,26 @@
                     window.location.href = "{{ route('login') }}?expired=1";
                     return false;
                 });
-            } else if (Livewire.hook) {
-                Livewire.hook('request', ({ fail }) => {
-                    fail(({ status, preventDefault }) => {
-                        if (status === 419) {
-                            preventDefault();
-                            window.location.href = "{{ route('login') }}?expired=1";
-                        }
-                    });
-                });
             }
+            // Livewire.onPageExpired hanya menangani 419 (sesi habis). Tanpa hook di bawah
+            // ini, request yang gagal karena sebab lain (500 dari exception tak terduga, dll)
+            // sama sekali tidak terlihat oleh user — spinner berhenti tapi tidak ada notifikasi
+            // apapun, terlihat seperti tombol tidak berfungsi.
+            Livewire.hook('request', ({ fail }) => {
+                fail(({ status, preventDefault }) => {
+                    if (status === 419) {
+                        preventDefault();
+                        window.location.href = "{{ route('login') }}?expired=1";
+                        return;
+                    }
+                    if (status && status !== 200) {
+                        preventDefault();
+                        window.dispatchEvent(new CustomEvent('notify', {
+                            detail: { type: 'error', message: 'Terjadi kesalahan saat memproses permintaan (kode ' + status + '). Silakan coba lagi.' }
+                        }));
+                    }
+                });
+            });
         });
 
         // Dynamic Font Applier
@@ -191,6 +212,16 @@
             const currentFont = document.body.getAttribute('data-font-web');
             if (currentFont) applyDynamicFont(currentFont);
         });
+
+        // Cegah scroll wheel mouse mengubah nilai input number saat kursor
+        // kebetulan berada di atasnya (browser secara default mengubah nilai
+        // jika input number sedang fokus lalu di-scroll — risiko salah input
+        // tanpa sengaja, mis. saat kasir scroll daftar produk).
+        document.addEventListener('wheel', function (e) {
+            if (document.activeElement && document.activeElement.tagName === 'INPUT' && document.activeElement.type === 'number') {
+                document.activeElement.blur();
+            }
+        }, { passive: true });
 
         // Global MutationObserver to automatically rebuild Lucide icons on any DOM change
         let lucideDebounce;

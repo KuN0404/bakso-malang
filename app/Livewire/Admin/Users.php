@@ -6,13 +6,15 @@ use App\Models\User;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Rule;
 use Livewire\Component;
+use Livewire\WithFileUploads;
 use Livewire\WithPagination;
 use App\Models\Role;
+use Illuminate\Support\Facades\Storage;
 
 #[Layout('layouts.admin')]
 class Users extends Component
 {
-    use WithPagination;
+    use WithPagination, WithFileUploads;
 
     public bool $showModal = false;
     public ?int $editingId = null;
@@ -37,6 +39,15 @@ class Users extends Component
 
     public bool $isEditingSuperAdmin = false;
 
+    // Profil (opsional)
+    public ?string $phone = null;
+    public ?string $birth_date = null;
+    public ?string $address = null;
+    public ?string $gender = null;
+    public ?string $notes = null;
+    public $photo = null;
+    public ?string $existingPhoto = null;
+
     public function updatingSearch(): void
     {
         $this->resetPage();
@@ -49,7 +60,10 @@ class Users extends Component
 
     public function create(): void
     {
-        $this->reset(['editingId', 'username', 'name', 'email', 'password', 'selectedRoles', 'isEditingSuperAdmin']);
+        $this->reset([
+            'editingId', 'username', 'name', 'email', 'password', 'selectedRoles', 'isEditingSuperAdmin',
+            'phone', 'birth_date', 'address', 'gender', 'notes', 'photo', 'existingPhoto',
+        ]);
         $this->showModal = true;
     }
 
@@ -75,7 +89,92 @@ class Users extends Component
         $this->password = '';
         $this->selectedRoles = $user->roles->pluck('name')->toArray();
         $this->isEditingSuperAdmin = $user->isSuperAdmin();
+
+        // Profil sudah eager-loaded lewat User::getForEdit() (with 'profile') — tidak ada query tambahan di sini.
+        $profile = $user->profile;
+        $this->phone = $profile?->phone;
+        $this->birth_date = $profile?->birth_date?->format('Y-m-d');
+        $this->address = $profile?->address;
+        $this->gender = $profile?->gender;
+        $this->notes = $profile?->notes;
+        $this->existingPhoto = $profile?->photo;
+        $this->photo = null;
+
         $this->showModal = true;
+    }
+
+    protected function deleteOldPhoto(?string $photoPath): void
+    {
+        if ($photoPath && Storage::disk('public')->exists($photoPath)) {
+            Storage::disk('public')->delete($photoPath);
+        }
+    }
+
+    /**
+     * Process photo: Resize, Convert to WebP, and Save
+     */
+    protected function processPhoto($photo): ?string
+    {
+        if (!$photo) return null;
+
+        $filename = md5($photo->getClientOriginalName() . time()) . '.webp';
+        $path = 'staff/' . $filename;
+
+        $manager = new \Intervention\Image\ImageManager(new \Intervention\Image\Drivers\Gd\Driver());
+        $img = $manager->read($photo->getRealPath());
+
+        $img->scaleDown(width: 800);
+
+        Storage::disk('public')->put($path, (string) $img->toWebp(quality: 80));
+
+        return $path;
+    }
+
+    public function removePhoto(): void
+    {
+        if ($this->editingId && $this->existingPhoto) {
+            $user = User::getForEdit($this->editingId);
+            $this->deleteOldPhoto($this->existingPhoto);
+            $user->profile()->update(['photo' => null]);
+        }
+
+        $this->existingPhoto = null;
+        $this->photo = null;
+    }
+
+    protected function profileValidationRules(): array
+    {
+        return [
+            'phone' => 'nullable|string|max:20',
+            'birth_date' => 'nullable|date|before:today',
+            'address' => 'nullable|string|max:500',
+            'gender' => 'nullable|in:L,P',
+            'notes' => 'nullable|string|max:500',
+            'photo' => 'nullable|image|mimes:png,jpg,jpeg|max:2048',
+        ];
+    }
+
+    protected function saveProfile(User $user): void
+    {
+        $profileData = [
+            'phone' => $this->phone ?: null,
+            'birth_date' => $this->birth_date ?: null,
+            'address' => $this->address ?: null,
+            'gender' => $this->gender ?: null,
+            'notes' => $this->notes ?: null,
+        ];
+
+        if ($this->photo) {
+            $newPhotoPath = $this->processPhoto($this->photo);
+            if ($newPhotoPath) {
+                if ($this->existingPhoto) {
+                    $this->deleteOldPhoto($this->existingPhoto);
+                }
+                $profileData['photo'] = $newPhotoPath;
+            }
+        }
+
+        $user->profile()->updateOrCreate([], $profileData);
     }
 
     public function save(): void
@@ -95,18 +194,18 @@ class Users extends Component
         // Logic khusus Super Admin
         if ($this->isEditingSuperAdmin) {
             $exceptId = $this->editingId ?: 'NULL';
-            $this->validate([
+            $this->validate(array_merge([
                 'name'  => 'required|min:2|max:100',
                 'email' => "required|email|unique:users,email,{$exceptId},id,deleted_at,NULL",
                 'password' => 'nullable|min:6',
-            ]);
+            ], $this->profileValidationRules()));
 
             $user = User::find($this->editingId);
             $data = [
                 'name'  => $this->name,
                 'email' => $this->email,
             ];
-            
+
             if ($this->password) {
                 $data['password'] = bcrypt($this->password);
             }
@@ -117,6 +216,8 @@ class Users extends Component
             if (!$user->hasRole('Super Admin')) {
                 $user->assignRole('Super Admin');
             }
+
+            $this->saveProfile($user);
 
             $this->dispatch('notify', type: 'success', message: 'Data Super Admin berhasil diperbarui');
             $this->showModal = false;
@@ -130,17 +231,17 @@ class Users extends Component
         }
 
         $exceptId = $this->editingId ?: 'NULL';
-        $rules = [
+        $rules = array_merge([
             'username' => "required|min:3|max:50|unique:users,username,{$exceptId},id,deleted_at,NULL",
             'name' => 'required|min:2|max:100',
             'email' => "required|email|unique:users,email,{$exceptId},id,deleted_at,NULL",
             'selectedRoles' => 'required|array|min:1',
-        ];
-        
+        ], $this->profileValidationRules());
+
         if (!$this->editingId) {
             $rules['password'] = 'required|min:6';
         }
-        
+
         $this->validate($rules, [
             'selectedRoles.required' => 'Wajib memilih minimal satu role.',
             'selectedRoles.min' => 'Wajib memilih minimal satu role.',
@@ -160,10 +261,12 @@ class Users extends Component
             $user = User::find($this->editingId);
             $user->update($data);
             $user->syncRoles($this->selectedRoles);
+            $this->saveProfile($user);
             $this->dispatch('notify', type: 'success', message: 'User berhasil diperbarui');
         } else {
             $user = User::create($data);
             $user->syncRoles($this->selectedRoles);
+            $this->saveProfile($user);
             $this->dispatch('notify', type: 'success', message: 'User berhasil ditambahkan');
         }
 

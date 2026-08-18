@@ -22,6 +22,12 @@ class Customers extends Component
     #[Url(except: '')]
     public string $search = '';
 
+    #[Url(except: '')]
+    public string $sourceFilter = '';
+
+    #[Url(except: 'blocked')]
+    public string $blacklistStatus = 'blocked';
+
     public bool $showBlockModal = false;
     public string $blockPhone = '';
     public string $blockReason = '';
@@ -40,6 +46,16 @@ class Customers extends Component
         $this->resetPage();
     }
 
+    public function updatingSourceFilter(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatingBlacklistStatus(): void
+    {
+        $this->resetPage();
+    }
+
     public function switchTab(string $tab): void
     {
         if ($tab === 'blacklist') {
@@ -48,6 +64,8 @@ class Customers extends Component
 
         $this->tab = $tab;
         $this->search = '';
+        $this->sourceFilter = '';
+        $this->blacklistStatus = 'blocked';
         $this->resetPage();
     }
 
@@ -121,9 +139,9 @@ class Customers extends Component
         $blockedMap = collect();
 
         if ($this->tab === 'blacklist') {
-            $blacklist = BlockedPhoneNumber::getPaginated($this->search, 15);
+            $blacklist = BlockedPhoneNumber::getPaginated($this->search, 15, $this->blacklistStatus);
         } else {
-            $customers  = $directory->paginate($this->search, 15);
+            $customers  = $directory->paginate($this->search, 15, $this->sourceFilter);
             $blockedMap = $directory->getBlockedMap(
                 Collection::make($customers->items())->pluck('phone')
             );

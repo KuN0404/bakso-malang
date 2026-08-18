@@ -5,6 +5,8 @@ namespace App\Actions\Payment;
 use App\Actions\Notifications\SendReceiptNotificationAction;
 use App\DTOs\Payment\CartPayload;
 use App\Enums\PaymentTransactionStatus;
+use App\Exceptions\InsufficientStockException;
+use App\Models\Component;
 use App\Models\DailyQueueNumber;
 use App\Models\PaymentSource;
 use App\Models\PaymentTransaction;
@@ -14,6 +16,7 @@ use App\Models\Shift;
 use App\Models\StockLog;
 use App\Models\Transaction;
 use App\Services\CartValidationService;
+use App\Services\ComponentDemandResolver;
 use App\Services\ComponentStockService;
 use App\Services\ReportSyncService;
 use Illuminate\Support\Facades\DB;
@@ -28,6 +31,7 @@ class InitiateCashPaymentAction
         private readonly ComponentStockService $componentStockService,
         private readonly CartValidationService $cartValidationService,
         private readonly SendReceiptNotificationAction $sendReceiptNotification,
+        private readonly ComponentDemandResolver $demandResolver,
     ) {}
 
     /**
@@ -37,7 +41,7 @@ class InitiateCashPaymentAction
     {
         return DB::transaction(function () use ($payload, $cashierId) {
             // -- Hitung ulang harga dari DB — JANGAN percaya unit_price/subtotal dari client --
-            $validated = $this->cartValidationService->validateAndPrice($payload->cart);
+            $validated = $this->cartValidationService->validateAndPrice($payload->cart, $cashierId);
             $items     = $validated['items'];
             $subtotal  = $validated['subtotal'];
 
@@ -63,7 +67,12 @@ class InitiateCashPaymentAction
 
             foreach ($productQuantities as $productId => $totalQty) {
                 $product = $products->get($productId);
-                if ($product && $product->track_stock) {
+                // Produk ber-BOM sengaja dilewati: stoknya adalah turunan dari stok
+                // komponen, bukan products.stock — ketersediaannya divalidasi saat
+                // deductForBom(). Tanpa guard ini, produk BOM dengan track_stock=true
+                // dan stock=0 (kondisi normal, karena stok produknya memang tidak
+                // dipakai) selalu ditolak walau komponennya penuh.
+                if ($product && $product->track_stock && !$product->hasBom()) {
                     // Gunakan available stock (stock fisik - active reservations Self Order)
                     $availableStock = $product->getAvailableStock();
                     if ($totalQty > $availableStock) {
@@ -71,6 +80,42 @@ class InitiateCashPaymentAction
                             "Stok {$product->name} tidak cukup. " .
                             "Tersedia: {$availableStock} (Fisik: {$product->stock}, Reserved: " .
                             ($product->stock - $availableStock) . "), Dibutuhkan: {$totalQty}."
+                        );
+                    }
+                }
+            }
+
+            // -- Validasi stok komponen (BOM + substitusi + modifier) secara agregat --
+            // Dilakukan SEBELUM baris transaksi dibuat, sambil memegang lock komponen
+            // dengan urutan id menaik. Dua alasan:
+            //   1. Urutan lock yang deterministik mencegah deadlock ABBA antar kasir.
+            //   2. Kegagalan stok tidak lagi menghanguskan nomor antrean & nomor faktur.
+            // Kebutuhan dijumlahkan lintas seluruh keranjang, sehingga dua produk
+            // berbeda yang memperebutkan komponen sama ikut terdeteksi.
+            $componentDemand = $this->demandResolver->demandForCart($items);
+
+            if (!empty($componentDemand)) {
+                $componentIds = array_keys($componentDemand);
+                sort($componentIds);
+
+                $lockedComponents = Component::whereIn('id', $componentIds)
+                    ->orderBy('id')
+                    ->lockForUpdate()
+                    ->get()
+                    ->keyBy('id');
+
+                foreach ($componentDemand as $componentId => $needed) {
+                    $component = $lockedComponents->get($componentId);
+
+                    if (!$component) {
+                        throw new \RuntimeException("Komponen ID [{$componentId}] tidak ditemukan.");
+                    }
+
+                    if ($needed > (float) $component->stock + 1e-6) {
+                        throw new InsufficientStockException(
+                            "Stok komponen '{$component->name}' tidak cukup. " .
+                            "Dibutuhkan: {$needed} {$component->unit?->symbol}, " .
+                            "Tersisa: {$component->stock} {$component->unit?->symbol}."
                         );
                     }
                 }
@@ -131,7 +176,7 @@ class InitiateCashPaymentAction
             // -- Detail + Stok (pakai $items yang sudah divalidasi ulang dari DB) --
             $this->createDetailsAndDeductStock($transaction, $items, $products, $cashierId);
 
-            $transaction->load(['details.modifiers', 'user', 'paymentSource', 'serviceArea']);
+            $transaction->load(['details.modifiers', 'details.components', 'user', 'paymentSource', 'serviceArea']);
 
             // Sync laporan (di luar lock tapi masih di dalam DB transaction)
             $this->reportSyncService->syncTransaction($transaction);
@@ -198,12 +243,16 @@ class InitiateCashPaymentAction
             $product = $products->get($item['product_id']);
 
             if ($product && $product->hasBom()) {
-                // Mode BOM: Kurangi stok komponen yang terdaftar pada BOM produk ini
+                // Mode BOM: Kurangi stok komponen yang terdaftar pada BOM produk ini,
+                // dengan memperhitungkan substitusi yang dipilih kasir. $detail
+                // diteruskan supaya komposisi aktual tercatat untuk audit & retur.
                 $this->componentStockService->deductForBom(
                     $item['product_id'],
                     $item['quantity'],
                     $transaction->id,
-                    $cashierId
+                    $cashierId,
+                    $item['substitutions'] ?? [],
+                    $detail
                 );
             } elseif ($product && $product->track_stock) {
                 // Mode Direct Stock: Kurangi stok produk (backward compat)

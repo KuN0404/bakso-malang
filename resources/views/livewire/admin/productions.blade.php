@@ -54,7 +54,7 @@
                         <td class="px-6 py-4 text-gray-700">{{ $p->production_date->format('d/m/Y') }}</td>
                         <td class="px-6 py-4 text-xs text-gray-600">
                             @foreach($p->inputs->take(2) as $in)
-                                <div>- {{ $in->ingredient?->name }}: {{ number_format($in->quantity, 2, ',', '.') }} {{ $in->ingredient?->unit }}</div>
+                                <div>- {{ $in->ingredient?->name }}: {{ number_format($in->quantity, 2, ',', '.') }} {{ $in->ingredient?->unit?->symbol }}</div>
                             @endforeach
                             @if($p->inputs->count() > 2)
                                 <span class="text-gray-400">+{{ $p->inputs->count() - 2 }} bahan lainnya</span>
@@ -175,7 +175,7 @@
                                 <select wire:model.live="inputItems.{{ $index }}.ingredient_id" class="w-full text-xs border border-gray-200 rounded-lg p-2 bg-white">
                                     <option value="">-- Pilih Bahan Baku --</option>
                                     @foreach($ingredients as $ing)
-                                        <option value="{{ $ing->id }}">{{ $ing->name }} (Stok: {{ number_format($ing->stock, 2, ',', '.') }} {{ $ing->unit }})</option>
+                                        <option value="{{ $ing->id }}">{{ $ing->name }} (Stok: {{ number_format($ing->stock, 2, ',', '.') }} {{ $ing->unit?->symbol }})</option>
                                     @endforeach
                                 </select>
                                 @error("inputItems.{$index}.ingredient_id") <span class="text-xs text-red-500">{{ $message }}</span> @enderror
@@ -230,7 +230,7 @@
                                 <select wire:model.live="outputItems.{{ $index }}.component_id" class="w-full text-xs border border-gray-200 rounded-lg p-2 bg-white">
                                     <option value="">-- Pilih Komponen --</option>
                                     @foreach($components as $comp)
-                                        <option value="{{ $comp->id }}">{{ $comp->name }} (Stok: {{ number_format($comp->stock, 0, ',', '.') }} {{ $comp->unit }})</option>
+                                        <option value="{{ $comp->id }}">{{ $comp->name }} (Stok: {{ number_format($comp->stock, 0, ',', '.') }} {{ $comp->unit?->symbol }})</option>
                                     @endforeach
                                 </select>
                                 @error("outputItems.{$index}.component_id") <span class="text-xs text-red-500">{{ $message }}</span> @enderror
@@ -308,7 +308,7 @@
                             @foreach($selectedProduction->inputs as $in)
                                 <tr>
                                     <td class="py-2 px-3 font-medium">{{ $in->ingredient?->name }}</td>
-                                    <td class="py-2 px-3 text-center">{{ number_format($in->quantity, 2, ',', '.') }} {{ $in->ingredient?->unit }}</td>
+                                    <td class="py-2 px-3 text-center">{{ number_format($in->quantity, 2, ',', '.') }} {{ $in->ingredient?->unit?->symbol }}</td>
                                     <td class="py-2 px-3 text-right">Rp {{ number_format($in->unit_cost, 0, ',', '.') }}</td>
                                     <td class="py-2 px-3 text-right font-semibold">Rp {{ number_format($in->subtotal, 0, ',', '.') }}</td>
                                 </tr>

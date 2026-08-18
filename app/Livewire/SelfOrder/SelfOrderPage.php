@@ -90,6 +90,10 @@ class SelfOrderPage extends Component
 
     public function mount(): void
     {
+        if (!Setting::get('self_order_enabled', true, 'self_order')) {
+            abort(503, 'Self Order sedang tidak tersedia. Silakan pesan langsung di kasir.');
+        }
+
         // Idempotency key baru untuk setiap mount
         session()->put('self_order_idempotency_key', (string) Str::uuid());
 
@@ -241,6 +245,28 @@ class SelfOrderPage extends Component
     // Cart Methods
     // -----------------------------------------------------------------
 
+    /**
+     * Gerbang tunggal validasi stok komponen untuk keranjang Self Order.
+     *
+     * Memakai ComponentDemandResolver yang sama dengan POS dan dengan badge stok di
+     * halaman ini, sehingga angka yang dilihat customer dan yang divalidasi tidak
+     * mungkin berbeda. Resolver sudah reservation-aware, jadi stok yang sedang
+     * ditahan pesanan lain ikut diperhitungkan.
+     */
+    protected function cartFits(array $candidateCart): bool
+    {
+        $shortfalls = app(\App\Services\ComponentDemandResolver::class)->shortfalls($candidateCart);
+
+        if (empty($shortfalls)) {
+            return true;
+        }
+
+        $err = $shortfalls[0];
+        $this->flashError("Stok tidak cukup untuk pesanan sebanyak itu ('{$err['component']}' tersisa {$err['available']} {$err['unit']}).");
+
+        return false;
+    }
+
     public function addToCart(int $productId, int $quantity = 1, array $modifiers = [], ?string $notes = null): void
     {
         $product = Product::find($productId);
@@ -271,6 +297,24 @@ class SelfOrderPage extends Component
                     ];
                 }
             }
+        }
+
+        // Validasi stok komponen SEBELUM item masuk keranjang. Tanpa ini customer baru
+        // ditolak saat submit pesanan, dan produk ber-BOM tidak pernah tervalidasi
+        // sama sekali di keranjang.
+        $candidate = $this->cart;
+        if (isset($candidate[$cartKey])) {
+            $candidate[$cartKey]['quantity'] += $quantity;
+        } else {
+            $candidate[$cartKey] = [
+                'product_id' => $productId,
+                'quantity'   => $quantity,
+                'modifiers'  => $modifiersData,
+            ];
+        }
+
+        if (!$this->cartFits($candidate)) {
+            return;
         }
 
         if (isset($this->cart[$cartKey])) {
@@ -315,6 +359,16 @@ class SelfOrderPage extends Component
         if ($newQty > $maxQty) {
             $this->flashError("Maksimum {$maxQty} per item.");
             return;
+        }
+
+        // Hanya perlu dicek saat menambah — mengurangi selalu aman.
+        if ($delta > 0) {
+            $candidate = $this->cart;
+            $candidate[$cartKey]['quantity'] = $newQty;
+
+            if (!$this->cartFits($candidate)) {
+                return;
+            }
         }
 
         $this->cart[$cartKey]['quantity'] = $newQty;

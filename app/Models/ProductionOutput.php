@@ -64,6 +64,6 @@ class ProductionOutput extends Model
      */
     public function getOutputUnit(): string
     {
-        return $this->component?->unit ?? 'pcs';
+        return $this->component?->unit?->symbol ?? 'pcs';
     }
 }

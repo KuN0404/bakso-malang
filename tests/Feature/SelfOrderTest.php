@@ -26,6 +26,7 @@ use App\Models\StockReservation;
 use App\Models\User;
 use App\Services\MidtransService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Livewire;
 use Tests\TestCase;
 
 class SelfOrderTest extends TestCase
@@ -313,6 +314,76 @@ class SelfOrderTest extends TestCase
         $this->assertEquals(20, $component->fresh()->stock); // fisik belum berkurang
     }
 
+    /**
+     * Produk ber-BOM umumnya track_stock=false. Dulu gerbang @if($product->track_stock)
+     * di blade membuat badge "Habis" tidak pernah muncul untuk produk seperti ini.
+     */
+    public function test_bom_product_without_track_stock_reports_unavailable_when_component_empty(): void
+    {
+        $component = Component::create([
+            'code' => 'CMP-AVL', 'name' => 'Bakso Kecil', 'unit' => 'pcs', 'stock' => 0,
+        ]);
+
+        $product = $this->makeProduct(['track_stock' => false]);
+        ProductBom::create([
+            'product_id' => $product->id, 'component_id' => $component->id, 'quantity' => 3,
+        ]);
+
+        $product = $product->fresh()->load('bom.component');
+
+        $this->assertSame(0, $product->getAvailableStock());
+        $this->assertFalse($product->isAvailable());
+
+        $component->update(['stock' => 9]);
+        $product = $product->fresh()->load('bom.component');
+
+        $this->assertSame(3, $product->getAvailableStock()); // 9 / 3
+        $this->assertTrue($product->isAvailable());
+    }
+
+    /** Keranjang Self Order harus menolak sebelum submit, bukan setelahnya. */
+    public function test_self_order_cart_rejects_when_component_insufficient(): void
+    {
+        $component = Component::create([
+            'code' => 'CMP-CART', 'name' => 'Bakso Kecil', 'unit' => 'pcs', 'stock' => 5,
+        ]);
+
+        $product = $this->makeProduct(['track_stock' => false]);
+        ProductBom::create([
+            'product_id' => $product->id, 'component_id' => $component->id, 'quantity' => 3,
+        ]);
+
+        // 1 produk butuh 3 (muat), 2 produk butuh 6 (tidak muat dari stok 5).
+        Livewire::test(\App\Livewire\SelfOrder\SelfOrderPage::class)
+            ->call('addToCart', $product->id)
+            ->assertCount('cart', 1)
+            ->call('addToCart', $product->id)
+            ->assertCount('cart', 1); // penambahan kedua ditolak
+
+        $this->assertTrue(true);
+    }
+
+    /** Dua produk berbeda yang memperebutkan komponen sama harus dijumlahkan. */
+    public function test_place_order_rejects_when_two_products_share_scarce_component(): void
+    {
+        $component = Component::create([
+            'code' => 'CMP-SHARE', 'name' => 'Kuah Kaldu', 'unit' => 'porsi', 'stock' => 3,
+        ]);
+
+        $a = $this->makeProduct(['track_stock' => false]);
+        $b = $this->makeProduct(['track_stock' => false]);
+        ProductBom::create(['product_id' => $a->id, 'component_id' => $component->id, 'quantity' => 2]);
+        ProductBom::create(['product_id' => $b->id, 'component_id' => $component->id, 'quantity' => 2]);
+
+        $this->expectException(InsufficientStockException::class);
+
+        // Masing-masing 1 unit → total butuh 4, stok hanya 3.
+        app(PlaceSelfOrderAction::class)->execute(
+            $this->validCheckoutData($a, ['items' => [$this->validItem($a, 1), $this->validItem($b, 1)]]),
+            '127.0.0.1'
+        );
+    }
+
     // -----------------------------------------------------------------
     // AcceptSelfOrderPaymentAction (Bayar di Kasir)
     // -----------------------------------------------------------------
@@ -334,6 +405,79 @@ class SelfOrderTest extends TestCase
         $this->assertEquals(SelfOrderStatus::Paid, $selfOrder->fresh()->status);
         $this->assertEquals(3, $product->fresh()->stock); // 5 - 2 dikurangi aktual
         $this->assertEquals(3, $product->fresh()->getAvailableStock());
+    }
+
+    /**
+     * Self Order memotong stok lewat reservasi (bukan ComponentStockService::deductForBom),
+     * sehingga dulu tidak pernah menulis snapshot komposisi komponen. Akibatnya retur
+     * menghitung ulang dari BOM yang hidup — salah begitu BOM berubah atau saat oversold.
+     */
+    public function test_accept_payment_writes_component_snapshot_for_bom_product(): void
+    {
+        $component = Component::create([
+            'code' => 'CMP-SNAP', 'name' => 'Bakso Kecil', 'unit' => 'pcs', 'stock' => 20,
+        ]);
+
+        $product = $this->makeProduct(['track_stock' => false]);
+        ProductBom::create([
+            'product_id' => $product->id, 'component_id' => $component->id, 'quantity' => 3,
+        ]);
+
+        $cashier = $this->makeCashier();
+        $this->openShiftFor($cashier);
+
+        $selfOrder = app(PlaceSelfOrderAction::class)->execute(
+            $this->validCheckoutData($product, ['items' => [$this->validItem($product, 2)]]),
+            '127.0.0.1'
+        );
+
+        $transaction = app(AcceptSelfOrderPaymentAction::class)->execute($selfOrder->id, $cashier->id, 50000);
+
+        // 2 produk x 3 = 6 komponen benar-benar terpotong
+        $this->assertEquals(14.0, (float) $component->fresh()->stock);
+
+        $detail   = $transaction->details->first();
+        $snapshot = $detail->components;
+
+        $this->assertCount(1, $snapshot);
+        $this->assertEquals($component->id, $snapshot->first()->component_id);
+        $this->assertEquals('bom', $snapshot->first()->source);
+        $this->assertEquals(3.0, (float) $snapshot->first()->quantity_per_unit);
+        $this->assertEquals(6.0, (float) $snapshot->first()->quantity_total);
+    }
+
+    /** Retur transaksi Self Order harus memakai snapshot, bukan hitung ulang dari BOM. */
+    public function test_return_of_self_order_uses_snapshot_after_bom_changed(): void
+    {
+        $component = Component::create([
+            'code' => 'CMP-RET', 'name' => 'Bakso Kecil', 'unit' => 'pcs', 'stock' => 20,
+        ]);
+
+        $product = $this->makeProduct(['track_stock' => false]);
+        $bomLine = ProductBom::create([
+            'product_id' => $product->id, 'component_id' => $component->id, 'quantity' => 3,
+        ]);
+
+        $cashier = $this->makeCashier();
+        $this->openShiftFor($cashier);
+
+        $selfOrder = app(PlaceSelfOrderAction::class)->execute(
+            $this->validCheckoutData($product, ['items' => [$this->validItem($product, 1)]]),
+            '127.0.0.1'
+        );
+
+        $transaction = app(AcceptSelfOrderPaymentAction::class)->execute($selfOrder->id, $cashier->id, 50000);
+
+        $this->assertEquals(17.0, (float) $component->fresh()->stock); // 20 - 3
+
+        // Admin mengubah resep SETELAH penjualan — retur tidak boleh ikut berubah.
+        $bomLine->update(['quantity' => 10]);
+
+        app(\App\Services\ComponentStockService::class)
+            ->restoreForReturn($transaction->details->first()->id, 1, null, 555);
+
+        // Kembali 3 (sesuai yang dulu dipotong), bukan 10 dari BOM baru.
+        $this->assertEquals(20.0, (float) $component->fresh()->stock);
     }
 
     public function test_accept_payment_rejects_when_status_not_waiting_payment(): void
@@ -714,6 +858,64 @@ class SelfOrderTest extends TestCase
         $this->assertNotNull($transaction);
         $this->assertEquals(SelfOrderStatus::Paid, $selfOrder->fresh()->status);
         $this->assertEquals(0, $product->fresh()->stock); // floor di 0, bukan -1
+    }
+
+    /**
+     * Regresi paling penting: settlement terlambat memotong stok komponen secara
+     * best-effort (di-clamp di 0). Snapshot HARUS mencatat yang benar-benar terpotong,
+     * bukan yang diniatkan — kalau tidak, retur mengembalikan lebih banyak daripada
+     * yang pernah keluar dan menciptakan stok hantu.
+     */
+    public function test_late_settlement_snapshot_records_actual_deducted_components_not_intended(): void
+    {
+        $component = Component::create([
+            'code' => 'CMP-OVS', 'name' => 'Bakso Kecil', 'unit' => 'pcs', 'stock' => 2,
+        ]);
+
+        $product = $this->makeProduct(['track_stock' => false]);
+        ProductBom::create([
+            'product_id' => $product->id, 'component_id' => $component->id, 'quantity' => 3,
+        ]);
+
+        [$selfOrder, $paymentTx] = $this->createQrisOrderWithPaymentTx($product, 11000);
+
+        // Reservasi sudah kadung dilepas job expiry → jalur best-effort.
+        StockReservation::create([
+            'reservable_type' => SelfOrder::class,
+            'reservable_id'   => $selfOrder->id,
+            'item_type'       => 'component',
+            'item_id'         => $component->id,
+            'quantity'        => 3,
+            'status'          => 'released',
+            'released_at'     => now(),
+            'expires_at'      => now()->subMinute(),
+        ]);
+        $selfOrder->update(['status' => SelfOrderStatus::Expired->value]);
+
+        $payload = MidtransWebhookPayload::fromArray([
+            'order_id'           => $paymentTx->midtrans_order_id,
+            'transaction_id'     => 'MID-TX-LATE-BOM',
+            'transaction_status' => 'settlement',
+            'payment_type'       => 'qris',
+            'gross_amount'       => '11000.00',
+            'status_code'        => '200',
+        ]);
+
+        $transaction = app(HandleSelfOrderWebhookAction::class)->execute($payload);
+
+        // Butuh 3, hanya ada 2 → terpotong 2, floor di 0.
+        $this->assertEquals(0.0, (float) $component->fresh()->stock);
+
+        $snapshot = $transaction->details->first()->components->first();
+        $this->assertNotNull($snapshot, 'Snapshot komponen wajib ditulis di jalur settlement terlambat');
+        $this->assertEquals(3.0, (float) $snapshot->quantity_per_unit, 'Niatnya tetap 3 per unit');
+        $this->assertEquals(2.0, (float) $snapshot->quantity_total, 'Yang benar-benar terpotong hanya 2');
+
+        // Retur hanya boleh mengembalikan 2, bukan 3.
+        app(\App\Services\ComponentStockService::class)
+            ->restoreForReturn($transaction->details->first()->id, 1, null, 777);
+
+        $this->assertEquals(2.0, (float) $component->fresh()->stock);
     }
 
     // -----------------------------------------------------------------

@@ -70,7 +70,16 @@
                                 @endif
                                 
                                 {{-- Stock Status --}}
-                                @if(!$product->track_stock)
+                                @php
+                                    $productHasBom = $product->hasBom();
+                                    $bomQty = $productHasBom ? $product->getBomAvailableQty() : null;
+                                @endphp
+                                @if($productHasBom)
+                                    <span class="px-2.5 py-1 rounded-full text-xs font-medium inline-flex items-center gap-1 {{ $bomQty > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700' }}">
+                                        <i data-lucide="layers" class="w-3 h-3"></i>
+                                        {{ $bomQty > 0 ? "Estimasi Stok: {$bomQty}" : 'Stok Habis' }}
+                                    </span>
+                                @elseif(!$product->track_stock)
                                     <span class="px-2.5 py-1 rounded-full text-xs font-medium bg-purple-50 text-purple-600 inline-flex items-center gap-1">
                                         <i data-lucide="infinity" class="w-3 h-3"></i> Unlimited
                                     </span>
@@ -111,6 +120,61 @@
                     </div>
                 @endif
             </div>
+
+            @if($product->hasBom())
+                {{-- Komposisi BOM --}}
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50">
+                        <h3 class="font-semibold text-gray-800 flex items-center gap-2">
+                            <i data-lucide="layers" class="w-4 h-4 text-primary-600"></i>
+                            Komposisi Komponen (BOM)
+                        </h3>
+                        <span class="text-xs text-gray-500">{{ $product->bom->count() }} komponen · Estimasi stok: <span class="font-bold text-gray-700">{{ $product->getBomAvailableQty() }}</span></span>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left">
+                            <thead class="bg-gray-50 text-gray-600 font-medium border-b border-gray-100">
+                                <tr>
+                                    <th class="px-6 py-3">Komponen</th>
+                                    <th class="px-6 py-3 text-right">Qty / 1 Produk</th>
+                                    <th class="px-6 py-3 text-right">Stok Komponen</th>
+                                    <th class="px-6 py-3">Pengganti</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-100">
+                                @foreach($product->bom as $bomLine)
+                                    <tr class="hover:bg-gray-50/50 transition-colors" wire:key="bom-row-{{ $bomLine->id }}">
+                                        <td class="px-6 py-3 font-medium text-gray-800">{{ $bomLine->component?->name ?? '-' }}</td>
+                                        <td class="px-6 py-3 text-right text-gray-600">
+                                            {{ rtrim(rtrim(number_format($bomLine->quantity, 3, ',', '.'), '0'), ',') }}
+                                            {{ $bomLine->component?->unit?->symbol }}
+                                        </td>
+                                        <td class="px-6 py-3 text-right">
+                                            <span class="{{ ($bomLine->component && $bomLine->component->stock < $bomLine->quantity) ? 'text-red-600 font-semibold' : 'text-gray-600' }}">
+                                                {{ rtrim(rtrim(number_format($bomLine->component?->stock ?? 0, 3, ',', '.'), '0'), ',') }}
+                                                {{ $bomLine->component?->unit?->symbol }}
+                                            </span>
+                                            @if($bomLine->component && $bomLine->component->stock < $bomLine->quantity)
+                                                <span class="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-red-100 text-red-700">Kurang</span>
+                                            @endif
+                                        </td>
+                                        <td class="px-6 py-3">
+                                            @forelse($bomLine->activeSubstitutions as $rule)
+                                                <span class="inline-flex items-center gap-1 px-2 py-0.5 mb-1 rounded text-xs font-medium bg-amber-50 text-amber-700 border border-amber-100">
+                                                    <i data-lucide="repeat" class="w-3 h-3"></i>
+                                                    {{ rtrim(rtrim(number_format($rule->quantity, 3, ',', '.'), '0'), ',') }} {{ $rule->component?->unit?->symbol }} {{ $rule->component?->name }}
+                                                </span>
+                                            @empty
+                                                <span class="text-gray-400 text-xs">-</span>
+                                            @endforelse
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            @endif
 
             <!-- Stock History -->
             <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">

@@ -41,6 +41,16 @@ class PosCheckout extends Component
     #[Locked]
     public array $cart = [];
 
+    // -- State modal substitusi komponen --
+    public bool $showSubstitutionModal = false;
+    #[Locked]
+    public ?int $substitutionProductId = null;
+    public string $substitutionProductName = '';
+    #[Locked]
+    public array $substitutionLines = [];
+    #[Locked]
+    public array $selectedSubstitutions = [];
+
     // Lifecycle hooks
     public function updatedCart($value, $key)
     {
@@ -55,7 +65,29 @@ class PosCheckout extends Component
             }
 
             $product = Product::find($this->cart[$cartKey]['product_id']);
-            if ($product && $product->track_stock) {
+
+            if ($product && $product->hasBom()) {
+                // Produk ber-BOM: stok dihitung dari komponen, bukan products.stock.
+                // Tanpa cabang ini qty yang diketik langsung di keranjang akan
+                // dipaksa jadi 0, karena products.stock produk BOM memang 0.
+                $candidate = $this->cart;
+                $candidate[$cartKey]['quantity'] = $quantity;
+
+                if (!$this->cartFits($candidate, notify: false)) {
+                    // Turunkan sampai ketemu jumlah terbesar yang masih muat.
+                    $maxAllowed = $quantity;
+                    while ($maxAllowed > 0) {
+                        $maxAllowed--;
+                        $candidate[$cartKey]['quantity'] = $maxAllowed;
+                        if ($maxAllowed === 0 || $this->cartFits($candidate, notify: false)) {
+                            break;
+                        }
+                    }
+
+                    $this->cart[$cartKey]['quantity'] = $maxAllowed;
+                    $this->dispatch('notify', type: 'error', message: "Stok komponen tidak cukup. Sisa untuk item ini: {$maxAllowed}");
+                }
+            } elseif ($product && $product->track_stock) {
                 $currentTotal = $this->getTotalQuantityForProduct($product->id, $cartKey);
                 $newTotal = $currentTotal + $quantity;
 
@@ -468,6 +500,44 @@ class PosCheckout extends Component
             ->get();
     }
 
+    /**
+     * Stok BOM ("normal" dan "dengan substitusi") untuk SELURUH produk di grid,
+     * dihitung sekali lewat satu availabilityMapForProducts() alih-alih memanggil
+     * getBomAvailableQty()/getBomAvailabilityWithSubstitutions() per produk di
+     * Blade — itu yang sebelumnya memicu N+1 (query Component + StockReservation
+     * berulang per kartu produk). $this->products sudah eager-load
+     * 'bom.component' dan 'bom.activeSubstitutions.component' lewat
+     * Product::scopeForPosDisplay(), jadi di sini murni satu query batch.
+     *
+     * @return array<int,array{bomQty:?int,subQty:int}>
+     */
+    #[Computed]
+    public function productAvailability(): array
+    {
+        $products = $this->products;
+        $resolver = app(\App\Services\ComponentDemandResolver::class);
+        $availability = $resolver->availabilityMapForProducts($products);
+
+        $result = [];
+
+        foreach ($products as $product) {
+            if (!$product->hasBom()) {
+                continue;
+            }
+
+            $bomQty = $product->getBomAvailableQty([], $availability);
+            $subQty = 0;
+
+            if ($bomQty <= 0) {
+                $subQty = $product->getBomAvailabilityWithSubstitutions($availability)['qty'];
+            }
+
+            $result[$product->id] = ['bomQty' => $bomQty, 'subQty' => $subQty];
+        }
+
+        return $result;
+    }
+
     #[Computed]
     public function paymentSources()
     {
@@ -628,7 +698,7 @@ class PosCheckout extends Component
         $this->selectedCategoryId = $categoryId;
     }
 
-    public function addToCart(int $productId, array $modifiers = []): void
+    public function addToCart(int $productId, array $modifiers = [], array $substitutions = []): void
     {
         $product = Product::getForPos($productId);
 
@@ -637,19 +707,12 @@ class PosCheckout extends Component
             return;
         }
 
-        $cartKey    = $this->generateCartKey($productId, $modifiers);
+        $cartKey    = $this->generateCartKey($productId, $modifiers, $substitutions);
         $currentQty = isset($this->cart[$cartKey]) ? $this->cart[$cartKey]['quantity'] : 0;
         $newQty     = $currentQty + 1;
 
-        if ($product->hasBom()) {
-            $totalInCart = $this->getTotalQuantityForProduct($product->id);
-            $stockErrors = app(\App\Services\ComponentStockService::class)->checkBomAvailability($product->id, $totalInCart + 1);
-            if (!empty($stockErrors)) {
-                $err = $stockErrors[0];
-                $this->dispatch('notify', type: 'error', message: "Stok komponen '{$err['component']}' tidak cukup (Tersisa: {$err['stock']} {$err['unit']}).");
-                return;
-            }
-        } elseif ($product->track_stock) {
+        // Produk non-BOM tetap divalidasi lewat stok produk seperti sebelumnya.
+        if (!$product->hasBom() && $product->track_stock) {
             if ($product->stock <= 0) {
                 $this->dispatch('notify', type: 'error', message: "Stok '{$product->name}' habis (0). Produk tidak dapat dimasukkan ke keranjang.");
                 return;
@@ -662,17 +725,22 @@ class PosCheckout extends Component
             }
         }
 
-        // Cek stok komponen modifier
-        foreach ($modifiers as $modId => $modData) {
-            if (!empty($modData['component_id'])) {
-                $modQty = (float)($modData['qty'] ?? 1);
-                $modErrors = app(\App\Services\ComponentStockService::class)->checkModifierAvailability((int)$modId, $modQty);
-                if (!empty($modErrors)) {
-                    $err = $modErrors[0];
-                    $this->dispatch('notify', type: 'error', message: "Stok komponen '{$err['component']}' untuk modifier '{$modData['name']}' tidak cukup.");
-                    return;
-                }
-            }
+        // Validasi komponen (BOM + substitusi + modifier) untuk SELURUH keranjang
+        // setelah penambahan ini — bukan hanya untuk produk ini sendiri.
+        $candidate = $this->cart;
+        if (isset($candidate[$cartKey])) {
+            $candidate[$cartKey]['quantity'] = $newQty;
+        } else {
+            $candidate[$cartKey] = [
+                'product_id'    => $product->id,
+                'quantity'      => 1,
+                'modifiers'     => $modifiers,
+                'substitutions' => $substitutions,
+            ];
+        }
+
+        if (!$this->cartFits($candidate, true, $product)) {
+            return;
         }
 
         if (isset($this->cart[$cartKey])) {
@@ -690,6 +758,7 @@ class PosCheckout extends Component
                 'modifiers'     => $modifiers,
                 'modifier_total' => $modifierTotal,
                 'subtotal'      => $subtotal,
+                'substitutions' => $substitutions,
             ];
         }
 
@@ -711,20 +780,20 @@ class PosCheckout extends Component
 
         if (isset($this->cart[$cartKey])) {
             $product = Product::find($this->cart[$cartKey]['product_id']);
-            if ($product && $product->hasBom()) {
-                $currentTotal = $this->getTotalQuantityForProduct($product->id, $cartKey);
-                $stockErrors = app(\App\Services\ComponentStockService::class)->checkBomAvailability($product->id, $currentTotal + $quantity);
-                if (!empty($stockErrors)) {
-                    $err = $stockErrors[0];
-                    $this->dispatch('notify', type: 'error', message: "Stok komponen '{$err['component']}' tidak cukup (Tersisa: {$err['stock']} {$err['unit']}).");
-                    return;
-                }
-            } elseif ($product && $product->track_stock) {
+
+            if ($product && !$product->hasBom() && $product->track_stock) {
                 $currentTotal = $this->getTotalQuantityForProduct($product->id, $cartKey);
                 if (($currentTotal + $quantity) > $product->stock) {
                     $this->dispatch('notify', type: 'error', message: "Stok total tidak cukup. Max: {$product->stock}");
                     return;
                 }
+            }
+
+            $candidate = $this->cart;
+            $candidate[$cartKey]['quantity'] = $quantity;
+
+            if (!$this->cartFits($candidate)) {
+                return;
             }
 
             $this->cart[$cartKey]['quantity'] = $quantity;
@@ -735,6 +804,185 @@ class PosCheckout extends Component
                 $this->dispatch('notify', type: 'warning', message: 'Keranjang diubah. QRIS sebelumnya dibatalkan.');
             }
         }
+    }
+
+    // -----------------------------------------------------------------
+    // Substitusi Komponen
+    // -----------------------------------------------------------------
+
+    /**
+     * Buka modal substitusi untuk sebuah produk. Sesuai kebijakan, tombolnya
+     * hanya muncul kalau komposisi normal TIDAK mencukupi — supaya komponen
+     * pengganti (biasanya lebih mahal) tidak terpakai padahal stok normal ada.
+     */
+    public function openSubstitutionModal(int $productId): void
+    {
+        $product = Product::with(['bom.component.unit', 'bom.activeSubstitutions.component.unit'])->find($productId);
+
+        if (!$product || !$product->hasBom()) {
+            return;
+        }
+
+        $resolver = app(\App\Services\ComponentDemandResolver::class);
+
+        // Ambil ketersediaan semua komponen terkait sekali saja (hindari N+1).
+        $allComponentIds = [];
+        foreach ($product->bom as $line) {
+            $allComponentIds[] = $line->component_id;
+            foreach ($line->activeSubstitutions as $rule) {
+                $allComponentIds[] = $rule->component_id;
+            }
+        }
+        $availability = $resolver->availabilityMap($allComponentIds);
+
+        $shortLines = [];
+
+        foreach ($product->bom as $line) {
+            if ((float) $line->quantity <= 0) {
+                continue;
+            }
+
+            $available = $availability[$line->component_id] ?? 0.0;
+
+            if ($available >= (float) $line->quantity) {
+                continue; // baris ini cukup, tidak perlu diganti
+            }
+
+            $options = [];
+
+            foreach ($line->activeSubstitutions as $rule) {
+                $ruleAvailable = $availability[$rule->component_id] ?? 0.0;
+
+                $options[] = [
+                    'rule_id'        => $rule->id,
+                    'component_id'   => $rule->component_id,
+                    'component_name' => $rule->component?->name,
+                    'quantity'       => (float) $rule->quantity,
+                    'unit'           => $rule->component?->unit?->symbol,
+                    'available'      => $ruleAvailable,
+                    'is_enough'      => $ruleAvailable >= (float) $rule->quantity,
+                    'label'          => $rule->display_label,
+                ];
+            }
+
+            $shortLines[] = [
+                'bom_id'         => $line->id,
+                'component_id'   => $line->component_id,
+                'component_name' => $line->component?->name,
+                'needed'         => (float) $line->quantity,
+                'available'      => $available,
+                'unit'           => $line->component?->unit?->symbol,
+                'options'        => $options,
+            ];
+        }
+
+        $this->substitutionProductId = $productId;
+        $this->substitutionProductName = $product->name;
+        $this->substitutionLines = $shortLines;
+        $this->selectedSubstitutions = [];
+        $this->showSubstitutionModal = true;
+    }
+
+    /**
+     * Daftar komponen yang bisa dipilih untuk substitusi manual. Hanya dihitung
+     * saat modal terbuka supaya tidak membebani render normal halaman POS.
+     */
+    #[Computed]
+    public function substitutableComponents()
+    {
+        if (!$this->showSubstitutionModal) {
+            return collect();
+        }
+
+        return \App\Models\Component::query()
+            ->where('is_active', true)
+            ->where('stock', '>', 0)
+            ->orderBy('name')
+            ->get(['id', 'name', 'stock']);
+    }
+
+    public function closeSubstitutionModal(): void
+    {
+        $this->showSubstitutionModal = false;
+        $this->substitutionProductId = null;
+        $this->substitutionLines = [];
+        $this->selectedSubstitutions = [];
+    }
+
+    /**
+     * Pilih satu opsi pengganti untuk sebuah baris BOM (aturan admin).
+     */
+    public function chooseSubstitution(int $bomId, int $ruleId): void
+    {
+        foreach ($this->substitutionLines as $line) {
+            if ((int) $line['bom_id'] !== $bomId) {
+                continue;
+            }
+
+            foreach ($line['options'] as $option) {
+                if ((int) $option['rule_id'] === $ruleId) {
+                    if (!$option['is_enough']) {
+                        $this->dispatch('notify', type: 'error', message: "Stok '{$option['component_name']}' juga tidak mencukupi.");
+                        return;
+                    }
+
+                    $this->selectedSubstitutions[$bomId] = [
+                        'component_id' => (int) $option['component_id'],
+                        'quantity'     => (float) $option['quantity'],
+                        'rule_id'      => (int) $option['rule_id'],
+                    ];
+                    return;
+                }
+            }
+        }
+    }
+
+    /**
+     * Substitusi manual: kasir memilih sendiri komponen pengganti dan jumlahnya.
+     * Tetap divalidasi ulang di server (CartValidationService) saat checkout.
+     */
+    public function chooseManualSubstitution(int $bomId, int $componentId, float $quantity): void
+    {
+        if (!auth()->user()?->can('apply_manual_substitution')) {
+            $this->dispatch('notify', type: 'error', message: 'Anda tidak memiliki izin untuk mengganti komponen secara manual.');
+            return;
+        }
+
+        if ($componentId <= 0 || $quantity <= 0) {
+            $this->dispatch('notify', type: 'error', message: 'Komponen dan jumlah pengganti harus diisi.');
+            return;
+        }
+
+        $this->selectedSubstitutions[$bomId] = [
+            'component_id' => $componentId,
+            'quantity'     => $quantity,
+            'rule_id'      => null, // null = manual
+        ];
+    }
+
+    /**
+     * Terapkan substitusi terpilih dan masukkan produk ke keranjang.
+     */
+    public function applySubstitutionAndAdd(): void
+    {
+        if (!$this->substitutionProductId) {
+            return;
+        }
+
+        // Setiap baris yang kurang wajib punya pilihan pengganti, kalau tidak
+        // produk memang tidak bisa dibuat.
+        foreach ($this->substitutionLines as $line) {
+            if (!isset($this->selectedSubstitutions[$line['bom_id']])) {
+                $this->dispatch('notify', type: 'error', message: "Pilih pengganti untuk '{$line['component_name']}' terlebih dahulu.");
+                return;
+            }
+        }
+
+        $productId = $this->substitutionProductId;
+        $subs      = $this->selectedSubstitutions;
+
+        $this->closeSubstitutionModal();
+        $this->addToCart($productId, [], $subs);
     }
 
     protected function getTotalQuantityForProduct(int $productId, ?string $excludeCartKey = null): int
@@ -1424,7 +1672,15 @@ class PosCheckout extends Component
         return \App\Models\SelfOrder::where('shift_id', $shiftId)->active()->count();
     }
 
-    protected function generateCartKey(int $productId, array $modifiers): string
+    /**
+     * Kunci baris keranjang. Substitusi ikut masuk kunci supaya baris dengan
+     * komposisi pengganti TIDAK tergabung dengan baris berkomposisi normal —
+     * kalau tergabung, komposisi yang dipotong saat checkout jadi salah.
+     *
+     * Dengan $substitutions kosong, kunci yang dihasilkan identik dengan versi
+     * sebelumnya, sehingga keranjang yang tersimpan di cache tetap kompatibel.
+     */
+    protected function generateCartKey(int $productId, array $modifiers, array $substitutions = []): string
     {
         $parts = [];
         foreach ($modifiers as $modId => $mod) {
@@ -1432,7 +1688,57 @@ class PosCheckout extends Component
             $parts[] = $modId . 'x' . $qty;
         }
         sort($parts);
-        return $productId . '_' . implode('_', $parts);
+
+        $key = $productId . '_' . implode('_', $parts);
+
+        if (!empty($substitutions)) {
+            $subParts = [];
+            foreach ($substitutions as $bomId => $sub) {
+                $subParts[] = 's' . $bomId . ':' . ($sub['component_id'] ?? 0) . 'x' . ($sub['quantity'] ?? 0);
+            }
+            sort($subParts);
+            $key .= '__' . implode('_', $subParts);
+        }
+
+        return $key;
+    }
+
+    /**
+     * Gerbang tunggal validasi stok komponen untuk seluruh keranjang.
+     *
+     * Pemanggil menyusun "keranjang kandidat" (keranjang setelah perubahan yang
+     * diinginkan) lalu memanggil method ini. Karena tampilan kartu produk,
+     * add-to-cart, ubah qty, dan validasi checkout semuanya bermuara ke
+     * ComponentDemandResolver yang sama, ketiganya tidak mungkin lagi berbeda
+     * jawaban — sekaligus menutup celah dua produk berbeda yang memperebutkan
+     * komponen yang sama (yang dulu tidak pernah dicek).
+     *
+     * @param  \App\Models\Product|null  $preloadedProduct  Produk yang pemanggil
+     *         sudah fetch sendiri (mis. addToCart() lewat Product::getForPos()),
+     *         supaya shortfalls() tidak query ulang produk yang sama.
+     */
+    protected function cartFits(array $candidateCart, bool $notify = true, ?Product $preloadedProduct = null): bool
+    {
+        $preloaded = $preloadedProduct ? collect([$preloadedProduct->id => $preloadedProduct]) : collect();
+
+        $shortfalls = app(\App\Services\ComponentDemandResolver::class)
+            ->shortfalls($candidateCart, true, $preloaded);
+
+        if (empty($shortfalls)) {
+            return true;
+        }
+
+        if ($notify) {
+            $err = $shortfalls[0];
+            $this->dispatch(
+                'notify',
+                type: 'error',
+                message: "Stok komponen '{$err['component']}' tidak cukup "
+                       . "(butuh {$err['needed']}, tersisa {$err['available']} {$err['unit']})."
+            );
+        }
+
+        return false;
     }
 
     protected function calculateModifierTotal(array $modifiers): float

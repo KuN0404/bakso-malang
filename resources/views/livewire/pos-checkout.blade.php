@@ -686,9 +686,21 @@
                             ])->toArray()
                         ];
                         $hasModifiers = $product->modifierGroups->count() > 0;
-                        $isOutOfStock = $product->track_stock && $product->stock <= 0;
+                        $isBomProduct = $product->hasBom();
+
+                        // Dihitung sekali untuk seluruh grid lewat productAvailability()
+                        // (satu query batch), bukan per produk di sini — lihat
+                        // PosCheckout::productAvailability().
+                        $availabilityRow = $this->productAvailability[$product->id] ?? null;
+                        $bomQty = $isBomProduct ? ($availabilityRow['bomQty'] ?? 0) : null;
+                        $subQty = $isBomProduct ? ($availabilityRow['subQty'] ?? 0) : 0;
+                        $hasSubstituteOption = $subQty > 0;
+
+                        $isOutOfStock = $isBomProduct
+                            ? $bomQty <= 0
+                            : ($product->track_stock && $product->stock <= 0);
                     @endphp
-                    <div 
+                    <div
                         @if(!$isOutOfStock)
                             @if($hasModifiers)
                                 @click="openModifierModal({{ json_encode($productData) }})"
@@ -696,12 +708,24 @@
                                 wire:click.throttle.300ms="addToCart({{ $product->id }}, [])"
                             @endif
                         @endif
-                        wire:key="product-{{ $product->id }}"
+                        wire:key="product-{{ $product->id }}-{{ $bomQty ?? 'x' }}-{{ $subQty }}"
                         class="bg-white rounded-xl p-4 shadow-sm hover:shadow-md transition-all cursor-pointer group border border-gray-100 hover:border-primary-300 relative {{ $isOutOfStock ? 'opacity-60 grayscale cursor-not-allowed hover:border-gray-200 hover:shadow-none' : '' }}"
                     >
                         <!-- Badges -->
                         <div class="absolute top-2 right-2 flex flex-col gap-1 items-end z-10">
-                            @if($product->track_stock)
+                            @if($isBomProduct)
+                                @if($bomQty > 0)
+                                    <div class="bg-emerald-600 text-white text-[11px] px-2.5 py-0.5 rounded-full font-bold shadow-sm flex items-center gap-1">
+                                        <x-lucide name="box" class="w-3 h-3" />
+                                        <span>Stok: {{ $bomQty }}</span>
+                                    </div>
+                                @else
+                                    <div class="bg-red-600 text-white text-[11px] px-2.5 py-0.5 rounded-full font-bold shadow-sm flex items-center gap-1">
+                                        <x-lucide name="box" class="w-3 h-3" />
+                                        <span>Habis</span>
+                                    </div>
+                                @endif
+                            @elseif($product->track_stock)
                                 @if($product->stock > 0)
                                     <div class="bg-emerald-600 text-white text-[11px] px-2.5 py-0.5 rounded-full font-bold shadow-sm flex items-center gap-1">
                                         <x-lucide name="box" class="w-3 h-3" />
@@ -755,7 +779,62 @@
                             Rp {{ number_format($product->price, 0, ',', '.') }}
                         </p>
 
-                        @if($product->track_stock)
+                        @if($isBomProduct)
+                            @if($bomQty <= 0)
+                                <p class="text-xs mt-1.5 font-bold text-red-600 flex items-center gap-1 bg-red-50 border border-red-100 px-2 py-1 rounded-md">
+                                    <x-lucide name="box" class="w-3.5 h-3.5" />
+                                    <span>Stok normal: 0</span>
+                                </p>
+
+                                {{-- Komponen yang menjadi penyebab habis --}}
+                                @foreach($product->bom as $bomLine)
+                                    @if($bomLine->component && $bomLine->component->stock < $bomLine->quantity)
+                                        <p class="text-[11px] mt-1 text-amber-700 flex items-center gap-1">
+                                            <x-lucide name="triangle-alert" class="w-3 h-3" />
+                                            <span>{{ $bomLine->component->name }} habis</span>
+                                        </p>
+                                    @endif
+                                @endforeach
+
+                                @if($hasSubstituteOption)
+                                    <button type="button"
+                                        wire:click.stop="openSubstitutionModal({{ $product->id }})"
+                                        class="relative z-[6] mt-1.5 w-full text-[11px] font-bold text-amber-900 bg-amber-300 hover:bg-amber-400 border border-amber-500 px-2 py-1.5 rounded-md flex items-center justify-center gap-1 transition-colors">
+                                        <x-lucide name="repeat" class="w-3.5 h-3.5" />
+                                        <span>Gunakan substitusi ({{ $subQty }})</span>
+                                    </button>
+                                @endif
+                            @else
+                                <p class="text-xs mt-1.5 font-semibold text-emerald-700 flex items-center gap-1 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-md">
+                                    <x-lucide name="box" class="w-3.5 h-3.5" />
+                                    <span>Stok: {{ $bomQty }}</span>
+                                </p>
+                            @endif
+
+                            {{-- Komposisi komponen: popover agar kartu tidak jadi ramai --}}
+                            <div class="relative mt-1" x-data="{ openBom: false }" @click.stop>
+                                <button type="button" @click="openBom = !openBom"
+                                    class="text-[11px] text-gray-500 hover:text-primary-600 inline-flex items-center gap-1">
+                                    <x-lucide name="list" class="w-3 h-3" />
+                                    <span>Komponen ({{ $product->bom->count() }})</span>
+                                </button>
+                                <div x-show="openBom" x-cloak @click.outside="openBom = false" x-transition
+                                    class="absolute bottom-full left-0 mb-1 w-56 bg-white border border-gray-200 rounded-lg shadow-lg p-2 z-30">
+                                    <p class="text-[11px] font-bold text-gray-700 mb-1">Komposisi per 1 porsi</p>
+                                    <ul class="space-y-0.5">
+                                        @foreach($product->bom as $bomLine)
+                                            <li class="text-[11px] flex justify-between gap-2 {{ $bomLine->component && $bomLine->component->stock < $bomLine->quantity ? 'text-red-600 font-semibold' : 'text-gray-600' }}">
+                                                <span>{{ rtrim(rtrim(number_format($bomLine->quantity, 2, ',', '.'), '0'), ',') }} × {{ $bomLine->component?->name ?? '-' }}</span>
+                                                <span class="text-gray-400 whitespace-nowrap">sisa {{ rtrim(rtrim(number_format($bomLine->component?->stock ?? 0, 2, ',', '.'), '0'), ',') }}</span>
+                                            </li>
+                                        @endforeach
+                                    </ul>
+                                    <p class="text-[11px] text-gray-500 mt-1.5 pt-1.5 border-t border-gray-100">
+                                        Estimasi stok: <span class="font-bold text-gray-700">{{ $bomQty }}</span>
+                                    </p>
+                                </div>
+                            </div>
+                        @elseif($product->track_stock)
                             @if($product->stock <= 0)
                                 <p class="text-xs mt-1.5 font-bold text-red-600 flex items-center gap-1 bg-red-50 border border-red-100 px-2 py-1 rounded-md">
                                     <x-lucide name="box" class="w-3.5 h-3.5" />
@@ -803,9 +882,107 @@
             @endif
         </div>
 
+        <!-- Substitution Modal (Livewire-driven: butuh state server & validasi stok) -->
+        @if($showSubstitutionModal)
+            <div class="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center p-4"
+                 wire:click.self="closeSubstitutionModal"
+                 @keydown.escape.window="$wire.closeSubstitutionModal()">
+                <div class="bg-white rounded-2xl w-full max-w-lg shadow-2xl max-h-[90vh] flex flex-col">
+                    <div class="p-5 border-b flex justify-between items-start flex-none">
+                        <div>
+                            <h3 class="text-lg font-bold text-gray-800">Ganti Komponen</h3>
+                            <p class="text-sm text-gray-500">{{ $substitutionProductName }} — komposisi normal tidak mencukupi</p>
+                        </div>
+                        <button type="button" wire:click="closeSubstitutionModal" class="text-gray-400 hover:text-gray-600 p-1.5 hover:bg-gray-100 rounded-lg">
+                            <x-lucide name="x" class="w-5 h-5" />
+                        </button>
+                    </div>
+
+                    <div class="p-5 overflow-y-auto flex-1 custom-scroll space-y-4">
+                        @forelse($substitutionLines as $line)
+                            <div class="border border-gray-200 rounded-xl p-3">
+                                <div class="flex items-center gap-2 mb-2">
+                                    <x-lucide name="triangle-alert" class="w-4 h-4 text-amber-500" />
+                                    <p class="text-sm font-semibold text-gray-800">
+                                        {{ $line['component_name'] }}
+                                        <span class="font-normal text-gray-500">
+                                            — butuh {{ $line['needed'] }} {{ $line['unit'] }}, tersisa {{ $line['available'] }}
+                                        </span>
+                                    </p>
+                                </div>
+
+                                @forelse($line['options'] as $option)
+                                    @php
+                                        $isChosen = ($selectedSubstitutions[$line['bom_id']]['rule_id'] ?? null) === $option['rule_id'];
+                                    @endphp
+                                    <button type="button"
+                                        @disabled(!$option['is_enough'])
+                                        wire:click="chooseSubstitution({{ $line['bom_id'] }}, {{ $option['rule_id'] }})"
+                                        class="w-full text-left mb-2 px-3 py-2 rounded-lg border transition-all flex items-center justify-between gap-2
+                                            {{ $isChosen ? 'border-primary-500 bg-primary-50 ring-1 ring-primary-500' : 'border-gray-200 hover:bg-gray-50' }}
+                                            {{ !$option['is_enough'] ? 'opacity-50 cursor-not-allowed' : '' }}">
+                                        <span class="text-sm font-medium text-gray-800">
+                                            Gunakan {{ rtrim(rtrim(number_format($option['quantity'], 2, ',', '.'), '0'), ',') }}
+                                            {{ $option['unit'] }} {{ $option['component_name'] }}
+                                        </span>
+                                        <span class="text-xs {{ $option['is_enough'] ? 'text-emerald-600' : 'text-red-600' }} whitespace-nowrap">
+                                            sisa {{ rtrim(rtrim(number_format($option['available'], 2, ',', '.'), '0'), ',') }}
+                                        </span>
+                                    </button>
+                                @empty
+                                    <p class="text-xs text-gray-400 italic">Tidak ada aturan pengganti untuk komponen ini.</p>
+                                @endforelse
+
+                                {{-- Substitusi manual (butuh permission khusus) --}}
+                                @can('apply_manual_substitution')
+                                    <div x-data="{ open: false, componentId: '', qty: 1 }" class="mt-2 pt-2 border-t border-gray-100">
+                                        <button type="button" @click="open = !open" class="text-xs font-semibold text-primary-600 hover:text-primary-700 inline-flex items-center gap-1">
+                                            <x-lucide name="settings-2" class="w-3.5 h-3.5" />
+                                            <span>Ganti manual</span>
+                                        </button>
+                                        <div x-show="open" x-cloak class="mt-2 flex gap-2 items-end">
+                                            <select x-model="componentId" class="flex-1 text-xs border border-gray-200 rounded-lg p-2">
+                                                <option value="">-- Pilih komponen --</option>
+                                                @foreach($this->substitutableComponents as $comp)
+                                                    <option value="{{ $comp->id }}">{{ $comp->name }} (sisa {{ rtrim(rtrim(number_format($comp->stock, 2, ',', '.'), '0'), ',') }})</option>
+                                                @endforeach
+                                            </select>
+                                            <input type="number" step="0.01" min="0.01" x-model="qty" class="w-20 text-xs border border-gray-200 rounded-lg p-2" placeholder="Qty">
+                                            <button type="button"
+                                                @click="$wire.chooseManualSubstitution({{ $line['bom_id'] }}, parseInt(componentId), parseFloat(qty)); open = false"
+                                                class="px-3 py-2 text-xs font-semibold text-white bg-primary-600 hover:bg-primary-700 rounded-lg">
+                                                Pakai
+                                            </button>
+                                        </div>
+                                    </div>
+                                @endcan
+
+                                @if(isset($selectedSubstitutions[$line['bom_id']]) && !($selectedSubstitutions[$line['bom_id']]['rule_id'] ?? null))
+                                    <p class="text-xs text-primary-700 mt-2 font-medium">
+                                        Pengganti manual dipilih ({{ $selectedSubstitutions[$line['bom_id']]['quantity'] }} unit).
+                                    </p>
+                                @endif
+                            </div>
+                        @empty
+                            <p class="text-sm text-gray-500">Tidak ada komponen yang perlu diganti.</p>
+                        @endforelse
+                    </div>
+
+                    <div class="p-5 border-t bg-gray-50 flex gap-3 flex-none rounded-b-2xl">
+                        <button type="button" wire:click="closeSubstitutionModal" class="flex-1 py-2.5 bg-white border border-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-50">
+                            Batal
+                        </button>
+                        <button type="button" wire:click="applySubstitutionAndAdd" class="flex-1 py-2.5 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-lg">
+                            Tambah ke Keranjang
+                        </button>
+                    </div>
+                </div>
+            </div>
+        @endif
+
         <!-- Modifier Selection Modal -->
-        <div 
-            x-show="showModifierModal" 
+        <div
+            x-show="showModifierModal"
             x-cloak
             class="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4"
             @click.self="showModifierModal = false"

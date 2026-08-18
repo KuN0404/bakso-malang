@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * Bill of Materials — satu baris komposisi komponen untuk sebuah produk.
@@ -39,5 +40,20 @@ class ProductBom extends Model
     public function component(): BelongsTo
     {
         return $this->belongsTo(Component::class);
+    }
+
+    /**
+     * Aturan pengganti untuk baris BOM ini (dipakai POS saat komponen normal kurang).
+     */
+    public function substitutions(): HasMany
+    {
+        return $this->hasMany(ProductBomSubstitution::class, 'product_bom_id')
+            ->orderBy('sort_order')
+            ->orderBy('id');
+    }
+
+    public function activeSubstitutions(): HasMany
+    {
+        return $this->substitutions()->where('is_active', true);
     }
 }

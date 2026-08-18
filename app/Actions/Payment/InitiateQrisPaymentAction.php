@@ -8,6 +8,7 @@ use App\Models\PaymentTransaction;
 use App\Models\Setting;
 use App\Services\CartValidationService;
 use App\Services\MidtransService;
+use App\Services\ReportSyncService;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -28,6 +29,7 @@ class InitiateQrisPaymentAction
         private readonly MidtransService $midtransService,
         private readonly CancelPaymentTransactionAction $cancelAction,
         private readonly CartValidationService $cartValidationService,
+        private readonly ReportSyncService $reportSyncService,
     ) {}
 
     /**
@@ -36,7 +38,7 @@ class InitiateQrisPaymentAction
     public function execute(CartPayload $payload, string $invoiceNumber, int $cashierId): PaymentTransaction
     {
         // -- Hitung ulang harga dari DB — JANGAN percaya subtotal/total dari client --
-        $validated = $this->cartValidationService->validateAndPrice($payload->cart);
+        $validated = $this->cartValidationService->validateAndPrice($payload->cart, $cashierId);
         $items     = $validated['items'];
         $subtotal  = $validated['subtotal'];
 
@@ -83,6 +85,8 @@ class InitiateQrisPaymentAction
                 'actor_id'     => $cashierId,
                 'note'         => "QRIS dibuat. Berlaku {$expiryMinutes} menit.",
             ]);
+
+            $this->reportSyncService->syncPaymentTransaction($paymentTx);
 
             // -- Cache cart snapshot yang SUDAH divalidasi untuk direkonstruksi oleh webhook handler --
             Cache::put(

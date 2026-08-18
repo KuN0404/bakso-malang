@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Livewire\Admin\Purchases;
+use App\Livewire\Admin\PurchaseCreate;
 use App\Models\Ingredient;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -40,7 +40,7 @@ class PurchaseValidationTest extends TestCase
         $user = $this->makeCashierWithPermission();
 
         Livewire::actingAs($user)
-            ->test(Purchases::class)
+            ->test(PurchaseCreate::class)
             ->set('invoice_number', 'INV-PO-TEST-1')
             ->set('purchase_date', now()->format('Y-m-d'))
             ->set('items', [
@@ -62,7 +62,7 @@ class PurchaseValidationTest extends TestCase
         $user = $this->makeCashierWithPermission();
 
         Livewire::actingAs($user)
-            ->test(Purchases::class)
+            ->test(PurchaseCreate::class)
             ->set('invoice_number', 'INV-PO-TEST-2')
             ->set('purchase_date', now()->format('Y-m-d'))
             ->set('items', [
@@ -85,7 +85,7 @@ class PurchaseValidationTest extends TestCase
         $ingredient = $this->makeIngredient();
 
         Livewire::actingAs($user)
-            ->test(Purchases::class)
+            ->test(PurchaseCreate::class)
             ->set('invoice_number', 'INV-PO-TEST-3')
             ->set('purchase_date', now()->format('Y-m-d'))
             ->set('items', [

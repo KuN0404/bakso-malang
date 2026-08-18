@@ -29,7 +29,13 @@ class RolesAndPermissionsSeeder extends Seeder
             'create_categories',
             'edit_categories',
             'delete_categories',
-            
+
+            // Units
+            'view_units',
+            'create_units',
+            'edit_units',
+            'delete_units',
+
             // Modifiers
             'view_modifiers',
             'create_modifiers',
@@ -66,6 +72,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'manage_service_areas',
             'manage_pagers',
             'manage_whatsapp',
+            'manage_self_order_settings',
 
             // Users & Roles
             'view_users',
@@ -86,6 +93,10 @@ class RolesAndPermissionsSeeder extends Seeder
             'delete_ingredients',
             'view_purchases',
             'create_purchases',
+            'view_suppliers',
+            'create_suppliers',
+            'edit_suppliers',
+            'delete_suppliers',
             'view_productions',
             'create_productions',
             'view_hpp_calculator',
@@ -98,6 +109,8 @@ class RolesAndPermissionsSeeder extends Seeder
             'edit_components',
             'delete_components',
             'adjust_component_stock',
+            'manage_bom_substitutions',
+            'apply_manual_substitution',
 
             // Self Order
             'view_self_orders',
@@ -129,14 +142,16 @@ class RolesAndPermissionsSeeder extends Seeder
         $manager->syncPermissions([
             'view_products', 'create_products', 'edit_products', 'adjust_stock', 'manage_unlimited_stock', 'view_menu_catalog',
             'view_categories', 'create_categories', 'edit_categories',
+            'view_units', 'create_units', 'edit_units', 'delete_units',
             'view_modifiers', 'create_modifiers', 'edit_modifiers',
             'view_ingredients', 'create_ingredients', 'edit_ingredients', 'delete_ingredients',
-            'view_purchases', 'create_purchases', 'view_productions', 'create_productions', 'view_hpp_calculator', 'apply_hpp_calculator',
+            'view_purchases', 'create_purchases', 'view_suppliers', 'create_suppliers', 'edit_suppliers', 'delete_suppliers', 'view_productions', 'create_productions', 'view_hpp_calculator', 'apply_hpp_calculator',
             'view_components', 'create_components', 'edit_components', 'delete_components', 'adjust_component_stock',
+            'manage_bom_substitutions', 'apply_manual_substitution',
             'access_pos', 'view_transactions', 'cancel_transactions',
             'open_shift', 'close_shift', 'view_own_shifts', 'view_all_shifts', 'add_shift_expense',
             'view_sales_reports', 'view_financial_reports', 'view_peak_hours_reports', 'view_cancellation_reports', 'view_inventory_reports', 'view_returns', 'export_reports',
-            'manage_payment_sources', 'manage_service_areas', 'manage_pagers',
+            'manage_payment_sources', 'manage_service_areas', 'manage_pagers', 'manage_self_order_settings',
             'view_kitchen_display', 'update_order_status',
             // Self Order
             'view_self_orders', 'manage_self_orders', 'accept_self_order_payment', 'cancel_self_order', 'print_self_order_receipt',

@@ -14,6 +14,12 @@ return [
         'create_categories' => 'Buat Kategori',
         'edit_categories' => 'Edit Kategori',
         'delete_categories' => 'Hapus Kategori',
+
+        // Units
+        'view_units' => 'Lihat Satuan',
+        'create_units' => 'Buat Satuan',
+        'edit_units' => 'Edit Satuan',
+        'delete_units' => 'Hapus Satuan',
         
         // Products
         'view_products' => 'Lihat Produk',
@@ -57,6 +63,7 @@ return [
         'manage_service_areas' => 'Kelola Area Pelayanan',
         'manage_pagers' => 'Kelola Pager',
         'manage_whatsapp' => 'Kelola WhatsApp (Fonnte)',
+        'manage_self_order_settings' => 'Kelola Aktif/Nonaktif Self Order',
         
         // Users & Roles
         'view_users' => 'Lihat Pengguna',
@@ -74,6 +81,10 @@ return [
         'delete_ingredients' => 'Hapus Bahan Baku',
         'view_purchases' => 'Lihat Pembelian Stok',
         'create_purchases' => 'Buat Pembelian Stok',
+        'view_suppliers' => 'Lihat Supplier',
+        'create_suppliers' => 'Buat Supplier',
+        'edit_suppliers' => 'Edit Supplier',
+        'delete_suppliers' => 'Hapus Supplier',
         'view_productions' => 'Lihat Repacking / Produksi',
         'create_productions' => 'Buat Repacking / Produksi',
         'view_hpp_calculator' => 'Lihat & Gunakan Kalkulator HPP',
@@ -100,6 +111,8 @@ return [
         'edit_components'          => 'Edit Komponen',
         'delete_components'        => 'Hapus Komponen',
         'adjust_component_stock'   => 'Atur Stok Komponen',
+        'manage_bom_substitutions' => 'Kelola Aturan Substitusi Komponen',
+        'apply_manual_substitution'=> 'Ganti Komponen Manual di POS',
 
         // Pelanggan & Blacklist
         'view_customers'            => 'Lihat Data Pelanggan',
@@ -116,6 +129,12 @@ return [
             'create_categories',
             'edit_categories',
             'delete_categories',
+        ],
+        'Satuan' => [
+            'view_units',
+            'create_units',
+            'edit_units',
+            'delete_units',
         ],
         'Produk' => [
             'view_products',
@@ -143,6 +162,12 @@ return [
             'create_productions',
             'view_hpp_calculator',
             'apply_hpp_calculator',
+        ],
+        'Supplier' => [
+            'view_suppliers',
+            'create_suppliers',
+            'edit_suppliers',
+            'delete_suppliers',
         ],
         'Transaksi' => [
             'access_pos',
@@ -173,6 +198,7 @@ return [
             'manage_service_areas',
             'manage_pagers',
             'manage_whatsapp',
+            'manage_self_order_settings',
         ],
         'Pengguna & Peran' => [
             'view_users',
@@ -202,6 +228,8 @@ return [
             'edit_components',
             'delete_components',
             'adjust_component_stock',
+            'manage_bom_substitutions',
+            'apply_manual_substitution',
         ],
         'Pelanggan' => [
             'view_customers',

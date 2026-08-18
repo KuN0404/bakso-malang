@@ -198,7 +198,7 @@ class Products extends Component
 
     public function addBomItem(): void
     {
-        $this->bomItems[] = ['component_id' => '', 'quantity' => 1];
+        $this->bomItems[] = ['component_id' => '', 'quantity' => 1, 'substitutions' => []];
     }
 
     public function removeBomItem(int $index): void
@@ -206,6 +206,27 @@ class Products extends Component
         if (isset($this->bomItems[$index])) {
             unset($this->bomItems[$index]);
             $this->bomItems = array_values($this->bomItems);
+        }
+    }
+
+    /**
+     * Tambah aturan pengganti untuk satu baris BOM, mis. "3 Bakso Kecil boleh
+     * diganti 2 Bakso Besar Urat". Dipakai POS saat komponen normal tidak cukup.
+     */
+    public function addSubstitution(int $bomIndex): void
+    {
+        if (!isset($this->bomItems[$bomIndex])) {
+            return;
+        }
+
+        $this->bomItems[$bomIndex]['substitutions'][] = ['component_id' => '', 'quantity' => 1];
+    }
+
+    public function removeSubstitution(int $bomIndex, int $subIndex): void
+    {
+        if (isset($this->bomItems[$bomIndex]['substitutions'][$subIndex])) {
+            unset($this->bomItems[$bomIndex]['substitutions'][$subIndex]);
+            $this->bomItems[$bomIndex]['substitutions'] = array_values($this->bomItems[$bomIndex]['substitutions']);
         }
     }
 
@@ -221,7 +242,7 @@ class Products extends Component
 
     public function edit(int $id): void
     {
-        $product = Product::with(['modifierGroups', 'bom'])->findOrFail($id);
+        $product = Product::with(['modifierGroups', 'bom.substitutions'])->findOrFail($id);
         $this->editingId = $product->id;
         $this->category_id = $product->category_id;
         $this->name = $product->name;
@@ -238,15 +259,23 @@ class Products extends Component
         $this->stock = $product->stock;
         $this->selectedModifierGroups = $product->modifierGroups->pluck('id')->toArray();
         $this->bomItems = $product->bom->map(fn($b) => [
-            'component_id' => $b->component_id,
-            'quantity' => $b->quantity,
+            'component_id'  => $b->component_id,
+            'quantity'      => $b->quantity,
+            'substitutions' => $b->substitutions->map(fn($s) => [
+                'component_id' => $s->component_id,
+                'quantity'     => $s->quantity,
+            ])->toArray(),
         ])->toArray();
         $this->showModal = true;
     }
 
-    public function save(): void
+    public function save(?array $modifierGroups = null): void
     {
         $this->authorize($this->editingId ? 'edit_products' : 'create_products');
+
+        if ($modifierGroups !== null) {
+            $this->selectedModifierGroups = $modifierGroups;
+        }
 
         // Custom validation rules
         $rules = [
@@ -340,17 +369,81 @@ class Products extends Component
         $this->reset(['editingId', 'name', 'sku', 'description', 'price', 'cost_price', 'image', 'existingImage', 'is_active', 'is_featured', 'track_stock', 'stock', 'category_id', 'selectedModifierGroups', 'is_unlimited', 'bomItems']);
     }
 
+    /**
+     * Simpan BOM tanpa menghapus-dan-membuat-ulang.
+     *
+     * Versi lama melakukan $product->bom()->delete() lalu create ulang. Karena
+     * product_bom_substitutions memakai cascadeOnDelete, cara itu MENGHAPUS seluruh
+     * aturan substitusi setiap kali produk disimpan — termasuk saat admin hanya
+     * mengubah harga. Di sini baris dicocokkan berdasarkan component_id dan
+     * di-update di tempat, sehingga product_bom.id (yang direferensikan aturan
+     * substitusi dan snapshot keranjang POS) tetap stabil.
+     */
     private function syncBomItems(Product $product): void
     {
-        $product->bom()->delete();
+        $incoming = [];
 
         foreach ($this->bomItems as $item) {
-            if (!empty($item['component_id']) && (float)($item['quantity'] ?? 0) > 0) {
-                $product->bom()->create([
-                    'component_id' => $item['component_id'],
-                    'quantity' => (float)$item['quantity'],
-                ]);
+            $componentId = (int) ($item['component_id'] ?? 0);
+            $quantity    = (float) ($item['quantity'] ?? 0);
+
+            if ($componentId > 0 && $quantity > 0) {
+                // Dedupe: kalau admin memilih komponen yang sama dua kali, entri
+                // terakhir menang. Tanpa ini, insert kedua melanggar
+                // uq_product_component dan melempar QueryException mentah ke user.
+                $incoming[$componentId] = [
+                    'quantity'      => $quantity,
+                    'substitutions' => $item['substitutions'] ?? [],
+                ];
             }
+        }
+
+        // Hapus HANYA baris yang benar-benar dibuang (aturan substitusinya memang
+        // sudah tidak relevan dan boleh ikut terhapus lewat cascade).
+        $product->bom()
+            ->when(!empty($incoming), fn ($q) => $q->whereNotIn('component_id', array_keys($incoming)))
+            ->delete();
+
+        foreach ($incoming as $componentId => $data) {
+            $line = $product->bom()->updateOrCreate(
+                ['component_id' => $componentId],
+                ['quantity' => $data['quantity']]
+            );
+
+            $this->syncSubstitutions($line, $data['substitutions']);
+        }
+
+        $product->unsetRelation('bom');
+    }
+
+    /**
+     * Simpan aturan pengganti untuk satu baris BOM — pola non-destruktif yang
+     * sama seperti syncBomItems(), sehingga id aturan tetap stabil (id tersebut
+     * ikut tercatat di snapshot transaksi untuk audit).
+     */
+    private function syncSubstitutions(\App\Models\ProductBom $line, array $substitutions): void
+    {
+        $incoming = [];
+
+        foreach ($substitutions as $sub) {
+            $componentId = (int) ($sub['component_id'] ?? 0);
+            $quantity    = (float) ($sub['quantity'] ?? 0);
+
+            // Komponen pengganti tidak boleh sama dengan komponen aslinya.
+            if ($componentId > 0 && $quantity > 0 && $componentId !== (int) $line->component_id) {
+                $incoming[$componentId] = $quantity;
+            }
+        }
+
+        $line->substitutions()
+            ->when(!empty($incoming), fn ($q) => $q->whereNotIn('component_id', array_keys($incoming)))
+            ->delete();
+
+        foreach ($incoming as $componentId => $quantity) {
+            $line->substitutions()->updateOrCreate(
+                ['component_id' => $componentId],
+                ['quantity' => $quantity, 'is_active' => true]
+            );
         }
     }
 
@@ -408,7 +501,7 @@ class Products extends Component
 
         $categories = Category::active()->ordered()->get();
         $modifierGroups = ModifierGroup::active()->get();
-        $components = ComponentModel::where('is_active', true)->orderBy('name')->get();
+        $components = ComponentModel::where('is_active', true)->with('unit')->orderBy('name')->get();
 
         return view('livewire.admin.products', compact('products', 'categories', 'modifierGroups', 'components'))
             ->title('Produk');

@@ -4,6 +4,7 @@ namespace App\Livewire\Admin;
 
 use App\Models\Ingredient;
 use App\Models\IngredientStockLog;
+use App\Models\Unit;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
@@ -17,13 +18,15 @@ class Ingredients extends Component
 
     public bool $showModal = false;
     public bool $showStockModal = false;
+    public bool $showHistoryModal = false;
     public ?int $editingId = null;
     public ?Ingredient $selectedIngredient = null;
+    public ?Ingredient $historyIngredient = null;
 
     // Form fields
     public string $code = '';
     public string $name = '';
-    public string $unit = 'kg';
+    public ?int $unit_id = null;
     public float $stock = 0;
     public float $minimum_stock = 0;
     public float $cost_price = 0;
@@ -50,9 +53,9 @@ class Ingredients extends Component
 
     public function create(): void
     {
-        $this->reset(['editingId', 'name', 'unit', 'stock', 'minimum_stock', 'cost_price', 'note', 'is_active']);
+        $this->reset(['editingId', 'name', 'unit_id', 'stock', 'minimum_stock', 'cost_price', 'note', 'is_active']);
         $this->code = $this->generateCode();
-        $this->unit = 'kg';
+        $this->unit_id = Unit::where('symbol', 'kg')->value('id');
         $this->is_active = true;
         $this->showModal = true;
     }
@@ -63,7 +66,7 @@ class Ingredients extends Component
         $this->editingId = $ingredient->id;
         $this->code = $ingredient->code;
         $this->name = $ingredient->name;
-        $this->unit = $ingredient->unit;
+        $this->unit_id = $ingredient->unit_id;
         $this->stock = $ingredient->stock;
         $this->minimum_stock = $ingredient->minimum_stock;
         $this->cost_price = $ingredient->cost_price;
@@ -79,7 +82,7 @@ class Ingredients extends Component
         $rules = [
             'code' => 'required|max:50|unique:ingredients,code' . ($this->editingId ? ",{$this->editingId}" : ''),
             'name' => 'required|min:2|max:150',
-            'unit' => 'required|string|max:20',
+            'unit_id' => 'required|exists:units,id',
             'minimum_stock' => 'required|numeric|min:0',
             'cost_price' => 'required|numeric|min:0',
             'note' => 'nullable|string|max:500',
@@ -88,7 +91,7 @@ class Ingredients extends Component
         $messages = [
             'code.unique' => 'Kode bahan baku sudah digunakan.',
             'name.required' => 'Nama bahan baku wajib diisi.',
-            'unit.required' => 'Satuan wajib dipilih/diisi.',
+            'unit_id.required' => 'Satuan wajib dipilih.',
         ];
 
         $this->validate($rules, $messages);
@@ -98,7 +101,7 @@ class Ingredients extends Component
             $ingredient->update([
                 'code' => $this->code,
                 'name' => $this->name,
-                'unit' => $this->unit,
+                'unit_id' => $this->unit_id,
                 'minimum_stock' => $this->minimum_stock,
                 'cost_price' => $this->cost_price,
                 'note' => $this->note,
@@ -110,7 +113,7 @@ class Ingredients extends Component
             $ingredient = Ingredient::create([
                 'code' => $this->code,
                 'name' => $this->name,
-                'unit' => $this->unit,
+                'unit_id' => $this->unit_id,
                 'stock' => $this->stock,
                 'minimum_stock' => $this->minimum_stock,
                 'cost_price' => $this->cost_price,
@@ -138,7 +141,7 @@ class Ingredients extends Component
 
     public function openStockModal(int $id): void
     {
-        $this->selectedIngredient = Ingredient::findOrFail($id);
+        $this->selectedIngredient = Ingredient::with('unit')->findOrFail($id);
         $this->stockAdjustmentType = 'add';
         $this->stockAdjustmentAmount = 0;
         $this->stockNote = '';
@@ -183,7 +186,7 @@ class Ingredients extends Component
                 $newStock -= $amount;
                 $logType = 'sub';
                 if ($newStock < 0) {
-                    return "Stok tidak mencukupi. Stok saat ini: {$oldStock} {$ingredient->unit}";
+                    return "Stok tidak mencukupi. Stok saat ini: {$oldStock} {$ingredient->unit?->symbol}";
                 }
             } else {
                 $newStock = $amount;
@@ -215,6 +218,13 @@ class Ingredients extends Component
         $this->dispatch('notify', type: 'success', message: "Stok bahan baku berhasil diperbarui.");
     }
 
+    public function openHistoryModal(int $id): void
+    {
+        $this->authorize('view_ingredients');
+        $this->historyIngredient = Ingredient::with('unit')->findOrFail($id);
+        $this->showHistoryModal = true;
+    }
+
     public function delete(int $id): void
     {
         $this->authorize('delete_ingredients');
@@ -227,11 +237,21 @@ class Ingredients extends Component
     public function render()
     {
         $ingredients = Ingredient::query()
+            ->with('unit')
             ->when($this->search, fn($q) => $q->where('name', 'like', "%{$this->search}%")->orWhere('code', 'like', "%{$this->search}%"))
             ->orderBy('name')
             ->paginate($this->perPage);
 
-        return view('livewire.admin.ingredients', compact('ingredients'))
+        $unitsGrouped = Unit::getAllGroupedForSelect();
+
+        $historyLogs = ($this->showHistoryModal && $this->historyIngredient)
+            ? IngredientStockLog::where('ingredient_id', $this->historyIngredient->id)
+                ->with('user')
+                ->latest()
+                ->paginate(10, pageName: 'historyPage')
+            : null;
+
+        return view('livewire.admin.ingredients', compact('ingredients', 'unitsGrouped', 'historyLogs'))
             ->title('Bahan Baku');
     }
 }

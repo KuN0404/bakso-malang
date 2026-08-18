@@ -5,7 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Login ke Bakso Malang POS — sistem kasir restoran Bakso Malang.">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>Login — Bakso Malang POS</title>
+
+    @php
+        $siteLogo = \App\Models\Setting::get('site_logo', null, 'general');
+        $logoWeb = \App\Models\Setting::get('logo_web', null, 'general');
+        $logoFull = \App\Models\Setting::get('logo_full', null, 'general');
+        $logoType = \App\Models\Setting::get('logo_type', 'single', 'general');
+        $storeName = \App\Models\Setting::get('store_name', 'Bakso Malang', 'general');
+    @endphp
+
+    <title>Login — {{ $storeName }} POS</title>
+
+    @if ($siteLogo)
+        <link rel="icon" type="image/webp" href="{{ asset('storage/' . $siteLogo) }}">
+    @endif
 
     <!-- Google Fonts: Poppins — sama seperti admin -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -149,13 +162,21 @@
 
             {{-- Brand badge —— pojok kiri atas --}}
             <div class="relative z-10 flex items-center gap-3.5 p-8">
-                <div class="w-12 h-12 bg-sidebar rounded-xl flex items-center justify-center shadow-lg shadow-sidebar/30 flex-shrink-0">
-                    <x-lucide name="soup" class="w-6 h-6 text-white" />
-                </div>
-                <div class="leading-tight">
-                    <div class="text-base font-bold text-sidebar tracking-wide">Bakso Malang POS</div>
-                    <div class="text-xs text-primary-600 font-medium">Sistem Kasir Restoran</div>
-                </div>
+                @if ($logoType === 'full' && $logoFull)
+                    <img src="{{ asset('storage/' . $logoFull) }}" alt="{{ $storeName }}" class="h-10 w-auto max-w-[200px] object-contain">
+                @else
+                    <div class="w-12 h-12 bg-sidebar rounded-xl flex items-center justify-center shadow-lg shadow-sidebar/30 flex-shrink-0 overflow-hidden">
+                        @if ($logoWeb)
+                            <img src="{{ asset('storage/' . $logoWeb) }}" alt="{{ $storeName }}" class="w-full h-full object-cover">
+                        @else
+                            <x-lucide name="soup" class="w-6 h-6 text-white" />
+                        @endif
+                    </div>
+                    <div class="leading-tight">
+                        <div class="text-base font-bold text-sidebar tracking-wide">{{ $storeName }}</div>
+                        <div class="text-xs text-primary-600 font-medium">Sistem Kasir Restoran</div>
+                    </div>
+                @endif
             </div>
 
             {{-- Blob + Ilustrasi -- tengah --}}

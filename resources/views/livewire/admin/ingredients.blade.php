@@ -1,6 +1,6 @@
 <div class="relative">
     <!-- Loading Overlay -->
-    <div wire:loading wire:target="edit, openStockModal, create, save, saveStock" class="absolute inset-0 bg-white/50 backdrop-blur-[1px] z-50 rounded-xl">
+    <div wire:loading wire:target="edit, openStockModal, openHistoryModal, create, save, saveStock" class="absolute inset-0 bg-white/50 backdrop-blur-[1px] z-50 rounded-xl">
         <div class="sticky top-[40vh] flex flex-col items-center justify-center w-full gap-2">
             <svg class="animate-spin h-8 w-8 text-primary-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -60,7 +60,7 @@
                         </td>
                         <td class="px-6 py-4 font-bold">
                             <span class="{{ $stockStatus === 'out' ? 'text-red-600 bg-red-50 px-2 py-0.5 rounded' : ($stockStatus === 'low' ? 'text-yellow-700 bg-yellow-50 px-2 py-0.5 rounded' : 'text-emerald-600') }}">
-                                {{ number_format($ing->stock, 2, ',', '.') }} {{ $ing->unit }}
+                                {{ number_format($ing->stock, 2, ',', '.') }} {{ $ing->unit?->symbol }}
                             </span>
                             @if($stockStatus === 'out')
                                 <span class="ml-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700">Habis</span>
@@ -68,8 +68,8 @@
                                 <span class="ml-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-700">Menipis</span>
                             @endif
                         </td>
-                        <td class="px-6 py-4 text-gray-600">{{ number_format($ing->minimum_stock, 2, ',', '.') }} {{ $ing->unit }}</td>
-                        <td class="px-6 py-4 font-medium text-gray-800">Rp {{ number_format($ing->cost_price, 0, ',', '.') }} / {{ $ing->unit }}</td>
+                        <td class="px-6 py-4 text-gray-600">{{ number_format($ing->minimum_stock, 2, ',', '.') }} {{ $ing->unit?->symbol }}</td>
+                        <td class="px-6 py-4 font-medium text-gray-800">Rp {{ number_format($ing->cost_price, 0, ',', '.') }} / {{ $ing->unit?->symbol }}</td>
                         <td class="px-6 py-4 text-center">
                             @if($ing->is_active)
                                 <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
@@ -85,6 +85,9 @@
                             <div class="flex items-center justify-end gap-1">
                                 <button wire:click="openStockModal({{ $ing->id }})" title="Koreksi Stok" class="p-2 text-gray-400 hover:text-blue-600 rounded-lg hover:bg-gray-100">
                                     <i data-lucide="box" class="w-4 h-4"></i>
+                                </button>
+                                <button wire:click="openHistoryModal({{ $ing->id }})" title="Riwayat Stok" class="p-2 text-gray-400 hover:text-blue-600 rounded-lg hover:bg-gray-100">
+                                    <i data-lucide="history" class="w-4 h-4"></i>
                                 </button>
                                 @can('edit_ingredients')
                                     <button wire:click="edit({{ $ing->id }})" title="Edit" class="p-2 text-gray-400 hover:text-primary-600 rounded-lg hover:bg-gray-100">
@@ -158,15 +161,17 @@
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-gray-700 mb-1">Satuan</label>
-                        <select wire:model="unit" class="w-full text-sm border border-gray-200 rounded-lg p-2.5 focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500">
-                            <option value="kg">Kg (Kilogram)</option>
-                            <option value="gram">Gram</option>
-                            <option value="liter">Liter</option>
-                            <option value="ml">Ml (Milliliter)</option>
-                            <option value="pcs">Pcs / Biji</option>
-                            <option value="pack">Pack / Bungkusan</option>
+                        <select wire:model="unit_id" class="w-full text-sm border border-gray-200 rounded-lg p-2.5 focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500">
+                            <option value="">-- Pilih Satuan --</option>
+                            @foreach($unitsGrouped as $groupLabel => $unitsInGroup)
+                                <optgroup label="{{ $groupLabel }}">
+                                    @foreach($unitsInGroup as $u)
+                                        <option value="{{ $u->id }}">{{ $u->name }}</option>
+                                    @endforeach
+                                </optgroup>
+                            @endforeach
                         </select>
-                        @error('unit') <span class="text-xs text-red-500">{{ $message }}</span> @enderror
+                        @error('unit_id') <span class="text-xs text-red-500">{{ $message }}</span> @enderror
                     </div>
                 </div>
 
@@ -240,7 +245,7 @@
                     </select>
                 </div>
                 <div>
-                    <label class="block text-xs font-semibold text-gray-700 mb-1">Jumlah ({{ $selectedIngredient->unit }})</label>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Jumlah ({{ $selectedIngredient->unit?->symbol }})</label>
                     <input wire:model="stockAdjustmentAmount" type="number" step="0.01" class="w-full text-sm border border-gray-200 rounded-lg p-2.5">
                     @error('stockAdjustmentAmount') <span class="text-xs text-red-500">{{ $message }}</span> @enderror
                 </div>
@@ -261,6 +266,70 @@
                     </button>
                 </div>
             </form>
+        </div>
+    </div>
+    @endif
+
+    <!-- Stock History Modal -->
+    @if($showHistoryModal && $historyIngredient)
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-3xl overflow-hidden border border-gray-100">
+            <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                <h3 class="font-bold text-gray-800">Riwayat Stok: {{ $historyIngredient->name }}</h3>
+                <button wire:click="$set('showHistoryModal', false)" class="text-gray-400 hover:text-gray-600">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <div class="p-6 space-y-4">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm border-collapse">
+                        <thead>
+                            <tr class="bg-gray-50 border-b text-gray-600 font-semibold">
+                                <th class="py-2 px-3">Waktu Log</th>
+                                <th class="py-2 px-3">Aksi Mutasi</th>
+                                <th class="py-2 px-3">Perubahan Qty</th>
+                                <th class="py-2 px-3">Stok Akhir</th>
+                                <th class="py-2 px-3">Catatan</th>
+                                <th class="py-2 px-3">Petugas</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            @forelse($historyLogs as $log)
+                                <tr class="hover:bg-gray-50 transition-colors">
+                                    <td class="py-2.5 px-3 text-xs text-gray-500">{{ $log->created_at->format('d/m/Y H:i') }}</td>
+                                    <td class="py-2.5 px-3">
+                                        @if($log->type === 'purchase' || $log->type === 'initial')
+                                            <span class="px-2 py-0.5 rounded text-xs font-semibold bg-emerald-100 text-emerald-800">Pembelian / Awal</span>
+                                        @elseif($log->type === 'production_use')
+                                            <span class="px-2 py-0.5 rounded text-xs font-semibold bg-purple-100 text-purple-800">Dipakai Produksi</span>
+                                        @else
+                                            <span class="px-2 py-0.5 rounded text-xs font-semibold bg-amber-100 text-amber-800">Koreksi Stok</span>
+                                        @endif
+                                    </td>
+                                    <td class="py-2.5 px-3 font-bold {{ $log->type === 'production_use' || $log->type === 'sub' ? 'text-red-600' : 'text-emerald-600' }}">
+                                        {{ $log->type === 'production_use' || $log->type === 'sub' ? '-' : '+' }}{{ number_format($log->amount, 2, ',', '.') }} {{ $historyIngredient->unit?->symbol }}
+                                    </td>
+                                    <td class="py-2.5 px-3 font-semibold text-gray-800">{{ number_format($log->final_stock, 2, ',', '.') }} {{ $historyIngredient->unit?->symbol }}</td>
+                                    <td class="py-2.5 px-3 text-xs text-gray-500">{{ $log->note ?: '-' }}</td>
+                                    <td class="py-2.5 px-3 text-xs text-gray-500">{{ $log->user?->name ?? 'System' }}</td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="6" class="py-8 px-3 text-center text-gray-500">Belum ada riwayat mutasi stok.</td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+
+                @if($historyLogs && $historyLogs->count() > 0)
+                    <div>{{ $historyLogs->links() }}</div>
+                @endif
+
+                <div class="pt-4 flex justify-end border-t">
+                    <button wire:click="$set('showHistoryModal', false)" class="px-5 py-2 text-sm font-medium bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg">Tutup</button>
+                </div>
+            </div>
         </div>
     </div>
     @endif

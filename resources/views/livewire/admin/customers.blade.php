@@ -28,18 +28,31 @@
     </div>
 
     <!-- Filters -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-100 mb-6 p-4">
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 mb-6 p-4 flex gap-4">
         <div class="relative flex-1 min-w-[200px]">
             <input type="text" wire:model.live.debounce.300ms="search"
                 placeholder="{{ $tab === 'blacklist' ? 'Cari nomor atau alasan...' : 'Cari nomor HP atau nama...' }}"
                 class="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500">
             <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400"></i>
         </div>
+        @if($tab === 'customers')
+            <select wire:model.live="sourceFilter" class="px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500">
+                <option value="">Semua Sumber</option>
+                <option value="manual">POS (Manual)</option>
+                <option value="self_order">Self Order</option>
+            </select>
+        @else
+            <select wire:model.live="blacklistStatus" class="px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500">
+                <option value="blocked">Diblokir</option>
+                <option value="unblocked">Dibuka</option>
+                <option value="all">Semua Status</option>
+            </select>
+        @endif
     </div>
 
     <!-- Table -->
     <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-x-auto relative">
-        <div wire:loading.flex wire:target="search, gotoPage, previousPage, nextPage, switchTab" class="absolute inset-0 bg-white/70 z-10 items-center justify-center">
+        <div wire:loading.flex wire:target="search, sourceFilter, blacklistStatus, gotoPage, previousPage, nextPage, switchTab" class="absolute inset-0 bg-white/70 z-10 items-center justify-center">
             <div class="flex flex-col items-center gap-2">
                 <svg class="animate-spin h-8 w-8 text-primary-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -58,6 +71,7 @@
                         <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Email</th>
                         <th class="px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Total Order</th>
                         <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Order Terakhir</th>
+                        <th class="px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Sumber</th>
                         <th class="px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Status</th>
                         @can('manage_phone_blacklist')
                         <th class="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Aksi</th>
@@ -68,10 +82,26 @@
                     @forelse($customers as $customer)
                         <tr class="hover:bg-gray-50">
                             <td class="px-6 py-4 font-mono text-sm text-gray-800">{{ $customer->phone }}</td>
-                            <td class="px-6 py-4 text-gray-700">{{ $customer->name ?: '-' }}</td>
+                            <td class="px-6 py-4 text-gray-700">
+                                @if(!empty($customer->name))
+                                    {{ $customer->name }}
+                                @else
+                                    <span class="text-gray-400">-</span>
+                                @endif
+                            </td>
                             <td class="px-6 py-4 text-gray-500 text-sm">{{ $customer->email ?: '-' }}</td>
                             <td class="px-6 py-4 text-center text-gray-700">{{ $customer->total_orders }}</td>
                             <td class="px-6 py-4 text-gray-500 text-sm">{{ \Carbon\Carbon::parse($customer->last_order_at)->format('d M Y H:i') }}</td>
+                            <td class="px-6 py-4 text-center">
+                                <div class="flex items-center justify-center gap-1 flex-wrap">
+                                    @if($customer->has_manual)
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">POS</span>
+                                    @endif
+                                    @if($customer->has_self_order)
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700">Self Order</span>
+                                    @endif
+                                </div>
+                            </td>
                             <td class="px-6 py-4 text-center">
                                 @if($blockedMap->has($customer->phone))
                                     <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700">
@@ -95,7 +125,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7" class="px-6 py-12 text-center text-gray-500">
+                            <td colspan="8" class="px-6 py-12 text-center text-gray-500">
                                 <i data-lucide="users" class="w-12 h-12 mx-auto mb-3 text-gray-300"></i>
                                 <p>Belum ada data pelanggan</p>
                             </td>

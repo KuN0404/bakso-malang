@@ -241,25 +241,28 @@ class InventoryReport extends Component
 
         if ($this->activeTab === 'valuation') {
             $valuationData = Ingredient::query()
+                ->with('unit')
                 ->when($this->search, fn($q) => $q->where('name', 'like', "%{$this->search}%")->orWhere('code', 'like', "%{$this->search}%"))
                 ->orderBy('name')
                 ->paginate($this->perPage);
         } elseif ($this->activeTab === 'components') {
             $componentsData = ComponentModel::query()
+                ->with('unit')
                 ->when($this->search, fn($q) => $q->where('name', 'like', "%{$this->search}%")->orWhere('code', 'like', "%{$this->search}%"))
                 ->orderBy('name')
                 ->paginate($this->perPage);
         } elseif ($this->activeTab === 'purchases') {
             $purchasesData = Purchase::query()
-                ->with(['items.ingredient', 'items.product', 'user'])
+                ->with(['items.ingredient.unit', 'items.product', 'user', 'supplier'])
                 ->whereBetween('purchase_date', [$this->startDate, $this->endDate])
-                ->when($this->search, fn($q) => $q->where('invoice_number', 'like', "%{$this->search}%")->orWhere('supplier_name', 'like', "%{$this->search}%"))
+                ->when($this->search, fn($q) => $q->where('invoice_number', 'like', "%{$this->search}%")
+                    ->orWhereHas('supplier', fn ($sq) => $sq->where('name', 'like', "%{$this->search}%")))
                 ->orderByDesc('purchase_date')
                 ->orderByDesc('id')
                 ->paginate($this->perPage);
         } elseif ($this->activeTab === 'productions') {
             $productionsData = Production::query()
-                ->with(['inputs.ingredient', 'outputs.component', 'outputs.product', 'user'])
+                ->with(['inputs.ingredient.unit', 'outputs.component.unit', 'outputs.product', 'user'])
                 ->whereBetween('production_date', [$this->startDate, $this->endDate])
                 ->when($this->search, fn($q) => $q->where('production_code', 'like', "%{$this->search}%"))
                 ->orderByDesc('production_date')
@@ -267,7 +270,7 @@ class InventoryReport extends Component
                 ->paginate($this->perPage);
         } elseif ($this->activeTab === 'stock_logs') {
             $stockLogsData = IngredientStockLog::query()
-                ->with(['ingredient', 'user'])
+                ->with(['ingredient.unit', 'user'])
                 ->whereBetween('created_at', [Carbon::parse($this->startDate)->startOfDay(), Carbon::parse($this->endDate)->endOfDay()])
                 ->when($this->search, function ($q) {
                     $q->whereHas('ingredient', fn($ing) => $ing->where('name', 'like', "%{$this->search}%")->orWhere('code', 'like', "%{$this->search}%"));
@@ -276,7 +279,7 @@ class InventoryReport extends Component
                 ->paginate($this->perPage);
         } elseif ($this->activeTab === 'component_stock_logs') {
             $componentStockLogsData = ComponentStockLog::query()
-                ->with(['component', 'user'])
+                ->with(['component.unit', 'user'])
                 ->whereBetween('created_at', [Carbon::parse($this->startDate)->startOfDay(), Carbon::parse($this->endDate)->endOfDay()])
                 ->when($this->search, function ($q) {
                     $q->whereHas('component', fn($comp) => $comp->where('name', 'like', "%{$this->search}%")->orWhere('code', 'like', "%{$this->search}%"));
@@ -285,12 +288,14 @@ class InventoryReport extends Component
                 ->paginate($this->perPage);
         } elseif ($this->activeTab === 'low_stock') {
             $lowStockIngredients = Ingredient::query()
+                ->with('unit')
                 ->where(fn($q) => $q->lowStock()->orWhere->outOfStock())
                 ->when($this->search, fn($q) => $q->where('name', 'like', "%{$this->search}%")->orWhere('code', 'like', "%{$this->search}%"))
                 ->orderBy('name')
                 ->get();
 
             $lowStockComponents = ComponentModel::query()
+                ->with('unit')
                 ->where(fn($q) => $q->lowStock()->orWhere->outOfStock())
                 ->when($this->search, fn($q) => $q->where('name', 'like', "%{$this->search}%")->orWhere('code', 'like', "%{$this->search}%"))
                 ->orderBy('name')

@@ -202,7 +202,7 @@ class Modifiers extends Component
             
         // Correctness: Must query DB because selected group might not be in current page pagination
         $selectedGroup = $this->selectedGroupId ? ModifierGroup::find($this->selectedGroupId) : null;
-        $components = ComponentModel::where('is_active', true)->orderBy('name')->get();
+        $components = ComponentModel::where('is_active', true)->with('unit')->orderBy('name')->get();
 
         return view('livewire.admin.modifiers', compact('groups', 'modifiers', 'selectedGroup', 'components'))
             ->title('Modifier');

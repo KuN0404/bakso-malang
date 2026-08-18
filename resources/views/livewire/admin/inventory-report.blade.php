@@ -315,10 +315,10 @@
                         <td class="px-6 py-4 font-medium text-gray-900">{{ $ing->name }}</td>
                         <td class="px-6 py-4 font-bold">
                             <span class="{{ $ing->stock <= $ing->minimum_stock ? 'text-red-600 bg-red-50 px-2 py-0.5 rounded' : 'text-gray-800' }}">
-                                {{ number_format($ing->stock, 2, ',', '.') }} {{ $ing->unit }}
+                                {{ number_format($ing->stock, 2, ',', '.') }} {{ $ing->unit?->symbol }}
                             </span>
                         </td>
-                        <td class="px-6 py-4 text-gray-500">{{ number_format($ing->minimum_stock, 2, ',', '.') }} {{ $ing->unit }}</td>
+                        <td class="px-6 py-4 text-gray-500">{{ number_format($ing->minimum_stock, 2, ',', '.') }} {{ $ing->unit?->symbol }}</td>
                         <td class="px-6 py-4">Rp {{ number_format($ing->cost_price, 0, ',', '.') }}</td>
                         <td class="px-6 py-4 font-extrabold text-primary-700">Rp {{ number_format($assetVal, 0, ',', '.') }}</td>
                         <td class="px-6 py-4 text-center">
@@ -369,9 +369,9 @@
                         <td class="px-6 py-4 font-mono text-xs text-blue-700 font-semibold">{{ $comp->code }}</td>
                         <td class="px-6 py-4 font-medium text-gray-900">{{ $comp->name }}</td>
                         <td class="px-6 py-4 font-bold {{ $status === 'out' ? 'text-red-600' : ($status === 'low' ? 'text-yellow-700' : 'text-gray-800') }}">
-                            {{ number_format($comp->stock, 2, ',', '.') }} {{ $comp->unit }}
+                            {{ number_format($comp->stock, 2, ',', '.') }} {{ $comp->unit?->symbol }}
                         </td>
-                        <td class="px-6 py-4 text-gray-500">{{ number_format($comp->minimum_stock, 2, ',', '.') }} {{ $comp->unit }}</td>
+                        <td class="px-6 py-4 text-gray-500">{{ number_format($comp->minimum_stock, 2, ',', '.') }} {{ $comp->unit?->symbol }}</td>
                         <td class="px-6 py-4">Rp {{ number_format($comp->cost_price, 0, ',', '.') }}</td>
                         <td class="px-6 py-4 font-extrabold text-blue-700">Rp {{ number_format($assetVal, 0, ',', '.') }}</td>
                         <td class="px-6 py-4 text-center">
@@ -418,10 +418,10 @@
                     <tr class="hover:bg-gray-50 transition-colors">
                         <td class="px-6 py-4 font-mono text-xs font-semibold text-primary-600">{{ $p->invoice_number }}</td>
                         <td class="px-6 py-4 text-gray-700">{{ $p->purchase_date->format('d/m/Y') }}</td>
-                        <td class="px-6 py-4 font-medium text-gray-900">{{ $p->supplier_name ?: '-' }}</td>
+                        <td class="px-6 py-4 font-medium text-gray-900">{{ $p->supplier?->name ?: '-' }}</td>
                         <td class="px-6 py-4 text-xs text-gray-600">
                             @foreach($p->items as $item)
-                                <div>- {{ $item->item_type === 'ingredient' ? $item->ingredient?->name : $item->product?->name }} ({{ number_format($item->quantity, 2, ',', '.') }} {{ $item->item_type === 'ingredient' ? $item->ingredient?->unit : 'pcs' }}) @ Rp {{ number_format($item->unit_price, 0, ',', '.') }}</div>
+                                <div>- {{ $item->item_type === 'ingredient' ? $item->ingredient?->name : $item->product?->name }} ({{ number_format($item->quantity, 2, ',', '.') }} {{ $item->item_type === 'ingredient' ? $item->ingredient?->unit?->symbol : 'pcs' }}) @ Rp {{ number_format($item->unit_price, 0, ',', '.') }}</div>
                             @endforeach
                         </td>
                         <td class="px-6 py-4 font-bold text-gray-900">Rp {{ number_format($p->total_amount, 0, ',', '.') }}</td>
@@ -463,7 +463,7 @@
                         <td class="px-6 py-4 text-gray-700">{{ $p->production_date->format('d/m/Y') }}</td>
                         <td class="px-6 py-4 text-xs text-gray-600">
                             @foreach($p->inputs as $in)
-                                <div>- {{ $in->ingredient?->name }}: {{ number_format($in->quantity, 2, ',', '.') }} {{ $in->ingredient?->unit }} (Rp {{ number_format($in->subtotal, 0, ',', '.') }})</div>
+                                <div>- {{ $in->ingredient?->name }}: {{ number_format($in->quantity, 2, ',', '.') }} {{ $in->ingredient?->unit?->symbol }} (Rp {{ number_format($in->subtotal, 0, ',', '.') }})</div>
                             @endforeach
                         </td>
                         <td class="px-6 py-4 text-xs text-gray-900 font-medium">
@@ -519,9 +519,9 @@
                             @endif
                         </td>
                         <td class="px-6 py-4 font-bold {{ $log->type === 'production_use' || $log->type === 'sub' ? 'text-red-600' : 'text-emerald-600' }}">
-                            {{ $log->type === 'production_use' || $log->type === 'sub' ? '-' : '+' }}{{ number_format($log->amount, 2, ',', '.') }} {{ $log->ingredient?->unit }}
+                            {{ $log->type === 'production_use' || $log->type === 'sub' ? '-' : '+' }}{{ number_format($log->amount, 2, ',', '.') }} {{ $log->ingredient?->unit?->symbol }}
                         </td>
-                        <td class="px-6 py-4 font-semibold text-gray-800">{{ number_format($log->final_stock, 2, ',', '.') }} {{ $log->ingredient?->unit }}</td>
+                        <td class="px-6 py-4 font-semibold text-gray-800">{{ number_format($log->final_stock, 2, ',', '.') }} {{ $log->ingredient?->unit?->symbol }}</td>
                         <td class="px-6 py-4 text-xs text-gray-500">{{ $log->note ?: '-' }}</td>
                         <td class="px-6 py-4 text-xs text-gray-500">{{ $log->user?->name ?? 'System' }}</td>
                     </tr>
@@ -572,9 +572,9 @@
                             @endif
                         </td>
                         <td class="px-6 py-4 font-bold {{ $cLog->amount < 0 ? 'text-red-600' : 'text-emerald-600' }}">
-                            {{ $cLog->amount > 0 ? '+' : '' }}{{ number_format($cLog->amount, 2, ',', '.') }} {{ $cLog->component?->unit }}
+                            {{ $cLog->amount > 0 ? '+' : '' }}{{ number_format($cLog->amount, 2, ',', '.') }} {{ $cLog->component?->unit?->symbol }}
                         </td>
-                        <td class="px-6 py-4 font-semibold text-gray-800">{{ number_format($cLog->final_stock, 2, ',', '.') }} {{ $cLog->component?->unit }}</td>
+                        <td class="px-6 py-4 font-semibold text-gray-800">{{ number_format($cLog->final_stock, 2, ',', '.') }} {{ $cLog->component?->unit?->symbol }}</td>
                         <td class="px-6 py-4 text-xs text-gray-500">{{ $cLog->note ?: '-' }}</td>
                         <td class="px-6 py-4 text-xs text-gray-500">{{ $cLog->user?->name ?? 'System' }}</td>
                     </tr>
@@ -617,9 +617,9 @@
                             <td class="px-6 py-4 font-mono text-xs text-gray-500">{{ $ing->code }}</td>
                             <td class="px-6 py-4 font-medium text-gray-900">{{ $ing->name }}</td>
                             <td class="px-6 py-4 font-bold {{ $status === 'out' ? 'text-red-600' : 'text-yellow-700' }}">
-                                {{ number_format($ing->stock, 2, ',', '.') }} {{ $ing->unit }}
+                                {{ number_format($ing->stock, 2, ',', '.') }} {{ $ing->unit?->symbol }}
                             </td>
-                            <td class="px-6 py-4 text-gray-500">{{ number_format($ing->minimum_stock, 2, ',', '.') }} {{ $ing->unit }}</td>
+                            <td class="px-6 py-4 text-gray-500">{{ number_format($ing->minimum_stock, 2, ',', '.') }} {{ $ing->unit?->symbol }}</td>
                             <td class="px-6 py-4 text-center">
                                 @if($status === 'out')
                                     <span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700">Habis</span>
@@ -630,7 +630,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="5" class="px-6 py-8 text-center text-gray-500">Tidak ada bahan baku yang menipis / habis 🎉</td>
+                            <td colspan="5" class="px-6 py-8 text-center text-gray-500">Tidak ada bahan baku yang menipis / habis</td>
                         </tr>
                     @endforelse
                 </tbody>
@@ -658,9 +658,9 @@
                             <td class="px-6 py-4 font-mono text-xs text-blue-700 font-semibold">{{ $comp->code }}</td>
                             <td class="px-6 py-4 font-medium text-gray-900">{{ $comp->name }}</td>
                             <td class="px-6 py-4 font-bold {{ $status === 'out' ? 'text-red-600' : 'text-yellow-700' }}">
-                                {{ number_format($comp->stock, 2, ',', '.') }} {{ $comp->unit }}
+                                {{ number_format($comp->stock, 2, ',', '.') }} {{ $comp->unit?->symbol }}
                             </td>
-                            <td class="px-6 py-4 text-gray-500">{{ number_format($comp->minimum_stock, 2, ',', '.') }} {{ $comp->unit }}</td>
+                            <td class="px-6 py-4 text-gray-500">{{ number_format($comp->minimum_stock, 2, ',', '.') }} {{ $comp->unit?->symbol }}</td>
                             <td class="px-6 py-4 text-center">
                                 @if($status === 'out')
                                     <span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700">Habis</span>
@@ -671,7 +671,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="5" class="px-6 py-8 text-center text-gray-500">Tidak ada komponen yang menipis / habis 🎉</td>
+                            <td colspan="5" class="px-6 py-8 text-center text-gray-500">Tidak ada komponen yang menipis / habis</td>
                         </tr>
                     @endforelse
                 </tbody>

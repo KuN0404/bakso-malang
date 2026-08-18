@@ -22,3 +22,8 @@ Artisan::command('inspire', function () {
     \Illuminate\Support\Facades\Log::info('Self Order cart snapshots lama berhasil dibersihkan.');
 })->dailyAt('03:00');
 
+// Jaring pengaman sinkronisasi DB laporan — sync real-time bisa gagal diam-diam
+// (di-catch, cuma di-log) atau ada jalur yang belum terhubung. Backfill penuh
+// tiap jam menutup celah itu tanpa perlu campur tangan manual.
+\Illuminate\Support\Facades\Schedule::command('report:sync-all')->hourly()->withoutOverlapping();
+

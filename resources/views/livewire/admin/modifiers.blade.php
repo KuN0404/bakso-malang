@@ -248,7 +248,7 @@
                         <select wire:model="modifierComponentId" class="w-full px-4 py-2 border border-gray-200 rounded-lg text-sm bg-white">
                             <option value="">-- Tidak Ada (Hanya Harga) --</option>
                             @foreach($components as $comp)
-                                <option value="{{ $comp->id }}">{{ $comp->name }} (Stok: {{ number_format($comp->stock, 0, ',', '.') }} {{ $comp->unit }})</option>
+                                <option value="{{ $comp->id }}">{{ $comp->name }} (Stok: {{ number_format($comp->stock, 0, ',', '.') }} {{ $comp->unit?->symbol }})</option>
                             @endforeach
                         </select>
                         <p class="text-xs text-gray-500 mt-1">Jika dipilih, setiap pemilihan modifier ini akan mengurangi stok komponen terkait.</p>

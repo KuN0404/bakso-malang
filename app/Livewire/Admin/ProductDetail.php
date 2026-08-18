@@ -16,7 +16,7 @@ class ProductDetail extends Component
 
     public function mount(Product $product)
     {
-        $this->product = $product->load(['category', 'modifierGroups', 'activities.causer']);
+        $this->product = $product->load(['category', 'modifierGroups', 'activities.causer', 'bom.component.unit', 'bom.activeSubstitutions.component.unit']);
     }
 
     public function render()

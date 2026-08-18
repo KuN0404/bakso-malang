@@ -166,6 +166,42 @@ class ReportSyncService
                             ]);
                     }
                 }
+
+                // Sync snapshot komposisi komponen (BOM/substitusi) per detail
+                foreach ($detail->components as $comp) {
+                    if ($comp->component_id) {
+                        $component = \App\Models\Component::withTrashed()->find($comp->component_id);
+                        if ($component) $this->syncComponent($component);
+                    }
+                    if ($comp->replaced_component_id) {
+                        $replaced = \App\Models\Component::withTrashed()->find($comp->replaced_component_id);
+                        if ($replaced) $this->syncComponent($replaced);
+                    }
+
+                    $rdb->table('transaction_detail_components')->upsert(
+                        [[
+                            'id'                     => $comp->id,
+                            'transaction_detail_id'  => $comp->transaction_detail_id,
+                            'component_id'           => $comp->component_id,
+                            'component_name'         => $comp->component_name,
+                            'quantity_per_unit'      => $comp->quantity_per_unit,
+                            'quantity_total'         => $comp->quantity_total,
+                            'source'                 => $comp->source,
+                            'replaced_component_id'  => $comp->replaced_component_id,
+                            'replaced_quantity'      => $comp->replaced_quantity,
+                            'product_bom_id'         => $comp->product_bom_id,
+                            'substitution_rule_id'   => $comp->substitution_rule_id,
+                            'created_at'             => $comp->created_at,
+                            'updated_at'             => $comp->updated_at,
+                        ]],
+                        ['id'],
+                        [
+                            'component_id', 'component_name', 'quantity_per_unit', 'quantity_total',
+                            'source', 'replaced_component_id', 'replaced_quantity',
+                            'product_bom_id', 'substitution_rule_id', 'updated_at',
+                        ]
+                    );
+                }
             }
         } catch (\Throwable $e) {
             // Log error tanpa menghentikan transaksi utama
@@ -633,7 +669,8 @@ class ReportSyncService
                     'id'            => $ingredient->id,
                     'code'          => $ingredient->code,
                     'name'          => $ingredient->name,
-                    'unit'          => $ingredient->unit,
+                    // Report DB tetap menyimpan simbol satuan ter-denormalisasi (bukan unit_id).
+                    'unit'          => $ingredient->unit?->symbol,
                     'stock'         => $ingredient->stock,
                     'minimum_stock' => $ingredient->minimum_stock,
                     'cost_price'    => $ingredient->cost_price,
@@ -659,7 +696,7 @@ class ReportSyncService
                     'id'            => $component->id,
                     'code'          => $component->code,
                     'name'          => $component->name,
-                    'unit'          => $component->unit,
+                    'unit'          => $component->unit?->symbol,
                     'stock'         => $component->stock,
                     'minimum_stock' => $component->minimum_stock,
                     'cost_price'    => $component->cost_price,
@@ -690,7 +727,9 @@ class ReportSyncService
                     'id'             => $purchase->id,
                     'invoice_number' => $purchase->invoice_number,
                     'purchase_date'  => $purchase->purchase_date,
-                    'supplier_name'  => $purchase->supplier_name,
+                    // Report DB tetap menyimpan nama supplier ter-denormalisasi (bukan supplier_id)
+                    // supaya skema tabel purchases di koneksi report tidak perlu diubah.
+                    'supplier_name'  => $purchase->supplier?->name,
                     'total_amount'   => $purchase->total_amount,
                     'note'           => $purchase->note,
                     'status'         => $purchase->status,

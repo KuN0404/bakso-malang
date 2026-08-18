@@ -11,8 +11,10 @@ use App\Models\SelfOrder;
 use App\Models\SelfOrderCartSnapshot;
 use App\Models\SelfOrderItem;
 use App\Models\Setting;
+use App\Services\ComponentDemandResolver;
 use App\Services\MidtransService;
 use App\Services\PhoneBlacklistService;
+use App\Services\ReportSyncService;
 use App\Services\StockReservationService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -40,6 +42,7 @@ class PlaceSelfOrderAction
         private readonly StockReservationService $reservationService,
         private readonly MidtransService $midtransService,
         private readonly PhoneBlacklistService $phoneBlacklistService,
+        private readonly ReportSyncService $reportSyncService,
     ) {}
 
     /**
@@ -47,6 +50,10 @@ class PlaceSelfOrderAction
      */
     public function execute(array $validatedData, string $clientIp): SelfOrder
     {
+        if (!Setting::get('self_order_enabled', true, 'self_order')) {
+            throw new \Exception('Self Order sedang tidak tersedia.');
+        }
+
         // -- Idempotency check --
         $idempotencyKey = $validatedData['idempotency_key'] ?? null;
         if ($idempotencyKey) {
@@ -144,6 +151,9 @@ class PlaceSelfOrderAction
             // -- Anti-spam: blokir otomatis kalau nomor ini submit order terlalu sering --
             $this->phoneBlacklistService->registerSelfOrderAndAutoBlockIfSpam($selfOrder->customer_phone);
 
+            // -- Sync ke laporan (agar order pending/waiting_payment juga tercatat, bukan hanya yang jadi Transaction) --
+            $this->reportSyncService->syncSelfOrder($selfOrder);
+
             return $selfOrder->load(['items.modifiers', 'paymentTransaction']);
         });
     }
@@ -232,6 +242,22 @@ class PlaceSelfOrderAction
             ];
         }
 
+        // Validasi komponen secara AGREGAT untuk seluruh keranjang, sebelum reservasi.
+        // Loop per produk di atas sengaja melewati produk ber-BOM; tanpa pengecekan ini
+        // kekurangan komponen baru ketahuan di dalam reserveComponent() per baris,
+        // sehingga pesannya menyebut komponen pertama yang kebetulan gagal — bukan
+        // gambaran kebutuhan total, dan tidak melihat dua produk berbeda yang
+        // memperebutkan komponen yang sama.
+        $shortfalls = app(ComponentDemandResolver::class)->shortfalls($cartItems);
+
+        if (!empty($shortfalls)) {
+            $err = $shortfalls[0];
+            throw new InsufficientStockException(
+                "Stok komponen '{$err['component']}' tidak cukup. " .
+                "Dibutuhkan: {$err['needed']} {$err['unit']}, Tersedia: {$err['available']} {$err['unit']}."
+            );
+        }
+
         return $cartItems;
     }
 
@@ -281,6 +307,8 @@ class PlaceSelfOrderAction
             'actor_id'     => null,
             'note'         => "QRIS Self Order dibuat. Berlaku {$expiryMinutes} menit.",
         ]);
+
+        $this->reportSyncService->syncPaymentTransaction($paymentTx);
 
         // Update SelfOrder dengan payment_transaction_id dan invoice_number
         $selfOrder->update([

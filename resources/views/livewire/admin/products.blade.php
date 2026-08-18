@@ -50,6 +50,7 @@
                     <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Kategori</th>
                     <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Harga</th>
                     <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Stok</th>
+                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">BOM</th>
                     <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Status</th>
                     <th class="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Aksi</th>
                 </tr>
@@ -75,9 +76,23 @@
                         <td class="px-6 py-4 text-gray-600">{{ $product->category->name }}</td>
                         <td class="px-6 py-4 font-medium text-gray-800">{{ $product->formatted_price }}</td>
                         <td class="px-6 py-4 text-gray-600">
-                            @if($product->track_stock)
+                            @if($product->bom_count > 0)
+                                <span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800" title="Estimasi dari stok komponen BOM">
+                                    {{ $product->getBomAvailableQty() }}
+                                </span>
+                            @elseif($product->track_stock)
                                 <span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
                                     {{ $product->stock }}
+                                </span>
+                            @else
+                                <span class="text-gray-400 font-medium">-</span>
+                            @endif
+                        </td>
+                        <td class="px-6 py-4">
+                            @if($product->bom_count > 0)
+                                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-100 text-purple-700">
+                                    <i data-lucide="layers" class="w-3.5 h-3.5"></i>
+                                    {{ $product->bom_count }} Komponen
                                 </span>
                             @else
                                 <span class="text-gray-400 font-medium">-</span>
@@ -454,24 +469,63 @@
                         </div>
 
                         @foreach($bomItems as $bIndex => $bItem)
-                            <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end p-2 bg-white rounded-lg border border-blue-200/60">
-                                <div class="sm:col-span-7">
-                                    <label class="block text-xs font-medium text-gray-600 mb-1">Komponen Setengah Jadi</label>
-                                    <select wire:model="bomItems.{{ $bIndex }}.component_id" class="w-full text-xs border border-gray-200 rounded-lg p-2 bg-white">
-                                        <option value="">-- Pilih Komponen --</option>
-                                        @foreach($components as $comp)
-                                            <option value="{{ $comp->id }}">{{ $comp->name }} (Stok: {{ number_format($comp->stock, 0, ',', '.') }} {{ $comp->unit }})</option>
-                                        @endforeach
-                                    </select>
+                            <div class="p-2 bg-white rounded-lg border border-blue-200/60 space-y-2">
+                                <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
+                                    <div class="sm:col-span-7">
+                                        <label class="block text-xs font-medium text-gray-600 mb-1">Komponen Setengah Jadi</label>
+                                        <select wire:model="bomItems.{{ $bIndex }}.component_id" class="w-full text-xs border border-gray-200 rounded-lg p-2 bg-white">
+                                            <option value="">-- Pilih Komponen --</option>
+                                            @foreach($components as $comp)
+                                                <option value="{{ $comp->id }}">{{ $comp->name }} (Stok: {{ number_format($comp->stock, 0, ',', '.') }} {{ $comp->unit?->symbol }})</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                    <div class="sm:col-span-4">
+                                        <label class="block text-xs font-medium text-gray-600 mb-1">Qty per 1 Produk</label>
+                                        <input type="number" step="0.01" min="0.01" wire:model="bomItems.{{ $bIndex }}.quantity" class="w-full text-xs border border-gray-200 rounded-lg p-2">
+                                    </div>
+                                    <div class="sm:col-span-1 flex justify-end">
+                                        <button type="button" wire:click="removeBomItem({{ $bIndex }})" class="p-1.5 text-red-500 hover:bg-red-50 rounded-lg">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                        </button>
+                                    </div>
                                 </div>
-                                <div class="sm:col-span-4">
-                                    <label class="block text-xs font-medium text-gray-600 mb-1">Qty per 1 Produk</label>
-                                    <input type="number" step="0.01" min="0.01" wire:model="bomItems.{{ $bIndex }}.quantity" class="w-full text-xs border border-gray-200 rounded-lg p-2">
-                                </div>
-                                <div class="sm:col-span-1 flex justify-end">
-                                    <button type="button" wire:click="removeBomItem({{ $bIndex }})" class="p-1.5 text-red-500 hover:bg-red-50 rounded-lg">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                                    </button>
+
+                                {{-- Aturan pengganti: dipakai POS hanya kalau komponen di atas tidak mencukupi --}}
+                                <div class="pl-3 border-l-2 border-amber-200 ml-1 space-y-2">
+                                    <div class="flex items-center justify-between">
+                                        <p class="text-[11px] font-semibold text-amber-700">
+                                            Pengganti bila stok komponen ini habis
+                                        </p>
+                                        <button type="button" wire:click="addSubstitution({{ $bIndex }})" class="text-[11px] font-semibold text-amber-700 hover:text-amber-800 inline-flex items-center gap-1">
+                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                                            Tambah Pengganti
+                                        </button>
+                                    </div>
+
+                                    @forelse($bItem['substitutions'] ?? [] as $sIndex => $sItem)
+                                        <div class="grid grid-cols-1 sm:grid-cols-12 gap-2 items-end bg-amber-50/60 rounded-md p-2">
+                                            <div class="sm:col-span-7">
+                                                <select wire:model="bomItems.{{ $bIndex }}.substitutions.{{ $sIndex }}.component_id" class="w-full text-xs border border-amber-200 rounded-lg p-1.5 bg-white">
+                                                    <option value="">-- Komponen Pengganti --</option>
+                                                    @foreach($components as $comp)
+                                                        <option value="{{ $comp->id }}">{{ $comp->name }} (Stok: {{ number_format($comp->stock, 0, ',', '.') }} {{ $comp->unit?->symbol }})</option>
+                                                    @endforeach
+                                                </select>
+                                            </div>
+                                            <div class="sm:col-span-4">
+                                                <input type="number" step="0.01" min="0.01" wire:model="bomItems.{{ $bIndex }}.substitutions.{{ $sIndex }}.quantity"
+                                                    class="w-full text-xs border border-amber-200 rounded-lg p-1.5" placeholder="Qty pengganti">
+                                            </div>
+                                            <div class="sm:col-span-1 flex justify-end">
+                                                <button type="button" wire:click="removeSubstitution({{ $bIndex }}, {{ $sIndex }})" class="p-1 text-red-500 hover:bg-red-50 rounded">
+                                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    @empty
+                                        <p class="text-[11px] text-gray-400 italic">Belum ada pengganti — produk dianggap habis kalau komponen ini habis.</p>
+                                    @endforelse
                                 </div>
                             </div>
                         @endforeach
@@ -527,7 +581,7 @@
                     <button type="button" wire:click="$set('showModal', false)" class="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition-colors">Batal</button>
                     <button 
                         type="button" 
-                        @click="$wire.set('selectedModifierGroups', localModifierGroups); $wire.save()"
+                        @click="$wire.save(localModifierGroups)"
                         wire:loading.attr="disabled"
                         wire:target="save"
                         class="flex-1 py-3 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"

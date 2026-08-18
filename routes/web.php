@@ -12,6 +12,8 @@ use App\Livewire\Admin\PaymentSources;
 use App\Livewire\Admin\Products;
 use App\Livewire\Admin\ProductSalesReport;
 use App\Livewire\Admin\Productions;
+use App\Livewire\Admin\PurchaseCreate;
+use App\Livewire\Admin\PurchaseDetail;
 use App\Livewire\Admin\Purchases;
 use App\Livewire\Admin\Roles;
 use App\Livewire\Admin\HppCalculator;
@@ -52,6 +54,7 @@ Route::middleware(['auth', 'throttle:admin'])->prefix('admin')->name('admin.')->
 
     // Master Data
     Route::get('/categories', Categories::class)->name('categories.index')->middleware('can:view_categories');
+    Route::get('/units', App\Livewire\Admin\Units::class)->name('units.index')->middleware('can:view_units');
     Route::get('/products', Products::class)->name('products.index')->middleware('can:view_products');
     Route::get('/products/{product}', App\Livewire\Admin\ProductDetail::class)->name('products.show')->middleware('can:view_products');
     Route::get('/modifiers', Modifiers::class)->name('modifiers.index')->middleware('can:view_modifiers');
@@ -63,6 +66,9 @@ Route::middleware(['auth', 'throttle:admin'])->prefix('admin')->name('admin.')->
     Route::get('/ingredients', Ingredients::class)->name('ingredients.index')->middleware('can:view_ingredients');
     Route::get('/components', Components::class)->name('components.index')->middleware('can:view_components');
     Route::get('/purchases', Purchases::class)->name('purchases.index')->middleware('can:view_purchases');
+    Route::get('/purchases/create', PurchaseCreate::class)->name('purchases.create')->middleware('can:create_purchases');
+    Route::get('/purchases/{purchase}', PurchaseDetail::class)->name('purchases.show')->middleware('can:view_purchases');
+    Route::get('/suppliers', App\Livewire\Admin\Suppliers::class)->name('suppliers.index')->middleware('can:view_suppliers');
     Route::get('/productions', Productions::class)->name('productions.index')->middleware('can:view_productions');
 
     // Transactions & Shifts

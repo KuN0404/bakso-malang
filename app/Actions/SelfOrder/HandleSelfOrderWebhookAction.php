@@ -146,11 +146,19 @@ class HandleSelfOrderWebhookAction
         // dan user ID 0 tidak pernah valid (akan melanggar constraint jika belum ada kasir
         // yang klaim order & tidak ada shift terbuka saat settlement QRIS terjadi).
         $actorUserId = $selfOrder->processed_by ?? $shift?->user_id;
-        $this->reservationService->convertForSelfOrder(
+        $actualDeducted = $this->reservationService->convertForSelfOrder(
             selfOrder:     $selfOrder,
             actorUserId:   $actorUserId,
             transactionId: $transaction->id,
             invoiceNumber: $selfOrder->invoice_number
+        );
+
+        // -- Snapshot komposisi komponen (untuk audit & akurasi retur) --
+        // Penting untuk jalur ini: settlement terlambat memotong stok secara best-effort
+        // (di-clamp di 0), jadi quantity_total harus mencerminkan yang benar-benar keluar.
+        $this->componentStockService->recordSelfOrderSnapshots(
+            $transaction->details()->with('product.bom')->get(),
+            $actualDeducted
         );
 
         // -- Update SelfOrder → paid --
@@ -164,6 +172,7 @@ class HandleSelfOrderWebhookAction
 
         // -- Sync ke laporan --
         $this->reportSyncService->syncTransaction($transaction);
+        $this->reportSyncService->syncSelfOrder($selfOrder);
 
         // -- Kirim struk digital (email/WhatsApp sesuai kanal di Pengaturan) --
         try {
@@ -193,6 +202,7 @@ class HandleSelfOrderWebhookAction
             metadata:    $webhookPayload->raw,
         );
 
+        $this->reportSyncService->syncPaymentTransaction($paymentTx);
         $this->cancelSelfOrder($paymentTx->self_order_id, "Pembayaran QRIS gagal: {$webhookPayload->transactionStatus}");
 
         Log::channel('self_order_payment')->warning(
@@ -210,6 +220,7 @@ class HandleSelfOrderWebhookAction
             note:        'QRIS Self Order expired (notifikasi Midtrans)',
         );
 
+        $this->reportSyncService->syncPaymentTransaction($paymentTx);
         $this->cancelSelfOrder($paymentTx->self_order_id, 'QRIS kadaluarsa');
     }
 
@@ -226,6 +237,8 @@ class HandleSelfOrderWebhookAction
 
         // Release stock reservation
         app(StockReservationService::class)->releaseForSelfOrder($selfOrder);
+
+        $this->reportSyncService->syncSelfOrder($selfOrder);
     }
 
     private function getCartData(string $midtransOrderId, SelfOrder $selfOrder): array

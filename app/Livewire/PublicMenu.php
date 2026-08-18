@@ -35,7 +35,7 @@ class PublicMenu extends Component
 
     public function openProductModal($productId)
     {
-        $this->selectedProduct = Product::with(['category', 'modifierGroups.activeModifiers'])->find($productId);
+        $this->selectedProduct = Product::with(['category', 'modifierGroups.activeModifiers', 'bom.component'])->find($productId);
         $this->showProductModal = true;
     }
 
@@ -52,7 +52,7 @@ class PublicMenu extends Component
         }])->get();
 
         $query = Product::where('is_active', true)
-            ->with(['category', 'modifierGroups.activeModifiers'])
+            ->with(['category', 'modifierGroups.activeModifiers', 'bom.component'])
             ->when($this->selectedCategory, function ($q) {
                 $q->where('category_id', $this->selectedCategory);
             })

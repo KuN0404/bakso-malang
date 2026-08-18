@@ -146,8 +146,16 @@
         {{-- Products Grid --}}
         <div class="px-4 pt-4 grid grid-cols-2 gap-3">
             @forelse($this->products as $product)
+            @php
+                // Produk ber-BOM stoknya dihitung dari komponen; getAvailableStock() sudah
+                // BOM-aware sehingga satu pemanggilan cukup untuk kedua jenis produk.
+                $isTracked = $product->hasBom() || $product->track_stock;
+                $avail     = $isTracked ? $product->getAvailableStock() : null;
+                $isSoldOut = $isTracked && $avail <= 0;
+            @endphp
             <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition group flex flex-col justify-between
-                {{ !$product->is_active ? 'opacity-50 pointer-events-none' : '' }}"
+                {{ !$product->is_active ? 'opacity-50 pointer-events-none' : '' }}
+                {{ $isSoldOut ? 'opacity-60' : '' }}"
                 wire:key="product-{{ $product->id }}">
 
                 <div>
@@ -165,8 +173,11 @@
                         @endif
 
                         {{-- Stock Badge --}}
-                        @if($product->track_stock)
-                        @php $avail = $product->getAvailableStock(); @endphp
+                        {{-- Produk ber-BOM ikut ditampilkan walau track_stock=false: stoknya
+                             turunan dari komponen, bukan products.stock. Sebelumnya gerbang
+                             @if($product->track_stock) membuat produk BOM tidak pernah
+                             menampilkan "Habis" walau komponennya nol. --}}
+                        @if($isTracked)
                         @if($avail <= 0)
                         <div class="absolute inset-0 bg-black/50 flex items-center justify-center">
                             <span class="text-white font-bold text-xs bg-black/70 px-2.5 py-1 rounded-lg">Habis</span>
@@ -188,7 +199,12 @@
 
                 {{-- Add Button --}}
                 <div class="px-3 pb-3">
-                    @if($product->modifierGroups->count() > 0)
+                    @if($isSoldOut)
+                    <button disabled
+                        class="w-full bg-gray-200 text-gray-500 rounded-xl py-2 text-xs font-semibold cursor-not-allowed flex items-center justify-center gap-1">
+                        Stok Habis
+                    </button>
+                    @elseif($product->modifierGroups->count() > 0)
                     <button wire:click="openModifierModal({{ $product->id }})"
                         class="w-full bg-brand text-white rounded-xl py-2 text-xs font-semibold hover:bg-blue-700 active:scale-95 transition flex items-center justify-center gap-1">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

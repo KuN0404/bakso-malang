@@ -3,11 +3,11 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
-use App\Traits\SyncsToReport;
 
 /**
  * Komponen / item setengah jadi hasil repacking.
@@ -17,12 +17,14 @@ use App\Traits\SyncsToReport;
  */
 class Component extends Model
 {
-    use SoftDeletes, SyncsToReport;
+    // Tidak pakai SyncsToReport: raw unit_id tidak cocok dengan kolom 'unit' (string)
+    // di DB report. Sync ditangani eksplisit lewat ReportSyncService::syncComponent().
+    use SoftDeletes;
 
     protected $fillable = [
         'code',
         'name',
-        'unit',
+        'unit_id',
         'stock',
         'minimum_stock',
         'cost_price',
@@ -62,6 +64,11 @@ class Component extends Model
     public function modifiers(): HasMany
     {
         return $this->hasMany(Modifier::class);
+    }
+
+    public function unit(): BelongsTo
+    {
+        return $this->belongsTo(Unit::class);
     }
 
     // -----------------------------------------------------------------
@@ -127,8 +134,8 @@ class Component extends Model
             if ($throw) {
                 throw new \App\Exceptions\InsufficientStockException(
                     "Stok komponen '{$this->name}' tidak cukup "
-                    . "(Dibutuhkan: {$qty} {$this->unit}, "
-                    . "Tersisa: {$this->stock} {$this->unit})"
+                    . "(Dibutuhkan: {$qty} {$this->unit?->symbol}, "
+                    . "Tersisa: {$this->stock} {$this->unit?->symbol})"
                 );
             }
             return false;
@@ -156,6 +163,7 @@ class Component extends Model
     public static function getForRepacking(): \Illuminate\Database\Eloquent\Collection
     {
         return static::where('is_active', true)
+            ->with('unit')
             ->orderBy('name')
             ->get();
     }
@@ -167,7 +175,8 @@ class Component extends Model
         ?string $search = null,
         int $perPage = 15
     ): LengthAwarePaginator {
-        return static::when(
+        return static::with('unit')
+        ->when(
             $search,
             fn($q) => $q->where('name', 'like', "%{$search}%")
                        ->orWhere('code', 'like', "%{$search}%")
@@ -190,6 +199,6 @@ class Component extends Model
 
     public function getFormattedStockAttribute(): string
     {
-        return number_format($this->stock, 2, ',', '.') . ' ' . $this->unit;
+        return number_format($this->stock, 2, ',', '.') . ' ' . $this->unit?->symbol;
     }
 }

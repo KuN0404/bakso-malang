@@ -3,6 +3,7 @@
 namespace App\Livewire\Admin;
 
 use App\Models\PrinterConfig;
+use App\Models\SelfOrder;
 use App\Models\Setting;
 use Illuminate\Support\Facades\Mail;
 use Livewire\Attributes\Layout;
@@ -31,9 +32,13 @@ class Settings extends Component
     public $logo_web;
     public $site_logo;
     public $logo_full;
+    public $logo_light;
+    public $logo_dark;
     public ?string $existing_logo_web = null;
     public ?string $existing_site_logo = null;
     public ?string $existing_logo_full = null;
+    public ?string $existing_logo_light = null;
+    public ?string $existing_logo_dark = null;
     public string $logo_type = 'single';
 
     // Printer Config
@@ -57,6 +62,9 @@ class Settings extends Component
     public string $receipt_channel = 'email_only';
     public string $whatsapp_template = '';
 
+    // Self Order
+    public bool $selfOrderEnabled = true;
+
     public function mount(): void
     {
         // Load general settings (key without group prefix, group as separate param)
@@ -75,6 +83,8 @@ class Settings extends Component
         $this->existing_logo_web = Setting::get('logo_web', null, 'general');
         $this->existing_site_logo = Setting::get('site_logo', null, 'general');
         $this->existing_logo_full = Setting::get('logo_full', null, 'general');
+        $this->existing_logo_light = Setting::get('logo_light', null, 'general');
+        $this->existing_logo_dark = Setting::get('logo_dark', null, 'general');
         $this->logo_type = Setting::get('logo_type', 'single', 'general');
 
         // Load printer config
@@ -95,11 +105,33 @@ class Settings extends Component
 
         $this->receipt_channel = Setting::get('receipt_channel', 'email_only', 'notification');
         $this->whatsapp_template = Setting::get('whatsapp_template', $this->defaultWhatsappTemplate(), 'notification');
+
+        $this->selfOrderEnabled = (bool) Setting::get('self_order_enabled', true, 'self_order');
     }
 
     protected function defaultWhatsappTemplate(): string
     {
         return "Halo {nama}, terima kasih sudah berbelanja di {toko}!\n\nStruk pesanan Anda (#{invoice}):\n{link}";
+    }
+
+    public function toggleSelfOrder(): void
+    {
+        $this->authorize('manage_self_order_settings');
+
+        $newState = !$this->selfOrderEnabled;
+
+        if (!$newState) {
+            $activeCount = SelfOrder::active()->count();
+            if ($activeCount > 0) {
+                $this->dispatch('notify', type: 'error', message: "Tidak bisa menonaktifkan Self Order — masih ada {$activeCount} order aktif (belum selesai/dibayar). Tunggu sampai order tersebut selesai atau dibatalkan.");
+                return;
+            }
+        }
+
+        Setting::set('self_order_enabled', $newState, 'self_order', 'boolean');
+        $this->selfOrderEnabled = $newState;
+
+        $this->dispatch('notify', type: 'success', message: $newState ? 'Self Order berhasil diaktifkan' : 'Self Order berhasil dinonaktifkan');
     }
 
     public function saveNotification(): void
@@ -244,6 +276,28 @@ class Settings extends Component
         }
     }
 
+    public function removeLogoLight(): void
+    {
+        if ($this->existing_logo_light) {
+            $this->deleteOldLogo($this->existing_logo_light);
+            Setting::set('logo_light', '', 'general');
+            $this->existing_logo_light = null;
+
+            $this->dispatch('notify', type: 'success', message: 'Logo latar terang berhasil dihapus');
+        }
+    }
+
+    public function removeLogoDark(): void
+    {
+        if ($this->existing_logo_dark) {
+            $this->deleteOldLogo($this->existing_logo_dark);
+            Setting::set('logo_dark', '', 'general');
+            $this->existing_logo_dark = null;
+
+            $this->dispatch('notify', type: 'success', message: 'Logo latar gelap berhasil dihapus');
+        }
+    }
+
     public function saveGeneral(): void
     {
         $this->validate([
@@ -255,6 +309,8 @@ class Settings extends Component
             'logo_web' => 'nullable|file|mimes:png,jpg,jpeg,svg,webp|max:2048',
             'site_logo' => 'nullable|file|mimes:png,jpg,jpeg,svg,webp,ico|max:1024',
             'logo_full' => 'nullable|file|mimes:png,jpg,jpeg,svg,webp|max:2048',
+            'logo_light' => 'nullable|file|mimes:png,jpg,jpeg,svg,webp|max:2048',
+            'logo_dark' => 'nullable|file|mimes:png,jpg,jpeg,svg,webp|max:2048',
             'logo_type' => 'required|in:single,full',
         ]);
 
@@ -307,6 +363,32 @@ class Settings extends Component
                 Setting::set('logo_full', $newPath, 'general');
                 $this->existing_logo_full = $newPath;
                 $this->reset('logo_full');
+            }
+        }
+
+        // Handle Logo Latar Terang (light) upload
+        if ($this->logo_light) {
+            $newPath = $this->processLogo($this->logo_light, 'logo_light');
+            if ($newPath) {
+                if ($this->existing_logo_light) {
+                    $this->deleteOldLogo($this->existing_logo_light);
+                }
+                Setting::set('logo_light', $newPath, 'general');
+                $this->existing_logo_light = $newPath;
+                $this->reset('logo_light');
+            }
+        }
+
+        // Handle Logo Latar Gelap (dark) upload
+        if ($this->logo_dark) {
+            $newPath = $this->processLogo($this->logo_dark, 'logo_dark');
+            if ($newPath) {
+                if ($this->existing_logo_dark) {
+                    $this->deleteOldLogo($this->existing_logo_dark);
+                }
+                Setting::set('logo_dark', $newPath, 'general');
+                $this->existing_logo_dark = $newPath;
+                $this->reset('logo_dark');
             }
         }
 

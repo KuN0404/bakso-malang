@@ -76,7 +76,7 @@
                     <tr class="hover:bg-gray-50 transition-colors {{ $status === 'out' ? 'bg-red-50/40' : ($status === 'low' ? 'bg-yellow-50/40' : '') }}">
                         <td class="px-6 py-4 font-mono text-xs font-semibold text-blue-700">{{ $comp->code }}</td>
                         <td class="px-6 py-4 font-medium text-gray-800">{{ $comp->name }}</td>
-                        <td class="px-6 py-4 text-gray-500 text-sm">{{ $comp->unit }}</td>
+                        <td class="px-6 py-4 text-gray-500 text-sm">{{ $comp->unit?->symbol }}</td>
                         <td class="px-6 py-4 text-right font-bold {{ $status === 'out' ? 'text-red-600' : ($status === 'low' ? 'text-yellow-700' : 'text-gray-900') }}">
                             {{ number_format($comp->stock, 2, ',', '.') }}
                         </td>
@@ -152,15 +152,17 @@
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-gray-700 mb-1">Satuan <span class="text-red-500">*</span></label>
-                        <select wire:model="unit" class="w-full text-sm border border-gray-200 rounded-lg p-2.5">
-                            <option value="pcs">pcs</option>
-                            <option value="porsi">porsi</option>
-                            <option value="gram">gram</option>
-                            <option value="kg">kg</option>
-                            <option value="liter">liter</option>
-                            <option value="ml">ml</option>
-                            <option value="pack">pack</option>
+                        <select wire:model="unit_id" class="w-full text-sm border border-gray-200 rounded-lg p-2.5">
+                            <option value="">-- Pilih Satuan --</option>
+                            @foreach($unitsGrouped as $groupLabel => $unitsInGroup)
+                                <optgroup label="{{ $groupLabel }}">
+                                    @foreach($unitsInGroup as $u)
+                                        <option value="{{ $u->id }}">{{ $u->name }}</option>
+                                    @endforeach
+                                </optgroup>
+                            @endforeach
                         </select>
+                        @error('unit_id') <span class="text-xs text-red-500">{{ $message }}</span> @enderror
                     </div>
                 </div>
 

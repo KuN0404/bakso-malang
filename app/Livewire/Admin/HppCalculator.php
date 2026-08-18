@@ -24,12 +24,12 @@ class HppCalculator extends Component
     public function mount(): void
     {
         // Sample initial row for convenience
-        $firstIngredient = Ingredient::where('is_active', true)->first();
+        $firstIngredient = Ingredient::where('is_active', true)->with('unit')->first();
         if ($firstIngredient) {
             $this->ingredientsList[] = [
                 'ingredient_id' => $firstIngredient->id,
                 'name'          => $firstIngredient->name,
-                'unit'          => $firstIngredient->unit,
+                'unit'          => $firstIngredient->unit?->symbol,
                 'cost_price'    => (float) $firstIngredient->cost_price,
                 'quantity'      => 5,
             ];
@@ -65,12 +65,12 @@ class HppCalculator extends Component
 
     public function addIngredientRow(): void
     {
-        $firstIngredient = Ingredient::where('is_active', true)->first();
+        $firstIngredient = Ingredient::where('is_active', true)->with('unit')->first();
         if ($firstIngredient) {
             $this->ingredientsList[] = [
                 'ingredient_id' => $firstIngredient->id,
                 'name'          => $firstIngredient->name,
-                'unit'          => $firstIngredient->unit,
+                'unit'          => $firstIngredient->unit?->symbol,
                 'cost_price'    => (float) $firstIngredient->cost_price,
                 'quantity'      => 1,
             ];
@@ -97,11 +97,11 @@ class HppCalculator extends Component
     {
         if (!$ingredientId) return;
 
-        $ingredient = Ingredient::find($ingredientId);
+        $ingredient = Ingredient::with('unit')->find($ingredientId);
         if ($ingredient && isset($this->ingredientsList[$index])) {
             $this->ingredientsList[$index]['ingredient_id'] = $ingredient->id;
             $this->ingredientsList[$index]['name']          = $ingredient->name;
-            $this->ingredientsList[$index]['unit']          = $ingredient->unit;
+            $this->ingredientsList[$index]['unit']          = $ingredient->unit?->symbol;
             $this->ingredientsList[$index]['cost_price']    = (float) $ingredient->cost_price;
         }
     }
@@ -115,7 +115,7 @@ class HppCalculator extends Component
     #[Computed]
     public function availableIngredients()
     {
-        return Ingredient::where('is_active', true)->orderBy('name')->get();
+        return Ingredient::where('is_active', true)->with('unit')->orderBy('name')->get();
     }
 
     #[Computed]

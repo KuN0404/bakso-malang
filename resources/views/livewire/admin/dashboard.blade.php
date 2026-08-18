@@ -65,7 +65,7 @@
         $lowStockTotal = $lowStock['ingredients_low'] + $lowStock['ingredients_out'] + $lowStock['components_low'] + $lowStock['components_out'];
     @endphp
     @if($lowStockTotal > 0)
-        <a href="{{ route('reports.inventory', ['activeTab' => 'low_stock']) }}" class="block bg-red-50 border border-red-200 rounded-xl p-5 mb-8 hover:bg-red-100 transition-colors">
+        <a href="{{ route('admin.reports.inventory', ['activeTab' => 'low_stock']) }}" class="block bg-red-50 border border-red-200 rounded-xl p-5 mb-8 hover:bg-red-100 transition-colors">
             <div class="flex items-center justify-between flex-wrap gap-3">
                 <div class="flex items-center gap-3">
                     <div class="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center shrink-0">

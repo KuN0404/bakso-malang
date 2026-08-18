@@ -139,7 +139,10 @@ class Product extends Model
     {
         return $query->where(function ($q) {
             $q->where('track_stock', false)
-              ->orWhere('stock', '>', 0);
+              ->orWhere('stock', '>', 0)
+              // Produk ber-BOM tidak boleh difilter lewat products.stock — stoknya
+              // turunan dari komponen. Ketersediaan aslinya dicek isAvailable().
+              ->orWhereHas('bom');
         });
     }
 
@@ -189,10 +192,109 @@ class Product extends Model
         return $this->bom()->exists();
     }
 
+    /**
+     * Hitung berapa unit produk ini masih bisa dibuat dari stok komponen BOM
+     * saat ini (min dari floor(stok komponen / qty per unit) di semua baris BOM).
+     * Gunakan relasi 'bom.component' yang sudah di-eager-load jika tersedia
+     * (hindari N+1) — lihat scopeForPosDisplay()/getForPos().
+     */
+    public function getBomAvailableQty(array $subMap = [], ?array $availability = null): int
+    {
+        $resolver = app(\App\Services\ComponentDemandResolver::class);
+
+        if ($availability !== null) {
+            return $resolver->maxProducibleUnitsFromAvailability($this, $availability, $subMap);
+        }
+
+        return $resolver->maxProducibleUnits($this, $subMap);
+    }
+
+    /**
+     * Stok maksimum bila aturan substitusi yang tersedia dipakai — "stok dengan
+     * substitusi", dibedakan dari getBomAvailableQty() yang merupakan "stok normal".
+     *
+     * Pemilihan aturan bersifat greedy dan deterministik: hanya baris BOM yang
+     * TIDAK mencukupi yang disubstitusi, satu aturan per baris (aturan pertama
+     * yang membuat baris itu cukup). Pencarian kombinasi optimal sengaja tidak
+     * dilakukan agar tidak meledak secara komputasi.
+     *
+     * @param  array|null  $availability  Bila diisi dan relasi 'bom'
+     *         (idealnya juga 'bom.activeSubstitutions.component') sudah
+     *         di-eager-load, dipakai langsung tanpa query availabilityMap()
+     *         tambahan — dipakai PosCheckout untuk menghitung seluruh grid
+     *         produk sekaligus lewat satu availabilityMapForProducts().
+     * @return array{qty:int, substitutions:array} substitutions siap dipakai sebagai $subMap
+     */
+    public function getBomAvailabilityWithSubstitutions(?array $availability = null): array
+    {
+        $resolver = app(\App\Services\ComponentDemandResolver::class);
+
+        if ($availability !== null && $this->relationLoaded('bom')) {
+            $subMap = $resolver->resolveSubstitutions($this, $availability);
+
+            return [
+                'qty'           => $resolver->maxProducibleUnitsFromAvailability($this, $availability, $subMap),
+                'substitutions' => $subMap,
+            ];
+        }
+
+        $bomLines = $this->relationLoaded('bom')
+            ? $this->bom
+            : $this->bom()->with(['component', 'activeSubstitutions.component'])->get();
+
+        // Semua id komponen (baris BOM + kandidat pengganti) diambil sekali saja —
+        // satu query, bukan satu query per baris/aturan.
+        $allComponentIds = [];
+        foreach ($bomLines as $line) {
+            $allComponentIds[] = $line->component_id;
+            foreach ($line->activeSubstitutions as $rule) {
+                $allComponentIds[] = $rule->component_id;
+            }
+        }
+
+        $availability = $resolver->availabilityMap($allComponentIds);
+
+        $subMap = [];
+
+        foreach ($bomLines as $line) {
+            if ((float) $line->quantity <= 0) {
+                continue;
+            }
+
+            // Baris ini sudah cukup? jangan disubstitusi.
+            $availableForLine = $availability[$line->component_id] ?? 0.0;
+            if ($availableForLine >= (float) $line->quantity) {
+                continue;
+            }
+
+            foreach ($line->activeSubstitutions as $rule) {
+                $ruleAvailable = $availability[$rule->component_id] ?? 0.0;
+
+                if ($rule->quantity > 0 && $ruleAvailable >= (float) $rule->quantity) {
+                    $subMap[$line->id] = [
+                        'component_id' => (int) $rule->component_id,
+                        'quantity'     => (float) $rule->quantity,
+                        'rule_id'      => (int) $rule->id,
+                    ];
+                    break;
+                }
+            }
+        }
+
+        return [
+            'qty'           => $resolver->maxProducibleUnits($this, $subMap),
+            'substitutions' => $subMap,
+        ];
+    }
+
     public function isAvailable(): bool
     {
         if (!$this->is_active) {
             return false;
+        }
+
+        if ($this->hasBom()) {
+            return $this->getBomAvailableQty() > 0;
         }
 
         if ($this->track_stock && $this->stock <= 0) {
@@ -209,6 +311,14 @@ class Product extends Model
      */
     public function getAvailableStock(): int
     {
+        // Produk ber-BOM: stok adalah turunan dari stok komponen, bukan products.stock.
+        // Cabang ini membuat SEMUA pemanggil ikut benar sekaligus — termasuk
+        // hasAvailableStock(), getAvailableStockMap(), dan endpoint polling
+        // SelfOrderStockController yang sebelumnya menandai produk BOM sebagai habis.
+        if ($this->hasBom()) {
+            return $this->getBomAvailableQty();
+        }
+
         if (!$this->track_stock) {
             return PHP_INT_MAX; // Unlimited
         }
@@ -232,14 +342,18 @@ class Product extends Model
     }
 
     /**
-     * Scope untuk Self Order: produk aktif dengan available stock > 0.
+     * Scope untuk Self Order: seluruh produk aktif, terlepas dari stoknya.
+     *
+     * Dulu scope ini juga memfilter stock=0 (kecuali produk ber-BOM), sehingga
+     * produk yang stoknya benar-benar habis hilang total dari daftar menu —
+     * beda dengan POS yang tetap menampilkannya (abu-abu, badge "Habis").
+     * Sekarang disamakan: filter stok dilepas di sini, dan badge "Habis" di
+     * self-order-page.blade.php yang menangani tampilannya (memakai
+     * isAvailable()/getAvailableStock() yang sudah BOM-aware).
      */
     public function scopeAvailableForSelfOrder($query)
     {
-        return $query->where('is_active', true)->where(function ($q) {
-            $q->where('track_stock', false)
-              ->orWhere('stock', '>', 0);
-        });
+        return $query->where('is_active', true);
     }
 
     public function decrementStock(int $quantity = 1): bool
@@ -266,7 +380,7 @@ class Product extends Model
     public function scopeForPosDisplay($query, ?int $categoryId = null, ?string $search = null)
     {
         $query->where('is_active', true)
-            ->with(['category', 'modifierGroups.activeModifiers', 'bom.component']);
+            ->with(['category', 'modifierGroups.activeModifiers', 'bom.component', 'bom.activeSubstitutions.component']);
 
         if ($categoryId) {
             $query->where('category_id', $categoryId);
@@ -287,7 +401,8 @@ class Product extends Model
      */
     public static function getPaginatedForAdmin(?string $search = null, ?string $filterCategory = null, int $perPage = 10): \Illuminate\Contracts\Pagination\LengthAwarePaginator
     {
-        return static::with('category')
+        return static::with(['category', 'bom.component'])
+            ->withCount('bom')
             ->when($search, fn($q) => $q->where('name', 'like', "%{$search}%")->orWhere('sku', 'like', "%{$search}%"))
             ->when($filterCategory, fn($q) => $q->whereHas('category', fn($c) => $c->where('slug', $filterCategory)))
             ->latest()
@@ -300,7 +415,19 @@ class Product extends Model
      */
     public static function getForCheckout(array $productIds): \Illuminate\Database\Eloquent\Collection
     {
-        return static::whereIn('id', $productIds)->lockForUpdate()->get();
+        return static::whereIn('id', $productIds)
+            ->with('bom.component')   // hindari N+1 exists() dari hasBom() saat validasi
+            ->orderBy('id')           // urutan lock deterministik → cegah deadlock ABBA
+            ->lockForUpdate()
+            ->get();
+    }
+
+    /**
+     * Untuk dropdown pilihan produk jadi (mis. form Pembelian Stok).
+     */
+    public static function getAllActiveSortedByName(): \Illuminate\Database\Eloquent\Collection
+    {
+        return static::active()->orderBy('name')->get();
     }
 
     /**

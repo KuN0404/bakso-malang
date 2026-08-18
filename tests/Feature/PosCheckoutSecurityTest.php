@@ -195,4 +195,48 @@ class PosCheckoutSecurityTest extends TestCase
         $this->assertEquals(33000, $cached['total']);
         $this->assertEquals(15000, $cached['cart'][0]['unit_price']);
     }
+
+    /**
+     * Regresi: produk ber-BOM dengan track_stock=true dan stock=0 (kondisi normal,
+     * karena stok produk BOM memang tidak dipakai — stoknya turunan dari komponen)
+     * sebelumnya SELALU ditolak checkout dengan "Stok ... tidak cukup", walau stok
+     * komponennya penuh. Penyebabnya validasi di InitiateCashPaymentAction tidak
+     * mengecualikan produk ber-BOM.
+     */
+    public function test_cash_payment_succeeds_for_bom_product_with_zero_product_stock(): void
+    {
+        $cashier = $this->makeCashier();
+
+        // Tabel units sudah di-seed oleh migrasinya sendiri (Unit::seedDefaults()).
+        $unit = \App\Models\Unit::firstWhere('symbol', 'pcs');
+
+        $component = \App\Models\Component::create([
+            'code' => 'CMP-001', 'name' => 'Bakso Kecil', 'unit_id' => $unit->id,
+            'stock' => 100, 'minimum_stock' => 0, 'cost_price' => 500, 'is_active' => true,
+        ]);
+
+        // track_stock=true + stock=0 → justru inilah kombinasi yang dulu bikin gagal.
+        $product = Product::create([
+            'category_id' => $this->category->id,
+            'name'        => 'Bakso Urat BOM',
+            'slug'        => 'bakso-urat-bom',
+            'sku'         => 'SKU-BOM-1',
+            'price'       => 15000,
+            'is_active'   => true,
+            'track_stock' => true,
+            'stock'       => 0,
+        ]);
+
+        $product->bom()->create(['component_id' => $component->id, 'quantity' => 3]);
+
+        $payload = $this->tamperedCartPayload($product, 15000, 'cash', paidAmount: 100000);
+
+        $transaction = app(InitiateCashPaymentAction::class)->execute($payload, $cashier->id);
+
+        $this->assertEquals(30000, (float) $transaction->subtotal);
+
+        // Stok komponen berkurang 3 x 2 unit = 6; stok produk tidak disentuh.
+        $this->assertEquals(94.0, (float) $component->fresh()->stock);
+        $this->assertEquals(0, (int) $product->fresh()->stock);
+    }
 }

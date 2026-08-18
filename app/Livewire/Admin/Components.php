@@ -5,6 +5,7 @@ namespace App\Livewire\Admin;
 use App\Exceptions\InsufficientStockException;
 use App\Models\Component as ComponentModel;
 use App\Models\ComponentStockLog;
+use App\Models\Unit;
 use App\Services\ComponentStockService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -24,7 +25,7 @@ class Components extends Component
     // Form fields
     public string $code     = '';
     public string $name     = '';
-    public string $unit     = 'pcs';
+    public ?int   $unit_id  = null;
     public float  $stock    = 0;
     public float  $minimumStock = 0;
     public float  $costPrice = 0;
@@ -54,9 +55,9 @@ class Components extends Component
 
     public function create(): void
     {
-        $this->reset(['editingId', 'name', 'unit', 'stock', 'minimumStock', 'costPrice', 'note', 'isActive']);
+        $this->reset(['editingId', 'name', 'unit_id', 'stock', 'minimumStock', 'costPrice', 'note', 'isActive']);
         $this->isActive = true;
-        $this->unit     = 'pcs';
+        $this->unit_id  = Unit::where('symbol', 'pcs')->value('id');
         $this->code     = $this->generateCode();
         $this->showModal = true;
     }
@@ -67,7 +68,7 @@ class Components extends Component
         $this->editingId    = $component->id;
         $this->code         = $component->code;
         $this->name         = $component->name;
-        $this->unit         = $component->unit;
+        $this->unit_id      = $component->unit_id;
         $this->stock        = $component->stock;
         $this->minimumStock = $component->minimum_stock;
         $this->costPrice    = $component->cost_price;
@@ -83,18 +84,19 @@ class Components extends Component
         $this->validate([
             'code'         => 'required|max:50|unique:components,code' . ($this->editingId ? ",{$this->editingId}" : ''),
             'name'         => 'required|min:2|max:150',
-            'unit'         => 'required|max:30',
+            'unit_id'      => 'required|exists:units,id',
             'minimumStock' => 'numeric|min:0',
             'costPrice'    => 'numeric|min:0',
         ], [
             'code.unique' => 'Kode komponen ini sudah digunakan.',
             'name.required' => 'Nama komponen wajib diisi.',
+            'unit_id.required' => 'Satuan wajib dipilih.',
         ]);
 
         $data = [
             'code'          => $this->code,
             'name'          => $this->name,
-            'unit'          => $this->unit,
+            'unit_id'       => $this->unit_id,
             'minimum_stock' => $this->minimumStock,
             'cost_price'    => $this->costPrice,
             'note'          => $this->note ?: null,
@@ -142,7 +144,8 @@ class Components extends Component
 
     public function render()
     {
-        $components = ComponentModel::when(
+        $components = ComponentModel::with('unit')
+        ->when(
             $this->search,
             fn($q) => $q->where('name', 'like', "%{$this->search}%")->orWhere('code', 'like', "%{$this->search}%")
         )
@@ -153,7 +156,9 @@ class Components extends Component
         $lowStockCount   = ComponentModel::where('stock', '>', 0)->whereColumn('stock', '<=', 'minimum_stock')->count();
         $outOfStockCount = ComponentModel::where('stock', '<=', 0)->count();
 
-        return view('livewire.admin.components', compact('components', 'lowStockCount', 'outOfStockCount'))
+        $unitsGrouped = Unit::getAllGroupedForSelect();
+
+        return view('livewire.admin.components', compact('components', 'lowStockCount', 'outOfStockCount', 'unitsGrouped'))
             ->title('Komponen / Setengah Jadi');
     }
 }

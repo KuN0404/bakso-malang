@@ -11,6 +11,7 @@ class DatabaseSeeder extends Seeder
         $this->call([
             RolesAndPermissionsSeeder::class,
             DefaultSettingsSeeder::class,
+            UnitSeeder::class,
         ]);
 
         // SampleProductsSeeder tidak dijalankan otomatis (bisa penuh data

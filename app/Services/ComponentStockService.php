@@ -6,8 +6,10 @@ use App\Exceptions\InsufficientStockException;
 use App\Models\Component;
 use App\Models\ComponentStockLog;
 use App\Models\Modifier;
+use App\Models\Product;
 use App\Models\ProductBom;
 use App\Models\TransactionDetail;
+use App\Models\TransactionDetailComponent;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -34,20 +36,33 @@ class ComponentStockService
         int $productId,
         int $productQty,
         int $transactionId,
-        int $userId
+        int $userId,
+        array $subMap = [],
+        ?TransactionDetail $detail = null
     ): void {
-        $bomItems = ProductBom::where('product_id', $productId)
-            ->with('component')
-            ->get();
+        $product = Product::with('bom.component')->find($productId);
 
-        foreach ($bomItems as $bom) {
-            $needed    = $bom->quantity * $productQty;
-            // Re-lock komponen untuk mencegah race condition
-            $component = Component::lockForUpdate()->find($bom->component_id);
+        if (!$product) {
+            throw new \RuntimeException("Produk ID [{$productId}] tidak ditemukan saat pengurangan stok BOM.");
+        }
+
+        // Agregasi kebutuhan per komponen DULU, baru dipotong. Kalau dipotong per
+        // baris BOM, satu komponen yang muncul di dua baris (normal + pengganti)
+        // akan dicek dua kali secara terpisah dan bisa lolos walau totalnya kurang.
+        $perUnit = app(ComponentDemandResolver::class)->demandPerUnit($product, $subMap);
+
+        // Urutan lock deterministik (component_id menaik) untuk mencegah deadlock
+        // ABBA saat dua kasir checkout bersamaan dengan komponen yang beririsan.
+        $componentIds = array_keys($perUnit);
+        sort($componentIds);
+
+        foreach ($componentIds as $componentId) {
+            $needed    = $perUnit[$componentId] * $productQty;
+            $component = Component::lockForUpdate()->find($componentId);
 
             if (!$component) {
                 throw new \RuntimeException(
-                    "Komponen ID [{$bom->component_id}] tidak ditemukan dalam BOM produk ID [{$productId}]."
+                    "Komponen ID [{$componentId}] tidak ditemukan dalam BOM produk ID [{$productId}]."
                 );
             }
 
@@ -56,8 +71,8 @@ class ComponentStockService
             if ($newStock < 0) {
                 throw new InsufficientStockException(
                     "Stok komponen '{$component->name}' tidak cukup. "
-                    . "Dibutuhkan: {$needed} {$component->unit}, "
-                    . "Tersisa: {$component->stock} {$component->unit}."
+                    . "Dibutuhkan: {$needed} {$component->unit?->symbol}, "
+                    . "Tersisa: {$component->stock} {$component->unit?->symbol}."
                 );
             }
 
@@ -76,8 +91,150 @@ class ComponentStockService
 
             // Log warning jika stok menipis setelah deduction
             if ($component->fresh()->isLowStock()) {
-                Log::warning("⚠ Stok komponen '{$component->name}' menipis: {$newStock} {$component->unit} (min: {$component->minimum_stock})");
+                Log::warning("⚠ Stok komponen '{$component->name}' menipis: {$newStock} {$component->unit?->symbol} (min: {$component->minimum_stock})");
             }
+        }
+
+        $this->writeComponentSnapshot($detail, $product, $subMap, $productQty, $perUnit);
+    }
+
+    /**
+     * Catat komposisi komponen yang benar-benar dipakai pada baris transaksi ini.
+     *
+     * Tanpa snapshot ini, retur menghitung ulang dari BOM yang hidup — salah untuk
+     * penjualan bersubstitusi (mengembalikan komponen yang tidak pernah dipotong)
+     * dan salah untuk BOM yang diubah admin setelah penjualan.
+     *
+     * @param  array  $perUnit    Kebutuhan teragregasi per komponen, per 1 unit produk.
+     * @param  array|null  $actualTotals  Jika diisi (jalur best-effort), dipakai sebagai
+     *                                    quantity_total menggantikan perUnit × qty.
+     */
+    public function writeComponentSnapshot(
+        ?TransactionDetail $detail,
+        Product $product,
+        array $subMap,
+        int $productQty,
+        array $perUnit,
+        ?array $actualTotals = null
+    ): void {
+        if (!$detail) {
+            return; // pemanggil lama (4 argumen) tidak menyediakan detail — lewati
+        }
+
+        // Peta komponen pengganti → baris BOM asal yang digantikan, untuk audit.
+        $replacedBy = [];
+        foreach ($product->bom as $line) {
+            if (isset($subMap[$line->id])) {
+                $subComponentId = (int) ($subMap[$line->id]['component_id'] ?? 0);
+                if ($subComponentId > 0) {
+                    $replacedBy[$subComponentId] = [
+                        'product_bom_id'        => $line->id,
+                        'replaced_component_id' => (int) $line->component_id,
+                        'replaced_quantity'     => (float) $line->quantity,
+                        'substitution_rule_id'  => $subMap[$line->id]['rule_id'] ?? null,
+                    ];
+                }
+            }
+        }
+
+        $originalLineByComponent = $product->bom->keyBy('component_id');
+
+        foreach ($perUnit as $componentId => $qtyPerUnit) {
+            $component = Component::find($componentId);
+            $meta      = $replacedBy[$componentId] ?? null;
+
+            $detail->components()->create([
+                'component_id'          => $componentId,
+                'component_name'        => $component?->name ?? "Komponen #{$componentId}",
+                'quantity_per_unit'     => round($qtyPerUnit, 3),
+                // quantity_total = yang BENAR-BENAR dipotong. Pada jalur best-effort
+                // bisa lebih kecil dari niatnya (oversold) — retur wajib memakai ini.
+                'quantity_total'        => round($actualTotals[$componentId] ?? ($qtyPerUnit * $productQty), 3),
+                'source'                => $meta ? 'substitute' : 'bom',
+                'replaced_component_id' => $meta['replaced_component_id'] ?? null,
+                'replaced_quantity'     => isset($meta) ? $meta['replaced_quantity'] * $productQty : null,
+                'product_bom_id'        => $meta['product_bom_id'] ?? $originalLineByComponent->get($componentId)?->id,
+                'substitution_rule_id'  => $meta['substitution_rule_id'] ?? null,
+            ]);
+        }
+    }
+
+    /**
+     * Tulis snapshot komposisi komponen untuk transaksi hasil Self Order.
+     *
+     * Self Order memotong stok lewat StockReservationService (reservasi → konversi),
+     * bukan lewat deductForBom(), sehingga snapshot tidak bisa ditulis dari sana:
+     * baris stock_reservations sama sekali tidak menyimpan product_id/cart line, jadi
+     * di titik konversi tidak diketahui komponen itu milik TransactionDetail yang mana.
+     * Karena itu snapshot ditulis di sini — dari sisi yang memegang $detail beserta
+     * produk dan qty-nya.
+     *
+     * $actualDeducted adalah hasil convertForSelfOrder(): [component_id => total yang
+     * benar-benar terpotong]. Pada jalur normal jumlahnya sama dengan yang diniatkan,
+     * pada settlement terlambat yang oversold bisa lebih kecil — maka porsi tiap detail
+     * diskalakan proporsional supaya retur tidak pernah mengembalikan lebih banyak
+     * daripada yang pernah keluar.
+     *
+     * @param  \Illuminate\Support\Collection|array  $details  TransactionDetail yang baru dibuat
+     * @param  array  $actualDeducted  [component_id => total benar-benar terpotong]
+     */
+    public function recordSelfOrderSnapshots(iterable $details, array $actualDeducted): void
+    {
+        $resolver = app(ComponentDemandResolver::class);
+
+        // Tahap 1 — kumpulkan niat (intended) per detail dan totalnya per komponen.
+        $planned       = [];
+        $intendedTotal = [];
+
+        foreach ($details as $detail) {
+            $product = $detail->product;
+
+            if (!$product || !$product->hasBom()) {
+                continue;
+            }
+
+            // Self Order tidak mendukung substitusi → subMap selalu kosong.
+            $perUnit = $resolver->demandPerUnit($product);
+
+            if (empty($perUnit)) {
+                continue;
+            }
+
+            $planned[] = ['detail' => $detail, 'product' => $product, 'perUnit' => $perUnit];
+
+            foreach ($perUnit as $componentId => $qtyPerUnit) {
+                $intendedTotal[$componentId] = ($intendedTotal[$componentId] ?? 0)
+                    + ($qtyPerUnit * (int) $detail->quantity);
+            }
+        }
+
+        // Tahap 2 — rasio realisasi per komponen. min(1, ...) menjaga agar komponen yang
+        // juga dipakai modifier (deduksinya ikut masuk $actualDeducted) tidak membuat
+        // rasio melebihi 1.
+        $ratio = [];
+        foreach ($intendedTotal as $componentId => $intended) {
+            $ratio[$componentId] = $intended > 0
+                ? min(1.0, (float) ($actualDeducted[$componentId] ?? 0) / $intended)
+                : 1.0;
+        }
+
+        // Tahap 3 — tulis snapshot per detail dengan porsi yang sudah diskalakan.
+        foreach ($planned as $row) {
+            $qty          = (int) $row['detail']->quantity;
+            $actualTotals = [];
+
+            foreach ($row['perUnit'] as $componentId => $qtyPerUnit) {
+                $actualTotals[$componentId] = $qtyPerUnit * $qty * ($ratio[$componentId] ?? 1.0);
+            }
+
+            $this->writeComponentSnapshot(
+                $row['detail'],
+                $row['product'],
+                [],            // tanpa substitusi
+                $qty,
+                $row['perUnit'],
+                $actualTotals
+            );
         }
     }
 
@@ -113,8 +270,8 @@ class ComponentStockService
         if ($newStock < 0) {
             throw new InsufficientStockException(
                 "Stok komponen '{$component->name}' tidak cukup untuk modifier '{$modifier->name}'. "
-                . "Dibutuhkan: {$totalQty} {$component->unit}, "
-                . "Tersisa: {$component->stock} {$component->unit}."
+                . "Dibutuhkan: {$totalQty} {$component->unit?->symbol}, "
+                . "Tersisa: {$component->stock} {$component->unit?->symbol}."
             );
         }
 
@@ -132,7 +289,7 @@ class ComponentStockService
         );
 
         if ($component->fresh()->isLowStock()) {
-            Log::warning("⚠ Stok komponen '{$component->name}' menipis: {$newStock} {$component->unit} (min: {$component->minimum_stock})");
+            Log::warning("⚠ Stok komponen '{$component->name}' menipis: {$newStock} {$component->unit?->symbol} (min: {$component->minimum_stock})");
         }
     }
 
@@ -154,13 +311,54 @@ class ComponentStockService
         ?int $userId,
         int $returnId
     ): void {
-        $detail = TransactionDetail::with(['product.bom', 'modifiers'])->find($transactionDetailId);
+        $detail = TransactionDetail::with(['product.bom', 'modifiers', 'components'])->find($transactionDetailId);
 
         if (!$detail || $returnedQty <= 0) {
             return;
         }
 
-        if ($detail->product && $detail->product->hasBom()) {
+        if ($detail->components->isNotEmpty()) {
+            // Jalur utama: kembalikan persis komposisi yang dulu dipotong.
+            // Memakai quantity_total (yang benar-benar terpotong), BUKAN
+            // quantity_per_unit — pada penjualan oversold lewat settlement QRIS
+            // keduanya berbeda, dan mengembalikan lebih dari yang pernah dipotong
+            // akan menciptakan stok hantu.
+            $soldQty = max(1, (int) $detail->quantity);
+            $ratio   = min(1.0, $returnedQty / $soldQty);
+
+            foreach ($detail->components as $snapshot) {
+                $component = Component::lockForUpdate()->find($snapshot->component_id);
+
+                if (!$component) {
+                    Log::warning("Retur: Komponen ID [{$snapshot->component_id}] pada snapshot Transaksi Detail #{$transactionDetailId} tidak ditemukan.");
+                    continue;
+                }
+
+                $restored = round((float) $snapshot->quantity_total * $ratio, 3);
+
+                if ($restored <= 0) {
+                    continue;
+                }
+
+                $newStock = $component->stock + $restored;
+                $component->update(['stock' => $newStock]);
+
+                ComponentStockLog::record(
+                    componentId:   $component->id,
+                    userId:        $userId,
+                    type:          'return_add',
+                    amount:        $restored,
+                    finalStock:    $newStock,
+                    note:          "Retur: Transaksi Detail #{$transactionDetailId} (Retur #{$returnId})"
+                                   . ($snapshot->isSubstitute() ? ' — komponen pengganti' : ''),
+                    referenceId:   $returnId,
+                    referenceType: 'return',
+                );
+            }
+        } elseif ($detail->product && $detail->product->hasBom()) {
+            // FALLBACK untuk transaksi lama (dibuat sebelum tabel snapshot ada).
+            // Perilakunya sengaja dipertahankan persis seperti sebelumnya. Jangan
+            // di-backfill dari BOM yang hidup — BOM bisa sudah berubah sejak dijual.
             foreach ($detail->product->bom as $bom) {
                 $component = Component::lockForUpdate()->find($bom->component_id);
 
@@ -234,26 +432,44 @@ class ComponentStockService
         int $productId,
         int $productQty,
         int $transactionId,
-        int $userId
+        int $userId,
+        array $subMap = [],
+        ?TransactionDetail $detail = null
     ): void {
-        $bomItems = ProductBom::where('product_id', $productId)->with('component')->get();
+        $product = Product::with('bom.component')->find($productId);
 
-        foreach ($bomItems as $bom) {
-            $needed    = $bom->quantity * $productQty;
-            $component = Component::lockForUpdate()->find($bom->component_id);
+        if (!$product) {
+            Log::error("BOM best-effort: Produk ID [{$productId}] tidak ditemukan, Transaksi #{$transactionId}.");
+            return;
+        }
+
+        $perUnit = app(ComponentDemandResolver::class)->demandPerUnit($product, $subMap);
+
+        $componentIds = array_keys($perUnit);
+        sort($componentIds); // urutan lock deterministik, cegah deadlock
+
+        $actualTotals = [];
+
+        foreach ($componentIds as $componentId) {
+            $needed    = $perUnit[$componentId] * $productQty;
+            $component = Component::lockForUpdate()->find($componentId);
 
             if (!$component) {
-                Log::error("BOM best-effort: Komponen ID [{$bom->component_id}] tidak ditemukan untuk produk ID [{$productId}], Transaksi #{$transactionId}.");
+                Log::error("BOM best-effort: Komponen ID [{$componentId}] tidak ditemukan untuk produk ID [{$productId}], Transaksi #{$transactionId}.");
                 continue;
             }
 
             $current = (float) $component->stock;
             $deduct  = min($needed, max(0, $current));
 
+            // Simpan yang BENAR-BENAR terpotong — dipakai sebagai quantity_total di
+            // snapshot supaya retur tidak mengembalikan lebih dari yang pernah keluar.
+            $actualTotals[$componentId] = $deduct;
+
             if ($deduct < $needed) {
                 Log::critical(
-                    "OVERSOLD (settlement QRIS): Komponen '{$component->name}' butuh {$needed} {$component->unit} untuk BOM Transaksi #{$transactionId}, " .
-                    "tersisa hanya {$current} {$component->unit}. Barang tetap harus dibuatkan, cek ketersediaan fisik secara manual."
+                    "OVERSOLD (settlement QRIS): Komponen '{$component->name}' butuh {$needed} {$component->unit?->symbol} untuk BOM Transaksi #{$transactionId}, " .
+                    "tersisa hanya {$current} {$component->unit?->symbol}. Barang tetap harus dibuatkan, cek ketersediaan fisik secara manual."
                 );
             }
 
@@ -272,9 +488,11 @@ class ComponentStockService
             );
 
             if ($component->fresh()->isLowStock()) {
-                Log::warning("⚠ Stok komponen '{$component->name}' menipis: {$newStock} {$component->unit} (min: {$component->minimum_stock})");
+                Log::warning("⚠ Stok komponen '{$component->name}' menipis: {$newStock} {$component->unit?->symbol} (min: {$component->minimum_stock})");
             }
         }
+
+        $this->writeComponentSnapshot($detail, $product, $subMap, $productQty, $perUnit, $actualTotals);
     }
 
     /**
@@ -304,8 +522,8 @@ class ComponentStockService
 
         if ($deduct < $totalQty) {
             Log::critical(
-                "OVERSOLD (settlement QRIS): Komponen '{$component->name}' butuh {$totalQty} {$component->unit} untuk modifier '{$modifier->name}' Transaksi #{$transactionId}, " .
-                "tersisa hanya {$current} {$component->unit}. Barang tetap harus dibuatkan, cek ketersediaan fisik secara manual."
+                "OVERSOLD (settlement QRIS): Komponen '{$component->name}' butuh {$totalQty} {$component->unit?->symbol} untuk modifier '{$modifier->name}' Transaksi #{$transactionId}, " .
+                "tersisa hanya {$current} {$component->unit?->symbol}. Barang tetap harus dibuatkan, cek ketersediaan fisik secara manual."
             );
         }
 
@@ -324,7 +542,7 @@ class ComponentStockService
         );
 
         if ($component->fresh()->isLowStock()) {
-            Log::warning("⚠ Stok komponen '{$component->name}' menipis: {$newStock} {$component->unit} (min: {$component->minimum_stock})");
+            Log::warning("⚠ Stok komponen '{$component->name}' menipis: {$newStock} {$component->unit?->symbol} (min: {$component->minimum_stock})");
         }
     }
 
@@ -339,26 +557,27 @@ class ComponentStockService
      * Digunakan untuk soft-check di POS saat addToCart.
      * Tidak menggunakan lockForUpdate — bukan operasi tulis.
      */
-    public function checkBomAvailability(int $productId, int $qty): array
+    public function checkBomAvailability(int $productId, int $qty, array $subMap = []): array
     {
-        $errors   = [];
-        $bomItems = ProductBom::where('product_id', $productId)
-            ->with('component:id,name,stock,unit,minimum_stock')
-            ->get();
+        // Didelegasikan ke ComponentDemandResolver supaya perhitungannya identik
+        // dengan yang dipakai tampilan POS dan validasi checkout. Bentuk return
+        // dipertahankan ('component','needed','stock','unit') agar pemanggil lama
+        // tidak perlu diubah.
+        $shortfalls = app(ComponentDemandResolver::class)->shortfalls([
+            [
+                'product_id'    => $productId,
+                'quantity'      => $qty,
+                'modifiers'     => [],
+                'substitutions' => $subMap,
+            ],
+        ]);
 
-        foreach ($bomItems as $bom) {
-            $needed = $bom->quantity * $qty;
-            if ($bom->component->stock < $needed) {
-                $errors[] = [
-                    'component' => $bom->component->name,
-                    'needed'    => $needed,
-                    'stock'     => $bom->component->stock,
-                    'unit'      => $bom->component->unit,
-                ];
-            }
-        }
-
-        return $errors;
+        return array_map(fn (array $s) => [
+            'component' => $s['component'],
+            'needed'    => $s['needed'],
+            'stock'     => $s['available'],
+            'unit'      => $s['unit'],
+        ], $shortfalls);
     }
 
     /**
@@ -368,7 +587,7 @@ class ComponentStockService
     public function checkModifierAvailability(int $modifierId, float $qty): array
     {
         $errors   = [];
-        $modifier = Modifier::with('component:id,name,stock,unit')->find($modifierId);
+        $modifier = Modifier::with(['component' => fn ($q) => $q->select('id', 'name', 'stock', 'unit_id')->with('unit')])->find($modifierId);
 
         if (!$modifier || !$modifier->component_id || !$modifier->component) {
             return $errors;
@@ -379,7 +598,7 @@ class ComponentStockService
                 'component' => $modifier->component->name,
                 'needed'    => $qty,
                 'stock'     => $modifier->component->stock,
-                'unit'      => $modifier->component->unit,
+                'unit'      => $modifier->component->unit?->symbol,
             ];
         }
 
@@ -457,7 +676,7 @@ class ComponentStockService
 
         if ($newStock < 0) {
             throw new InsufficientStockException(
-                "Pengurangan stok melebihi stok yang ada. Stok saat ini: {$oldStock} {$component->unit}."
+                "Pengurangan stok melebihi stok yang ada. Stok saat ini: {$oldStock} {$component->unit?->symbol}."
             );
         }
 

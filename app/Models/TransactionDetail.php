@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class TransactionDetail extends Model
 {
@@ -52,6 +53,16 @@ class TransactionDetail extends Model
             ->withPivot(['modifier_name', 'price_adjustment', 'quantity'])
             ->orderBy('modifiers.modifier_group_id')
             ->orderBy('modifiers.sort_order');
+    }
+
+    /**
+     * Snapshot komponen BOM/substitusi yang benar-benar dipotong untuk baris ini.
+     * Kosong untuk transaksi lama (sebelum fitur substitusi) — pemanggil wajib
+     * menyediakan fallback ke BOM produk. Lihat ComponentStockService::restoreForReturn().
+     */
+    public function components(): HasMany
+    {
+        return $this->hasMany(TransactionDetailComponent::class);
     }
 
     // -----------------------------------------------------------------

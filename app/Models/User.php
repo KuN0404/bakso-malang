@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -52,6 +53,11 @@ class User extends Authenticatable
     public function transactions(): HasMany
     {
         return $this->hasMany(Transaction::class);
+    }
+
+    public function profile(): HasOne
+    {
+        return $this->hasOne(UserProfile::class);
     }
 
     public function currentShift(): ?Shift
@@ -148,7 +154,7 @@ class User extends Authenticatable
             ->when($status === 'all', fn($q) => $q->withTrashed())
             // status === 'active' tidak perlu apa-apa: default query Eloquent sudah
             // mengecualikan baris yang di-soft-delete.
-            ->with('roles')
+            ->with(['roles', 'profile'])
             ->when($search, fn($q) => $q->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")->orWhere('username', 'like', "%{$search}%");
             }))
@@ -161,7 +167,7 @@ class User extends Authenticatable
      */
     public static function getForEdit(int $id): self
     {
-        return static::withTrashed()->with('roles')->findOrFail($id);
+        return static::withTrashed()->with(['roles', 'profile'])->findOrFail($id);
     }
 
     /**

@@ -12,6 +12,7 @@ use App\Models\PaymentTransaction;
 use App\Models\SelfOrder;
 use App\Models\Shift;
 use App\Models\Transaction;
+use App\Services\ComponentStockService;
 use App\Services\ReportSyncService;
 use App\Services\StockReservationService;
 use Illuminate\Support\Facades\DB;
@@ -37,6 +38,7 @@ class AcceptSelfOrderPaymentAction
         private readonly StockReservationService $reservationService,
         private readonly ReportSyncService $reportSyncService,
         private readonly SendReceiptNotificationAction $sendReceiptNotification,
+        private readonly ComponentStockService $componentStockService,
     ) {}
 
     /**
@@ -98,6 +100,8 @@ class AcceptSelfOrderPaymentAction
                 'note'         => "Konfirmasi bayar di kasir. Nominal: Rp " . number_format($paidAmount, 0, ',', '.'),
             ]);
 
+            $this->reportSyncService->syncPaymentTransaction($paymentTx);
+
             // -- Buat Transaction POS --
             $transaction = Transaction::create([
                 'user_id'                => $cashierId,
@@ -127,6 +131,8 @@ class AcceptSelfOrderPaymentAction
             $paymentTx->update(['transaction_id' => $transaction->id]);
 
             // -- Buat TransactionDetails --
+            $createdDetails = [];
+
             foreach ($selfOrder->items as $item) {
                 $detail = $transaction->details()->create([
                     'product_id'     => $item->product_id,
@@ -144,15 +150,20 @@ class AcceptSelfOrderPaymentAction
                         'quantity'         => $mod->quantity,
                     ]);
                 }
+
+                $createdDetails[] = $detail;
             }
 
             // -- Konversi reservation → actual stock reduction --
-            $this->reservationService->convertForSelfOrder(
+            $actualDeducted = $this->reservationService->convertForSelfOrder(
                 selfOrder:     $selfOrder,
                 actorUserId:   $cashierId,
                 transactionId: $transaction->id,
                 invoiceNumber: $invoiceNumber
             );
+
+            // -- Snapshot komposisi komponen (untuk audit & akurasi retur) --
+            $this->componentStockService->recordSelfOrderSnapshots($createdDetails, $actualDeducted);
 
             // -- Update SelfOrder --
             $selfOrder->update([
@@ -168,6 +179,7 @@ class AcceptSelfOrderPaymentAction
 
             // -- Sync laporan --
             $this->reportSyncService->syncTransaction($transaction);
+            $this->reportSyncService->syncSelfOrder($selfOrder);
 
             // -- Kirim struk digital (email/WhatsApp sesuai kanal di Pengaturan) --
             try {

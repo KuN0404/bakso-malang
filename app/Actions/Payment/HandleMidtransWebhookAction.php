@@ -254,11 +254,15 @@ class HandleMidtransWebhookAction
             $product = $products->get($item['product_id']);
 
             if ($product && $product->hasBom()) {
+                // Substitusi ikut dibawa dari snapshot cart QRIS. Entri cache lama
+                // (dibuat sebelum fitur ini) tidak punya key tersebut → komposisi normal.
                 $this->componentStockService->deductForBomBestEffort(
                     $item['product_id'],
                     $item['quantity'],
                     $transaction->id,
-                    $cashierId
+                    $cashierId,
+                    $item['substitutions'] ?? [],
+                    $detail
                 );
             } elseif ($product && $product->track_stock) {
                 // Best-effort juga di sini — sebelumnya decrement() polos tanpa pengecekan sama
@@ -289,7 +293,7 @@ class HandleMidtransWebhookAction
             }
         }
 
-        $transaction->load(['details.modifiers', 'user', 'paymentSource', 'serviceArea']);
+        $transaction->load(['details.modifiers', 'details.components', 'user', 'paymentSource', 'serviceArea']);
 
         // Hapus cache cart setelah berhasil
         \Illuminate\Support\Facades\Cache::forget("qris_cart_{$paymentTx->midtrans_order_id}");
